@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Arriendos</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF1EF;
+    --card:#FFFFFF;
+    --ink:#16261F;
+    --ink-soft:#4B5951;
+    --border:#D7DBD6;
+    --teal:#2B6F5C;
+    --teal-dark:#1E5445;
+    --brick:#B4432E;
+    --brick-soft:#F4E3DF;
+    --teal-soft:#E1EEE9;
+    --gold:#B98B2A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .app{display:flex;min-height:100vh;}
+  .sidebar{width:230px;background:var(--ink);color:var(--paper);flex-shrink:0;padding:28px 0;display:flex;flex-direction:column;}
+  .brand{font-family:'Fraunces',serif;font-size:20px;font-weight:600;padding:0 24px 24px;border-bottom:1px solid rgba(238,241,239,0.15);margin-bottom:12px;}
+  .brand span{display:block;font-family:'Inter',sans-serif;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9FB0A6;margin-top:4px;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:14px 24px;cursor:pointer;font-size:14px;color:#C9D3CD;border-left:3px solid transparent;transition:all .15s;}
+  .nav-item .num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6F8478;}
+  .nav-item:hover{background:rgba(255,255,255,0.04);color:#fff;}
+  .nav-item.active{background:rgba(43,111,92,0.35);color:#fff;border-left-color:var(--teal);}
+  .nav-item.active .num{color:#8FD6BC;}
+  .sidebar-foot{margin-top:auto;padding:16px 24px;font-size:11px;color:#6F8478;line-height:1.5;}
+  .main{flex:1;padding:36px 44px;max-width:1180px;}
+  h1{font-family:'Fraunces',serif;font-size:28px;margin:0 0 4px;}
+  .subtitle{color:var(--ink-soft);font-size:14px;margin-bottom:28px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;}
+  .card h2{font-family:'Fraunces',serif;font-size:18px;margin:0 0 18px;font-weight:600;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field.full{grid-column:1 / -1;}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;}
+  input,select,textarea{font-family:'Inter',sans-serif;font-size:14px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:#fdfdfc;color:var(--ink);}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal);}
+  textarea{resize:vertical;min-height:60px;}
+  .btn{font-family:'Inter',sans-serif;font-weight:600;font-size:13px;padding:10px 18px;border-radius:6px;border:none;cursor:pointer;transition:opacity .15s;}
+  .btn:hover{opacity:0.88;}
+  .btn-primary{background:var(--teal);color:#fff;}
+  .btn-secondary{background:var(--paper);color:var(--ink);border:1px solid var(--border);}
+  .btn-danger{background:var(--brick-soft);color:var(--brick);}
+  .btn-row{display:flex;gap:10px;margin-top:18px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);}
+  td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:hover td{background:#FAFBFA;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
+  .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
+  .tag-debt{background:var(--brick-soft);color:var(--brick);}
+  .row-actions{display:flex;gap:8px;}
+  .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
+  .row-actions button:hover{color:var(--teal-dark);}
+  .empty{color:var(--ink-soft);font-size:13.5px;padding:20px 0;text-align:center;}
+  .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
+  .stat .label{font-size:11.5px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);margin-bottom:6px;}
+  .stat .value{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;}
+  .stat.warn .value{color:var(--brick);}
+  .stat.good .value{color:var(--teal-dark);}
+  .tab-section{display:none;}
+  .tab-section.active{display:block;}
+  select.filter{max-width:280px;margin-bottom:16px;}
+  .toggle-form{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .status-msg{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .badge{background:var(--brick);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:1px 7px;border-radius:20px;margin-left:auto;}
+  .alert-card{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:8px;margin-bottom:10px;border-left:4px solid;}
+  .alert-card.u1{background:var(--brick-soft);border-color:var(--brick);}
+  .alert-card.u2{background:#FBF1DC;border-color:var(--gold);}
+  .alert-card.u3{background:var(--teal-soft);border-color:var(--teal);}
+  .alert-card .title{font-weight:600;font-size:14px;}
+  .alert-card .sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .alert-card .when{font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;white-space:nowrap;margin-left:16px;}
+  .storage-banner{background:var(--brick-soft);color:var(--brick);border:1px solid var(--brick);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;}
+  .drive-bar{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;}
+  .drive-bar .dot{width:9px;height:9px;border-radius:50%;background:#B7BFB9;flex-shrink:0;}
+  .drive-bar .dot.on{background:var(--teal);}
+  .drive-bar .drive-status{color:var(--ink-soft);flex:1;}
+  .drive-bar button{margin-left:auto;}
+  .drive-gate-overlay{position:fixed;inset:0;background:rgba(22,38,31,0.82);backdrop-filter:blur(2px);z-index:9999;align-items:center;justify-content:center;padding:20px;}
+  .drive-gate-card{background:var(--card);border-radius:14px;max-width:420px;width:100%;padding:36px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.35);}
+  .drive-gate-icon{font-size:32px;margin-bottom:10px;}
+  .drive-gate-card h2{font-family:'Fraunces',serif;font-size:22px;margin:0 0 12px;}
+  .drive-gate-card p{font-size:13.5px;color:var(--ink-soft);line-height:1.55;margin:0 0 20px;}
+  .drive-gate-card .btn{width:100%;padding:12px;font-size:14px;}
+  .drive-gate-checking{font-size:13.5px;color:var(--ink-soft);padding:14px 0;}
+  .drive-gate-fine{font-size:11.5px !important;margin-top:14px !important;color:#8A968F !important;}
+  .drive-gate-fine code{background:var(--paper);padding:1px 5px;border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="drive-gate-overlay" class="drive-gate-overlay" style="display:flex">
+  <div class="drive-gate-card">
+    <div class="drive-gate-icon">☁️</div>
+    <h2>Conecta tu Google Drive</h2>
+    <p>Para usar esta app necesitas conectar tu cuenta de Google. Tus propiedades, contratos y pagos se guardan únicamente en un archivo dentro de <strong>tu</strong> Drive — esta app no tiene acceso a nada más de tu cuenta.</p>
+    <div id="drive-gate-checking" style="display:none" class="drive-gate-checking">Verificando tu sesión de Google…</div>
+    <div id="drive-gate-action">
+      <button class="btn btn-primary" id="drive-gate-connect-btn">Conectar con Google Drive</button>
+      <p id="drive-gate-msg" class="drive-gate-fine">Se te pedirá autorizar acceso solo a los archivos que esta app crea (permiso <code>drive.file</code>). Puedes revocarlo cuando quieras desde tu cuenta de Google.</p>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">Cartera<span>Gestión de Arriendos</span></div>
+    <div class="nav-item active" data-tab="propiedades"><span class="num">01</span> Propiedades</div>
+    <div class="nav-item" data-tab="arrendatarios"><span class="num">02</span> Arrendatarios &amp; Contratos</div>
+    <div class="nav-item" data-tab="pagos"><span class="num">03</span> Pagos</div>
+    <div class="nav-item" data-tab="resumen"><span class="num">04</span> Resumen &amp; Deudas</div>
+    <div class="nav-item" data-tab="alertas"><span class="num">05</span> Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
+    <div class="sidebar-foot">Los datos se guardan automáticamente y son privados de tu cuenta.</div>
+  </div>
+
+  <div class="main">
+    <div id="storage-banner" class="storage-banner" style="display:none">
+      ⚠ No se detectó almacenamiento persistente en esta ventana. Lo que registres ahora <strong>se perderá al cerrar o recargar</strong>. Para que tus datos se guarden automáticamente, abre y usa esta app dentro del chat de Claude (como artifact), no como archivo descargado y abierto directo en el navegador.
+    </div>
+    <div class="drive-bar">
+      <span class="dot" id="drive-dot"></span>
+      <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
+      <button class="btn btn-secondary" id="drive-disconnect-btn" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
+      <button class="btn btn-secondary" id="drive-connect-btn">Conectar con Google Drive</button>
+    </div>
+
+
+    <!-- PROPIEDADES -->
+    <div class="tab-section active" id="tab-propiedades">
+      <h1>Propiedades</h1>
+      <div class="subtitle">Registro de inmuebles de la cartera.</div>
+      <div class="card">
+        <div class="toggle-form"><h2 id="prop-form-title">Nueva propiedad</h2></div>
+        <form id="form-propiedad">
+          <input type="hidden" id="p-id">
+          <div class="grid">
+            <div class="field"><label>Dirección</label><input id="p-direccion" required></div>
+            <div class="field"><label>Depto / Piso / Local #</label><input id="p-unidad"></div>
+            <div class="field"><label>M²</label><input id="p-m2" type="number" step="0.1"></div>
+            <div class="field"><label>Medidor de luz</label><input id="p-medidorLuz"></div>
+            <div class="field"><label>Medidor de agua</label><input id="p-medidorAgua"></div>
+            <div class="field"><label>Zonificación</label><input id="p-zonificacion"></div>
+            <div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div>
+            <div class="field"><label>Avalúo fiscal ($)</label><input id="p-avaluoFiscal" type="number"></div>
+            <div class="field"><label>Valor comercial probable ($)</label><input id="p-valorComercial" type="number"></div>
+            <div class="field"><label>Inscripción CBR — Foja</label><input id="p-cbrFoja"></div>
+            <div class="field"><label>Inscripción CBR — Número</label><input id="p-cbrNumero"></div>
+            <div class="field"><label>Inscripción CBR — Año</label><input id="p-cbrAnio"></div>
+            <div class="field"><label>Inscripción CBR — Localidad</label><input id="p-cbrLocalidad"></div>
+            <div class="field"><label># Cliente Luz</label><input id="p-clienteLuz"></div>
+            <div class="field"><label># Cliente Agua</label><input id="p-clienteAgua"></div>
+            <div class="field"><label># Cliente Gas</label><input id="p-clienteGas"></div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Guardar propiedad</button>
+            <button type="button" class="btn btn-secondary" id="p-cancel" style="display:none">Cancelar edición</button>
+          </div>
+          <div class="status-msg" id="p-status"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Propiedades registradas</h2>
+        <div id="prop-table"></div>
+      </div>
+    </div>
+
+    <!-- ARRENDATARIOS -->
+    <div class="tab-section" id="tab-arrendatarios">
+      <h1>Arrendatarios &amp; Contratos</h1>
+      <div class="subtitle">Datos societarios, de contacto y condiciones del contrato.</div>
+      <div class="card">
+        <h2 id="t-form-title">Nuevo arrendatario / contrato</h2>
+        <form id="form-arrendatario">
+          <input type="hidden" id="t-id">
+          <div class="grid">
+            <div class="field"><label>Propiedad asociada</label><select id="t-propiedadId"></select></div>
+            <div class="field"><label>Nombre sociedad</label><input id="t-nombreSociedad" required></div>
+            <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad"></div>
+            <div class="field"><label>Nombre representante</label><input id="t-nombreRepresentante"></div>
+            <div class="field"><label>Rut representante</label><input id="t-rutRepresentante"></div>
+            <div class="field"><label>Correo</label><input id="t-correo" type="email"></div>
+            <div class="field"><label>Teléfono</label><input id="t-telefono"></div>
+            <div class="field"><label>Fecha inicio contrato</label><input id="t-fechaInicioContrato" type="date" required></div>
+            <div class="field"><label>Fecha firma contrato</label><input id="t-fechaFirmaContrato" type="date"></div>
+            <div class="field"><label>Tipo de contrato</label>
+              <select id="t-tipoContrato"><option>Renovable</option><option>No Renovable</option></select>
+            </div>
+            <div class="field"><label>Periodo (ej: 12 meses)</label><input id="t-periodoContrato" placeholder="Ej: 12 meses"></div>
+            <div class="field"><label>Duración contrato (# meses, para calcular vencimiento)</label><input id="t-duracionMeses" type="number" min="1" placeholder="Ej: 12"></div>
+            <div class="field"><label>Tipo ajuste IPC</label>
+              <select id="t-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select>
+            </div>
+            <div class="field"><label>Monto arriendo pactado ($)</label><input id="t-montoArriendoPactado" type="number" required></div>
+            <div class="field full"><label>Información general</label><textarea id="t-infoGeneral"></textarea></div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Guardar arrendatario</button>
+            <button type="button" class="btn btn-secondary" id="t-cancel" style="display:none">Cancelar edición</button>
+          </div>
+          <div class="status-msg" id="t-status"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Arrendatarios registrados</h2>
+        <div id="tenant-table"></div>
+      </div>
+    </div>
+
+    <!-- PAGOS -->
+    <div class="tab-section" id="tab-pagos">
+      <h1>Pagos</h1>
+      <div class="subtitle">Registro de pagos de arriendo por arrendatario.</div>
+      <div class="card">
+        <h2 id="pay-form-title">Nuevo pago</h2>
+        <form id="form-pago">
+          <input type="hidden" id="pay-id">
+          <div class="grid">
+            <div class="field"><label>Arrendatario</label><select id="pay-arrendatarioId" required></select></div>
+            <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
+            <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="number" required></div>
+            <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="number" value="0"></div>
+            <div class="field"><label>Medio de pago</label>
+              <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
+            </div>
+            <div class="field full"><label>Comentarios</label><textarea id="pay-comentarios"></textarea></div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Registrar pago</button>
+            <button type="button" class="btn btn-secondary" id="pay-cancel" style="display:none">Cancelar edición</button>
+          </div>
+          <div class="status-msg" id="pay-status"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Historial de pagos</h2>
+        <select class="filter" id="pay-filter"></select>
+        <div id="pay-table"></div>
+      </div>
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="tab-section" id="tab-resumen">
+      <h1>Resumen &amp; Deudas</h1>
+      <div class="subtitle">Estado de pago consolidado a la fecha de hoy.</div>
+      <div class="summary-cards" id="summary-cards"></div>
+      <div class="card">
+        <h2>Estado por arrendatario</h2>
+        <div id="resumen-table"></div>
+      </div>
+    </div>
+
+    <!-- ALERTAS -->
+    <div class="tab-section" id="tab-alertas">
+      <h1>Alertas</h1>
+      <div class="subtitle">Avisos de vencimiento de contrato y de ajuste de IPC, con 3, 2 y 1 mes de anticipación.</div>
+      <div class="card">
+        <h2>Próximos vencimientos y ajustes</h2>
+        <div id="alertas-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ================== CONFIGURACIÓN DE GOOGLE DRIVE ==================
+// 1) Reemplaza esto con tu propio Client ID de Google Cloud (ver instrucciones que te dio Claude).
+const GOOGLE_CLIENT_ID = 'PEGA_AQUI_TU_CLIENT_ID.apps.googleusercontent.com';
+// Scope mínimo posible: la app solo puede ver/editar archivos que ella misma crea, nunca el resto del Drive.
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILENAME = 'gestion-arriendos-datos.json';
+// Clave NO sensible: solo indica "este navegador ya se conectó antes", para saber si
+// vale la pena intentar una reconexión silenciosa. No es una credencial ni un token.
+const DRIVE_HINT_KEY = 'arriendos_drive_connected_hint';
+
+let tokenClient = null;
+let driveToken = null;       // Token de acceso: vive SOLO en memoria (variable JS), nunca en localStorage/sessionStorage.
+let driveFileId = null;
+let hasLoadedFromDrive = false;
+let tokenRefreshTimer = null;
+
+function driveConfigured(){
+  return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('PEGA_AQUI');
+}
+
+function setDriveStatus(text, connected){
+  document.getElementById('drive-status').textContent = 'Google Drive: '+text;
+  document.getElementById('drive-dot').classList.toggle('on', !!connected);
+}
+
+// ---- Pantalla de bloqueo (gate) ----
+function showDriveGate(){
+  document.getElementById('drive-gate-overlay').style.display = 'flex';
+}
+function hideDriveGate(){
+  document.getElementById('drive-gate-overlay').style.display = 'none';
+}
+function setGateChecking(isChecking){
+  document.getElementById('drive-gate-checking').style.display = isChecking ? 'block' : 'none';
+  document.getElementById('drive-gate-action').style.display = isChecking ? 'none' : 'block';
+}
+
+function rememberConnectedHint(){
+  try{ localStorage.setItem(DRIVE_HINT_KEY, '1'); }catch(e){ /* si el navegador bloquea localStorage, no es crítico */ }
+}
+function hadConnectedBefore(){
+  try{ return localStorage.getItem(DRIVE_HINT_KEY) === '1'; }catch(e){ return false; }
+}
+function forgetConnectedHint(){
+  try{ localStorage.removeItem(DRIVE_HINT_KEY); }catch(e){}
+}
+
+function initGoogleDrive(){
+  if(!driveConfigured()){
+    setDriveStatus('falta configurar tu Client ID (ver instrucciones)', false);
+    document.getElementById('drive-connect-btn').disabled = true;
+    showDriveGate();
+    setGateChecking(false);
+    document.getElementById('drive-gate-msg').textContent = 'Este sitio todavía no tiene configurada la conexión con Google Drive. Si eres tú quien lo administra, revisa las instrucciones para pegar tu Client ID.';
+    document.getElementById('drive-gate-connect-btn').style.display = 'none';
+    return;
+  }
+  if(typeof google === 'undefined' || !google.accounts){ setTimeout(initGoogleDrive,300); return; }
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: handleTokenResponse
+  });
+
+  attemptSilentConnect();
+}
+window.addEventListener('load', initGoogleDrive);
+
+async function handleTokenResponse(resp){
+  if(resp.error){
+    driveToken = null;
+    setDriveStatus('no conectado', false);
+    setGateChecking(false);
+    showDriveGate();
+    return;
+  }
+  driveToken = resp.access_token;
+  rememberConnectedHint();
+  scheduleTokenRefresh(resp.expires_in);
+  setDriveStatus('conectado ✓ sincronizando…', true);
+  document.getElementById('drive-connect-btn').textContent = 'Sincronizar ahora';
+  hideDriveGate();
+  if(!hasLoadedFromDrive){
+    hasLoadedFromDrive = true;
+    await driveSync(true);
+  } else {
+    await driveSync(false);
+  }
+}
+
+// Intenta reconectar sin mostrar ventanas emergentes si el navegador aún tiene
+// la sesión de Google activa y el usuario ya autorizó esta app antes.
+// Si no se puede (primera vez, o el usuario cerró sesión de Google), se exige
+// una conexión explícita mediante clic, como corresponde al estándar OAuth.
+function attemptSilentConnect(){
+  showDriveGate();
+  setGateChecking(true);
+
+  if(!hadConnectedBefore()){
+    setGateChecking(false);
+    return;
+  }
+
+  let resolved = false;
+  const timeout = setTimeout(()=>{
+    if(!resolved){ resolved = true; setGateChecking(false); }
+  }, 4000);
+
+  const originalCallback = tokenClient.callback;
+  tokenClient.callback = (resp)=>{
+    if(!resolved){ resolved = true; clearTimeout(timeout); }
+    tokenClient.callback = originalCallback;
+    originalCallback(resp);
+  };
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
+function requestDriveConnection(){
+  if(!driveConfigured()){
+    alert('Primero debes configurar tu GOOGLE_CLIENT_ID en el código. Revisa las instrucciones.');
+    return;
+  }
+  if(!tokenClient){ alert('Google aún está cargando, intenta de nuevo en un segundo.'); return; }
+  tokenClient.requestAccessToken({ prompt: driveToken ? '' : 'consent' });
+}
+document.getElementById('drive-connect-btn').addEventListener('click', requestDriveConnection);
+document.getElementById('drive-gate-connect-btn').addEventListener('click', requestDriveConnection);
+
+document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
+  if(!confirm('Esto cerrará tu sesión de Google Drive en este navegador y pedirá reconectar. ¿Continuar?')) return;
+  if(driveToken && google.accounts && google.accounts.oauth2){
+    google.accounts.oauth2.revoke(driveToken, ()=>{});
+  }
+  driveToken = null;
+  driveFileId = null;
+  hasLoadedFromDrive = false;
+  if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
+  forgetConnectedHint();
+  setDriveStatus('no conectado', false);
+  showDriveGate();
+  setGateChecking(false);
+});
+
+// Renueva el token de forma silenciosa un par de minutos antes de que expire,
+// para que la sesión se sienta persistente sin guardar ningún secreto.
+function scheduleTokenRefresh(expiresInSec){
+  if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
+  const ms = Math.max((Number(expiresInSec || 3600) - 120) * 1000, 30000);
+  tokenRefreshTimer = setTimeout(()=>{
+    if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+  }, ms);
+}
+
+async function driveFindFile(){
+  const q = encodeURIComponent(`name='${DRIVE_FILENAME}' and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
+    headers:{ Authorization:'Bearer '+driveToken }
+  });
+  if(res.status===401) throw new Error('token expirado');
+  const data = await res.json();
+  return (data.files && data.files.length) ? data.files[0].id : null;
+}
+
+async function driveCreateFile(content){
+  const boundary = 'arriendos_boundary_xyz';
+  const metadata = { name: DRIVE_FILENAME, mimeType:'application/json' };
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`+
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n`+
+    `--${boundary}--`;
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method:'POST',
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':`multipart/related; boundary=${boundary}` },
+    body
+  });
+  if(res.status===401) throw new Error('token expirado');
+  const data = await res.json();
+  return data.id;
+}
+
+async function driveUpdateFile(fileId, content){
+  const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    method:'PATCH',
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
+    body: content
+  });
+  if(res.status===401) throw new Error('token expirado');
+}
+
+async function driveReadFile(fileId){
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers:{ Authorization:'Bearer '+driveToken }
+  });
+  if(res.status===401) throw new Error('token expirado');
+  return await res.text();
+}
+
+async function driveSync(isInitialLoad){
+  if(!driveToken){ showDriveGate(); setGateChecking(false); return; }
+  try{
+    if(driveFileId===null){ driveFileId = await driveFindFile(); }
+    if(isInitialLoad && driveFileId){
+      const text = await driveReadFile(driveFileId);
+      const remote = JSON.parse(text);
+      properties = remote.properties || [];
+      tenants = remote.tenants || [];
+      payments = remote.payments || [];
+      await saveKey('properties',properties);
+      await saveKey('tenants',tenants);
+      await saveKey('payments',payments);
+      renderAll();
+    } else {
+      const payload = JSON.stringify({properties,tenants,payments,updatedAt:new Date().toISOString()});
+      if(!driveFileId){
+        driveFileId = await driveCreateFile(payload);
+      } else {
+        await driveUpdateFile(driveFileId, payload);
+      }
+    }
+    const now = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    setDriveStatus('conectado ✓ · última sync '+now, true);
+  }catch(e){
+    console.error('Error sincronizando con Drive', e);
+    // El token pudo expirar entre renovaciones: pedimos reconexión silenciosa una vez más.
+    driveToken = null;
+    setDriveStatus('sesión expirada, reconectando…', false);
+    if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+  }
+}
+
+function pushToDriveIfConnected(){
+  if(driveToken) driveSync(false);
+}
+// ================== FIN CONFIGURACIÓN DRIVE ==================
+
+let properties = [], tenants = [], payments = [];
+let editingProp = null, editingTenant = null, editingPay = null;
+let storageOK = true;
+const memoryStore = {};
+
+const money = n => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(n||0));
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+async function loadKey(key){
+  try{
+    if(typeof window.storage === 'undefined') throw new Error('no storage');
+    const res = await window.storage.get(key,false);
+    return res ? JSON.parse(res.value) : [];
+  }catch(e){
+    storageOK = false;
+    return memoryStore[key] ? JSON.parse(memoryStore[key]) : [];
+  }
+}
+async function saveKey(key,data){
+  memoryStore[key] = JSON.stringify(data);
+  try{
+    if(typeof window.storage === 'undefined') throw new Error('no storage');
+    await window.storage.set(key, JSON.stringify(data), false);
+    return true;
+  }catch(e){
+    storageOK = false;
+    console.error('Almacenamiento persistente no disponible, usando memoria temporal',key,e);
+    return false;
+  }
+}
+
+async function init(){
+  properties = await loadKey('properties');
+  tenants = await loadKey('tenants');
+  payments = await loadKey('payments');
+  if(!storageOK){ document.getElementById('storage-banner').style.display='block'; }
+  renderAll();
+}
+
+function renderAll(){
+  renderProperties();
+  renderTenantSelects();
+  renderTenants();
+  renderPaySelects();
+  renderPayments();
+  renderResumen();
+  renderAlertas();
+}
+
+// ---------- NAV ----------
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+    document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('tab-'+item.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- PROPIEDADES ----------
+const propFields = ['direccion','unidad','m2','medidorLuz','medidorAgua','zonificacion','rolAvaluo','avaluoFiscal','valorComercial','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas'];
+
+document.getElementById('form-propiedad').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const obj = { id: editingProp || uid() };
+  propFields.forEach(f=> obj[f] = document.getElementById('p-'+f).value);
+  if(editingProp){
+    properties = properties.map(p=> p.id===editingProp ? obj : p);
+  } else {
+    properties.push(obj);
+  }
+  const ok = await saveKey('properties',properties);
+  document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
+  document.getElementById('p-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  setTimeout(()=>document.getElementById('p-status').textContent='',ok?1500:4000);
+  resetPropForm();
+  renderAll();
+  pushToDriveIfConnected();
+});
+document.getElementById('p-cancel').addEventListener('click', resetPropForm);
+
+function resetPropForm(){
+  editingProp = null;
+  document.getElementById('form-propiedad').reset();
+  document.getElementById('prop-form-title').textContent='Nueva propiedad';
+  document.getElementById('p-cancel').style.display='none';
+}
+
+function editProperty(id){
+  const p = properties.find(x=>x.id===id);
+  if(!p) return;
+  editingProp = id;
+  propFields.forEach(f=> document.getElementById('p-'+f).value = p[f] || '');
+  document.getElementById('prop-form-title').textContent='Editar propiedad';
+  document.getElementById('p-cancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function deleteProperty(id){
+  if(!confirm('¿Eliminar esta propiedad?')) return;
+  properties = properties.filter(p=>p.id!==id);
+  await saveKey('properties',properties);
+  renderAll();
+  pushToDriveIfConnected();
+}
+
+function renderProperties(){
+  const el = document.getElementById('prop-table');
+  if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
+  el.innerHTML = `<table><thead><tr>
+    <th>Dirección</th><th>Unidad</th><th>M²</th><th>Rol avalúo</th><th>Valor comercial</th><th></th>
+  </tr></thead><tbody>
+  ${properties.map(p=>`<tr>
+    <td>${esc(p.direccion)}</td>
+    <td>${esc(p.unidad)}</td>
+    <td class="mono">${esc(p.m2)}</td>
+    <td class="mono">${esc(p.rolAvaluo)}</td>
+    <td class="mono">${p.valorComercial?money(p.valorComercial):''}</td>
+    <td class="row-actions"><button onclick="editProperty('${p.id}')">Editar</button><button onclick="deleteProperty('${p.id}')">Eliminar</button></td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- ARRENDATARIOS ----------
+const tenantFields = ['propiedadId','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
+
+function renderTenantSelects(){
+  const sel = document.getElementById('t-propiedadId');
+  sel.innerHTML = '<option value="">— Sin asociar —</option>' + properties.map(p=>`<option value="${p.id}">${esc(p.direccion)} ${esc(p.unidad||'')}</option>`).join('');
+}
+
+document.getElementById('form-arrendatario').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const obj = { id: editingTenant || uid() };
+  tenantFields.forEach(f=> obj[f] = document.getElementById('t-'+f).value);
+  if(editingTenant){
+    tenants = tenants.map(t=> t.id===editingTenant ? obj : t);
+  } else {
+    tenants.push(obj);
+  }
+  const ok = await saveKey('tenants',tenants);
+  document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
+  document.getElementById('t-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  setTimeout(()=>document.getElementById('t-status').textContent='',ok?1500:4000);
+  resetTenantForm();
+  renderAll();
+  pushToDriveIfConnected();
+});
+document.getElementById('t-cancel').addEventListener('click', resetTenantForm);
+
+function resetTenantForm(){
+  editingTenant = null;
+  document.getElementById('form-arrendatario').reset();
+  document.getElementById('t-form-title').textContent='Nuevo arrendatario / contrato';
+  document.getElementById('t-cancel').style.display='none';
+}
+
+function editTenant(id){
+  const t = tenants.find(x=>x.id===id);
+  if(!t) return;
+  editingTenant = id;
+  tenantFields.forEach(f=> document.getElementById('t-'+f).value = t[f] || '');
+  document.getElementById('t-form-title').textContent='Editar arrendatario / contrato';
+  document.getElementById('t-cancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function deleteTenant(id){
+  if(!confirm('¿Eliminar este arrendatario y su contrato?')) return;
+  tenants = tenants.filter(t=>t.id!==id);
+  await saveKey('tenants',tenants);
+  renderAll();
+  pushToDriveIfConnected();
+}
+
+function propAddress(id){
+  const p = properties.find(x=>x.id===id);
+  return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
+}
+
+function renderTenants(){
+  const el = document.getElementById('tenant-table');
+  if(!tenants.length){ el.innerHTML='<div class="empty">Aún no hay arrendatarios registrados.</div>'; return; }
+  el.innerHTML = `<table><thead><tr>
+    <th>Sociedad</th><th>Propiedad</th><th>Inicio contrato</th><th>Tipo</th><th>Monto pactado</th><th></th>
+  </tr></thead><tbody>
+  ${tenants.map(t=>`<tr>
+    <td>${esc(t.nombreSociedad)}</td>
+    <td>${esc(propAddress(t.propiedadId))}</td>
+    <td class="mono">${esc(t.fechaInicioContrato)}</td>
+    <td>${esc(t.tipoContrato)}</td>
+    <td class="mono">${money(t.montoArriendoPactado)}</td>
+    <td class="row-actions"><button onclick="editTenant('${t.id}')">Editar</button><button onclick="deleteTenant('${t.id}')">Eliminar</button></td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- PAGOS ----------
+const payFields = ['arrendatarioId','fechaPago','montoPagado','descuentos','medioPago','comentarios'];
+
+function renderPaySelects(){
+  const opts = '<option value="">— Selecciona arrendatario —</option>' + tenants.map(t=>`<option value="${t.id}">${esc(t.nombreSociedad)}</option>`).join('');
+  document.getElementById('pay-arrendatarioId').innerHTML = opts;
+  document.getElementById('pay-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + tenants.map(t=>`<option value="${t.id}">${esc(t.nombreSociedad)}</option>`).join('');
+}
+document.getElementById('pay-filter').addEventListener('change', renderPayments);
+
+document.getElementById('form-pago').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const obj = { id: editingPay || uid() };
+  payFields.forEach(f=> obj[f] = document.getElementById('pay-'+f).value);
+  if(editingPay){
+    payments = payments.map(p=> p.id===editingPay ? obj : p);
+  } else {
+    payments.push(obj);
+  }
+  const ok = await saveKey('payments',payments);
+  document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
+  document.getElementById('pay-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  setTimeout(()=>document.getElementById('pay-status').textContent='',ok?1500:4000);
+  resetPayForm();
+  renderAll();
+  pushToDriveIfConnected();
+});
+document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
+
+function resetPayForm(){
+  editingPay = null;
+  document.getElementById('form-pago').reset();
+  document.getElementById('pay-form-title').textContent='Nuevo pago';
+  document.getElementById('pay-cancel').style.display='none';
+}
+
+function editPayment(id){
+  const p = payments.find(x=>x.id===id);
+  if(!p) return;
+  editingPay = id;
+  payFields.forEach(f=> document.getElementById('pay-'+f).value = p[f] || '');
+  document.getElementById('pay-form-title').textContent='Editar pago';
+  document.getElementById('pay-cancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function deletePayment(id){
+  if(!confirm('¿Eliminar este pago?')) return;
+  payments = payments.filter(p=>p.id!==id);
+  await saveKey('payments',payments);
+  renderAll();
+  pushToDriveIfConnected();
+}
+
+function tenantName(id){
+  const t = tenants.find(x=>x.id===id);
+  return t ? t.nombreSociedad : '—';
+}
+
+function renderPayments(){
+  const filter = document.getElementById('pay-filter').value;
+  const el = document.getElementById('pay-table');
+  const list = payments.filter(p=> !filter || p.arrendatarioId===filter)
+                        .sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
+  if(!list.length){ el.innerHTML='<div class="empty">No hay pagos registrados.</div>'; return; }
+  el.innerHTML = `<table><thead><tr>
+    <th>Arrendatario</th><th>Fecha pago</th><th>Monto pagado</th><th>Descuentos</th><th>Medio</th><th></th>
+  </tr></thead><tbody>
+  ${list.map(p=>`<tr>
+    <td>${esc(tenantName(p.arrendatarioId))}</td>
+    <td class="mono">${esc(p.fechaPago)}</td>
+    <td class="mono">${money(p.montoPagado)}</td>
+    <td class="mono">${money(p.descuentos)}</td>
+    <td>${esc(p.medioPago)}</td>
+    <td class="row-actions"><button onclick="editPayment('${p.id}')">Editar</button><button onclick="deletePayment('${p.id}')">Eliminar</button></td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- RESUMEN ----------
+function mesesTranscurridos(fechaInicio){
+  if(!fechaInicio) return 0;
+  const start = new Date(fechaInicio+'T00:00:00');
+  const now = new Date();
+  if(start > now) return 0;
+  let months = (now.getFullYear()-start.getFullYear())*12 + (now.getMonth()-start.getMonth());
+  if(now.getDate() >= start.getDate()) months += 1;
+  return Math.max(months,0);
+}
+
+function renderResumen(){
+  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDeudaGlobal=0, enMora=0;
+
+  const rows = tenants.map(t=>{
+    const pagosT = payments.filter(p=>p.arrendatarioId===t.id);
+    const totalPagado = pagosT.reduce((s,p)=>s+Number(p.montoPagado||0),0);
+    const totalDescuentos = pagosT.reduce((s,p)=>s+Number(p.descuentos||0),0);
+    const meses = mesesTranscurridos(t.fechaInicioContrato);
+    const monto = Number(t.montoArriendoPactado||0);
+    const totalEsperado = meses*monto;
+    const saldo = totalEsperado - (totalPagado + totalDescuentos);
+
+    totalEsperadoGlobal += totalEsperado;
+    totalPagadoGlobal += totalPagado + totalDescuentos;
+    if(saldo>0){ totalDeudaGlobal += saldo; enMora += 1; }
+
+    return {t, monto, meses, totalEsperado, totalPagado, totalDescuentos, saldo};
+  }).sort((a,b)=> b.saldo - a.saldo);
+
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="stat"><div class="label">Arrendatarios activos</div><div class="value">${tenants.length}</div></div>
+    <div class="stat good"><div class="label">Total pagado (histórico)</div><div class="value">${money(totalPagadoGlobal)}</div></div>
+    <div class="stat"><div class="label">Total esperado a la fecha</div><div class="value">${money(totalEsperadoGlobal)}</div></div>
+    <div class="stat warn"><div class="label">Deuda total (${enMora} en mora)</div><div class="value">${money(totalDeudaGlobal)}</div></div>
+  `;
+
+  const el = document.getElementById('resumen-table');
+  if(!rows.length){ el.innerHTML='<div class="empty">Registra arrendatarios y pagos para ver el resumen.</div>'; return; }
+  el.innerHTML = `<table><thead><tr>
+    <th>Arrendatario</th><th>Propiedad</th><th>Monto mensual</th><th>Meses adeudables</th><th>Total esperado</th><th>Total pagado</th><th>Saldo</th><th>Estado</th>
+  </tr></thead><tbody>
+  ${rows.map(r=>`<tr>
+    <td>${esc(r.t.nombreSociedad)}</td>
+    <td>${esc(propAddress(r.t.propiedadId))}</td>
+    <td class="mono">${money(r.monto)}</td>
+    <td class="mono">${r.meses}</td>
+    <td class="mono">${money(r.totalEsperado)}</td>
+    <td class="mono">${money(r.totalPagado+r.totalDescuentos)}</td>
+    <td class="mono">${money(Math.max(r.saldo,0))}</td>
+    <td>${r.saldo>0 ? '<span class="tag tag-debt">Con deuda</span>' : '<span class="tag tag-ok">Al día</span>'}</td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- ALERTAS ----------
+function addMonths(dateStr, n){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setMonth(d.getMonth()+n);
+  return d;
+}
+function toISO(d){ return d.toISOString().slice(0,10); }
+
+// meses completos restantes hasta targetDate (negativo si ya pasó)
+function monthsUntil(targetDate){
+  const now = new Date(); now.setHours(0,0,0,0);
+  const target = new Date(targetDate); target.setHours(0,0,0,0);
+  let months = (target.getFullYear()-now.getFullYear())*12 + (target.getMonth()-now.getMonth());
+  if(target.getDate() < now.getDate()) months -= 1;
+  return months;
+}
+
+function ipcIntervalMeses(tipo){
+  if(tipo==='Anual') return 12;
+  if(tipo==='Semestral') return 6;
+  return null;
+}
+
+function nextIpcDate(fechaInicio, intervalo){
+  const now = new Date(); now.setHours(0,0,0,0);
+  let next = addMonths(fechaInicio, intervalo);
+  let guard = 0;
+  while(next <= now && guard < 200){ next = new Date(next); next.setMonth(next.getMonth()+intervalo); guard++; }
+  return next;
+}
+
+function buildAlerts(){
+  const alerts = [];
+  tenants.forEach(t=>{
+    // Vencimiento de contrato
+    if(t.duracionMeses){
+      const venc = addMonths(t.fechaInicioContrato, Number(t.duracionMeses));
+      const m = monthsUntil(toISO(venc));
+      if(m===1||m===2||m===3){
+        alerts.push({tenant:t, tipo:'Vencimiento de contrato', meses:m, fecha:toISO(venc)});
+      } else if(m<0){
+        alerts.push({tenant:t, tipo:'Contrato vencido', meses:m, fecha:toISO(venc), vencido:true});
+      }
+    }
+    // Ajuste IPC
+    const intervalo = ipcIntervalMeses(t.tipoAjusteIPC);
+    if(intervalo && t.fechaInicioContrato){
+      const next = nextIpcDate(t.fechaInicioContrato, intervalo);
+      const m = monthsUntil(toISO(next));
+      if(m===1||m===2||m===3){
+        alerts.push({tenant:t, tipo:'Ajuste de IPC', meses:m, fecha:toISO(next)});
+      }
+    }
+  });
+  return alerts.sort((a,b)=> a.meses - b.meses);
+}
+
+function renderAlertas(){
+  const alerts = buildAlerts();
+  const badge = document.getElementById('alert-badge');
+  if(alerts.length){ badge.style.display='inline-block'; badge.textContent = alerts.length; }
+  else { badge.style.display='none'; }
+
+  const el = document.getElementById('alertas-list');
+  if(!alerts.length){ el.innerHTML='<div class="empty">No hay vencimientos ni ajustes de IPC dentro de los próximos 3 meses.</div>'; return; }
+
+  el.innerHTML = alerts.map(a=>{
+    const urgencyClass = a.vencido ? 'u1' : ('u'+a.meses);
+    const when = a.vencido
+      ? `Venció el ${a.fecha}`
+      : `${esc(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
+    return `<div class="alert-card ${urgencyClass}">
+      <div>
+        <div class="title">${esc(a.tipo)} — ${esc(a.tenant.nombreSociedad)}</div>
+        <div class="sub">${esc(propAddress(a.tenant.propiedadId))}</div>
+      </div>
+      <div class="when">${when}</div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s){
+  if(s===undefined||s===null) return '';
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+init();
+</script>
+</body>
+</html>
