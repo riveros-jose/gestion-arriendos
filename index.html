@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión de Arriendos</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -104,7 +105,7 @@
   <div class="drive-gate-card">
     <div class="drive-gate-icon">☁️</div>
     <h2>Conecta tu Google Drive</h2>
-    <p>Para usar esta app necesitas conectar tu cuenta de Google. Tus propiedades, contratos y pagos se guardan únicamente en un archivo dentro de <strong>tu</strong> Drive — esta app no tiene acceso a nada más de tu cuenta.</p>
+    <p>Para usar esta app necesitas conectar tu cuenta de Google. Tus propiedades, contratos y pagos se guardan en un archivo Excel dentro de una carpeta llamada <strong>RentaPro</strong> en tu propio Drive — esta app no tiene acceso a nada más de tu cuenta.</p>
     <div id="drive-gate-checking" style="display:none" class="drive-gate-checking">Verificando tu sesión de Google…</div>
     <div id="drive-gate-action">
       <button class="btn btn-primary" id="drive-gate-connect-btn">Conectar con Google Drive</button>
@@ -279,13 +280,16 @@
 const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.googleusercontent.com';
 // Scope mínimo posible: la app solo puede ver/editar archivos que ella misma crea, nunca el resto del Drive.
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-const DRIVE_FILENAME = 'gestion-arriendos-datos.json';
+const DRIVE_FOLDER_NAME = 'RentaPro';
+const DRIVE_FILENAME = 'registros-arriendos.xlsx';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 // Clave NO sensible: solo indica "este navegador ya se conectó antes", para saber si
 // vale la pena intentar una reconexión silenciosa. No es una credencial ni un token.
 const DRIVE_HINT_KEY = 'arriendos_drive_connected_hint';
 
 let tokenClient = null;
 let driveToken = null;       // Token de acceso: vive SOLO en memoria (variable JS), nunca en localStorage/sessionStorage.
+let driveFolderId = null;
 let driveFileId = null;
 let hasLoadedFromDrive = false;
 let tokenRefreshTimer = null;
@@ -409,6 +413,7 @@ document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
     google.accounts.oauth2.revoke(driveToken, ()=>{});
   }
   driveToken = null;
+  driveFolderId = null;
   driveFileId = null;
   hasLoadedFromDrive = false;
   if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
@@ -428,8 +433,27 @@ function scheduleTokenRefresh(expiresInSec){
   }, ms);
 }
 
-async function driveFindFile(){
-  const q = encodeURIComponent(`name='${DRIVE_FILENAME}' and trashed=false`);
+async function driveFindOrCreateFolder(){
+  const q = encodeURIComponent(`name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
+    headers:{ Authorization:'Bearer '+driveToken }
+  });
+  if(res.status===401) throw new Error('token expirado');
+  const data = await res.json();
+  if(data.files && data.files.length) return data.files[0].id;
+
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method:'POST',
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
+    body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType:'application/vnd.google-apps.folder' })
+  });
+  if(createRes.status===401) throw new Error('token expirado');
+  const created = await createRes.json();
+  return created.id;
+}
+
+async function driveFindFile(folderId){
+  const q = encodeURIComponent(`name='${DRIVE_FILENAME}' and '${folderId}' in parents and trashed=false`);
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
     headers:{ Authorization:'Bearer '+driveToken }
   });
@@ -438,16 +462,15 @@ async function driveFindFile(){
   return (data.files && data.files.length) ? data.files[0].id : null;
 }
 
-async function driveCreateFile(content){
-  const boundary = 'arriendos_boundary_xyz';
-  const metadata = { name: DRIVE_FILENAME, mimeType:'application/json' };
-  const body =
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`+
-    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n`+
-    `--${boundary}--`;
+async function driveCreateXlsxFile(arrayBuffer, folderId){
+  const metadata = { name: DRIVE_FILENAME, mimeType: XLSX_MIME, parents: [folderId] };
+  const boundary = 'rentapro_boundary_' + Date.now();
+  const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${XLSX_MIME}\r\n\r\n`;
+  const tail = `\r\n--${boundary}--`;
+  const body = new Blob([head, arrayBuffer, tail]);
   const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
     method:'POST',
-    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':`multipart/related; boundary=${boundary}` },
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': `multipart/related; boundary=${boundary}` },
     body
   });
   if(res.status===401) throw new Error('token expirado');
@@ -455,43 +478,79 @@ async function driveCreateFile(content){
   return data.id;
 }
 
-async function driveUpdateFile(fileId, content){
+async function driveUpdateXlsxFile(fileId, arrayBuffer){
   const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
     method:'PATCH',
-    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
-    body: content
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': XLSX_MIME },
+    body: new Blob([arrayBuffer], { type: XLSX_MIME })
   });
   if(res.status===401) throw new Error('token expirado');
 }
 
-async function driveReadFile(fileId){
+async function driveReadXlsxFile(fileId){
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     headers:{ Authorization:'Bearer '+driveToken }
   });
   if(res.status===401) throw new Error('token expirado');
-  return await res.text();
+  return await res.arrayBuffer();
+}
+
+// ---- Construcción y lectura del libro Excel (4 hojas) ----
+function buildWorkbook(){
+  const wb = XLSX.utils.book_new();
+
+  const propRows = properties.length ? properties.map(p=>({...p})) : [{}];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(propRows), 'Propiedades');
+
+  const tenantRows = tenants.length ? tenants.map(t=>({...t, propiedad_direccion: propAddress(t.propiedadId)})) : [{}];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tenantRows), 'Arrendatarios');
+
+  const payRows = payments.length ? payments.map(p=>({...p, arrendatario_nombre: tenantName(p.arrendatarioId)})) : [{}];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payRows), 'Pagos');
+
+  const resumenRows = computeResumenRows().map(r=>({
+    Arrendatario: r.t.nombreSociedad,
+    Propiedad: propAddress(r.t.propiedadId),
+    MontoMensual: r.monto,
+    MesesAdeudables: r.meses,
+    TotalEsperado: r.totalEsperado,
+    TotalPagado: r.totalPagado + r.totalDescuentos,
+    Saldo: Math.max(r.saldo,0),
+    Estado: r.saldo>0 ? 'Con deuda' : 'Al día'
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows.length?resumenRows:[{}]), 'Resumen');
+
+  return XLSX.write(wb, { type:'array', bookType:'xlsx' });
+}
+
+function loadFromWorkbook(arrayBuffer){
+  const wb = XLSX.read(new Uint8Array(arrayBuffer), { type:'array' });
+  const propSheet = wb.Sheets['Propiedades'];
+  const tenantSheet = wb.Sheets['Arrendatarios'];
+  const paySheet = wb.Sheets['Pagos'];
+  properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
+  tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
+  payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
 }
 
 async function driveSync(isInitialLoad){
   if(!driveToken){ showDriveGate(); setGateChecking(false); return; }
   try{
-    if(driveFileId===null){ driveFileId = await driveFindFile(); }
+    if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
+    if(driveFileId===null){ driveFileId = await driveFindFile(driveFolderId); }
     if(isInitialLoad && driveFileId){
-      const text = await driveReadFile(driveFileId);
-      const remote = JSON.parse(text);
-      properties = remote.properties || [];
-      tenants = remote.tenants || [];
-      payments = remote.payments || [];
+      const buf = await driveReadXlsxFile(driveFileId);
+      loadFromWorkbook(buf);
       await saveKey('properties',properties);
       await saveKey('tenants',tenants);
       await saveKey('payments',payments);
       renderAll();
     } else {
-      const payload = JSON.stringify({properties,tenants,payments,updatedAt:new Date().toISOString()});
+      const buf = buildWorkbook();
       if(!driveFileId){
-        driveFileId = await driveCreateFile(payload);
+        driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
       } else {
-        await driveUpdateFile(driveFileId, payload);
+        await driveUpdateXlsxFile(driveFileId, buf);
       }
     }
     const now = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
@@ -794,10 +853,8 @@ function mesesTranscurridos(fechaInicio){
   return Math.max(months,0);
 }
 
-function renderResumen(){
-  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDeudaGlobal=0, enMora=0;
-
-  const rows = tenants.map(t=>{
+function computeResumenRows(){
+  return tenants.map(t=>{
     const pagosT = payments.filter(p=>p.arrendatarioId===t.id);
     const totalPagado = pagosT.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const totalDescuentos = pagosT.reduce((s,p)=>s+Number(p.descuentos||0),0);
@@ -805,13 +862,19 @@ function renderResumen(){
     const monto = Number(t.montoArriendoPactado||0);
     const totalEsperado = meses*monto;
     const saldo = totalEsperado - (totalPagado + totalDescuentos);
-
-    totalEsperadoGlobal += totalEsperado;
-    totalPagadoGlobal += totalPagado + totalDescuentos;
-    if(saldo>0){ totalDeudaGlobal += saldo; enMora += 1; }
-
     return {t, monto, meses, totalEsperado, totalPagado, totalDescuentos, saldo};
   }).sort((a,b)=> b.saldo - a.saldo);
+}
+
+function renderResumen(){
+  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDeudaGlobal=0, enMora=0;
+
+  const rows = computeResumenRows();
+  rows.forEach(r=>{
+    totalEsperadoGlobal += r.totalEsperado;
+    totalPagadoGlobal += r.totalPagado + r.totalDescuentos;
+    if(r.saldo>0){ totalDeudaGlobal += r.saldo; enMora += 1; }
+  });
 
   document.getElementById('summary-cards').innerHTML = `
     <div class="stat"><div class="label">Arrendatarios activos</div><div class="value">${tenants.length}</div></div>
