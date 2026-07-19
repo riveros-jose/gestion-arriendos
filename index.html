@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión de Arriendos</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -150,7 +151,7 @@
   <div class="drive-gate-card">
     <div class="drive-gate-icon">☁️</div>
     <h2>Conecta tu Google Drive</h2>
-    <p id="drive-gate-desc">Para usar esta app necesitas conectar tu cuenta de Google. Los registros se guardan en un archivo Excel dentro de la carpeta <strong>RentaPro</strong> en tu Drive. Para poder leer ese archivo aunque lo subas o reemplaces tú mismo desde drive.google.com, esta app pide acceso a tu Drive completo (no solo a los archivos que ella crea).</p>
+    <p id="drive-gate-desc">Para usar esta app necesitas conectar tu cuenta de Google. Los registros se guardan en un archivo Excel dentro de la carpeta <strong>RentaPro</strong> en tu Drive. Esta app solo puede ver archivos que ella misma crea, o que tú elijas explícitamente con el selector de Google — nunca el resto de tu Drive.</p>
     <div id="drive-gate-checking" style="display:none" class="drive-gate-checking">Verificando tu sesión de Google…</div>
     <div id="drive-gate-action">
       <button class="btn btn-primary" id="drive-gate-connect-btn">Conectar con Google Drive</button>
@@ -180,6 +181,7 @@
     <div class="drive-bar">
       <span class="dot" id="drive-dot"></span>
       <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
+      <button class="btn btn-secondary" id="drive-pick-btn" title="Elige a mano el archivo Excel en tu Drive (útil si lo subiste tú directamente)">📂 Seleccionar archivo en Drive</button>
       <button class="btn btn-secondary" id="drive-reload-btn" title="Vuelve a leer el Excel de Drive (por si lo editaste a mano)">Recargar desde Excel</button>
       <button class="btn btn-secondary" id="drive-disconnect-btn" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
       <button class="btn btn-secondary" id="drive-connect-btn">Conectar con Google Drive</button>
@@ -462,6 +464,10 @@
 <script>
 // ================== CONFIGURACIÓN DE GOOGLE DRIVE ==================
 const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.googleusercontent.com';
+// Necesaria para el selector de archivos de Google (Picker) — ver instrucciones para obtenerla.
+// Sin esto, la app sigue funcionando para archivos que ella misma crea, pero no puede ofrecerte
+// elegir a mano un archivo que subiste tú directamente en drive.google.com.
+const GOOGLE_API_KEY = 'PEGA_AQUI_TU_API_KEY';
 
 // Si dejas esto VACÍO: cada usuario tendrá su PROPIA carpeta "RentaPro" en su propio Drive (modo individual).
 // Si le pones el ID de una carpeta de Drive ya existente: TODOS los usuarios que la tengan compartida
@@ -469,12 +475,11 @@ const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.goo
 // la carpeta en Drive: https://drive.google.com/drive/folders/ESTE_ES_EL_ID
 const SHARED_FOLDER_ID = '';
 
-// Usamos el scope amplio de Drive siempre (no solo en modo compartido). El scope mínimo
-// (drive.file) solo deja ver archivos que la propia app creó — si el usuario sube o
-// reemplaza el archivo a mano desde drive.google.com (como al migrar datos), ese archivo
-// queda invisible para la app y por eso terminaba creando uno nuevo en blanco cada vez.
-// Con el scope amplio, la app puede ver y editar cualquier archivo/carpeta de tu Drive.
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+// Permiso MÍNIMO: la app solo puede ver/editar archivos que ella misma creó, o que el usuario
+// eligió explícitamente con el selector de Google (Picker). Si el usuario sube o reemplaza el
+// archivo a mano en drive.google.com, no será visible automáticamente — para eso está el botón
+// "Seleccionar archivo en Drive", que usa el Picker para darle acceso puntual a ese archivo.
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 const DRIVE_FOLDER_NAME = 'RentaPro';
 const DRIVE_FILENAME = 'registros-arriendos.xlsx';
@@ -604,6 +609,63 @@ function scheduleTokenRefresh(expiresInSec){
   if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
   const ms = Math.max((Number(expiresInSec || 3600) - 120) * 1000, 30000);
   tokenRefreshTimer = setTimeout(()=>{ if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); }, ms);
+}
+
+// ---- Selector de archivos (Google Picker) ----
+// Permite elegir a mano un archivo del Drive del usuario, incluso si no fue creado por esta app
+// (por ejemplo, uno subido directamente en drive.google.com). Al elegirlo con este selector,
+// Google le da a la app acceso puntual a ESE archivo, sin necesitar el permiso amplio sobre todo el Drive.
+let pickerLibLoaded = false;
+
+function ensurePickerLib(){
+  return new Promise((resolve, reject)=>{
+    if(pickerLibLoaded){ resolve(); return; }
+    if(typeof gapi === 'undefined'){ reject(new Error('Librería de Google (gapi) no cargó todavía. Intenta de nuevo en un segundo.')); return; }
+    gapi.load('picker', { callback: ()=>{ pickerLibLoaded = true; resolve(); }, onerror: ()=>reject(new Error('No se pudo cargar el selector de Drive.')) });
+  });
+}
+
+async function openFilePicker(){
+  if(!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('PEGA_AQUI')){
+    alert('Falta configurar GOOGLE_API_KEY en el código para poder usar el selector de archivos. Revisa las instrucciones.');
+    return;
+  }
+  if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
+  try{
+    await ensurePickerLib();
+  }catch(e){
+    alert(e.message);
+    return;
+  }
+  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setMimeTypes(XLSX_MIME)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(false);
+  const picker = new google.picker.PickerBuilder()
+    .setOAuthToken(driveToken)
+    .setDeveloperKey(GOOGLE_API_KEY)
+    .addView(view)
+    .setTitle('Elige tu archivo registros-arriendos.xlsx')
+    .setCallback(onPickerResult)
+    .build();
+  picker.setVisible(true);
+}
+document.getElementById('drive-pick-btn').addEventListener('click', openFilePicker);
+
+async function onPickerResult(data){
+  if(data.action !== google.picker.Action.PICKED) return;
+  const file = data.docs[0];
+  driveFileId = file.id;
+  setDriveStatus('archivo elegido, cargando…', true);
+  try{
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?fields=parents`, { headers:{ Authorization:'Bearer '+driveToken } });
+    if(res.ok){
+      const meta = await res.json();
+      if(meta.parents && meta.parents[0]) driveFolderId = meta.parents[0];
+    }
+  }catch(e){ console.warn('No se pudo confirmar la carpeta del archivo elegido', e); }
+  hideDriveGate();
+  await driveSync(true);
 }
 
 async function driveFindOrCreateFolder(){
@@ -759,10 +821,12 @@ async function driveSync(isInitialLoad){
       await saveKey('readings',readings);
       renderAll();
     } else if(isInitialLoad && !driveFileId){
-      // No se encontró ningún archivo existente al conectar: nunca crear uno nuevo en silencio.
-      const proceed = confirm('No encontramos un archivo "registros-arriendos.xlsx" en tu Drive.\n\n¿Confirmas que quieres crear uno NUEVO (vacío)?\n\nSi ya tenías datos cargados antes, cancela esto y revisa tu carpeta RentaPro en Drive — puede que el archivo esté en otro lugar o con otro nombre.');
-      if(!proceed){
-        setDriveStatus('cancelado — revisa tu carpeta RentaPro en Drive', false);
+      // No se encontró ningún archivo automáticamente: nunca crear uno nuevo en silencio.
+      // Se ofrece primero buscarlo a mano con el selector de Google (cubre archivos subidos por el usuario).
+      const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = crear un archivo NUEVO (vacío).');
+      if(usarPicker){
+        driveSyncBusy = false;
+        openFilePicker();
         return;
       }
       const buf = buildWorkbook();
