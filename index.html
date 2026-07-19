@@ -54,7 +54,10 @@
   .btn-row{display:flex;gap:10px;margin-top:18px;}
   table{width:100%;border-collapse:collapse;font-size:13.5px;}
   th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);}
-  td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:var(--teal-dark);}
+  td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap;}
+  .truncate{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;}
   tr:hover td{background:#FAFBFA;}
   .mono{font-family:'IBM Plex Mono',monospace;}
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
@@ -211,9 +214,9 @@
               <div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
-              <div class="field"><label>Foja</label><input id="p-cbrFoja"></div>
-              <div class="field"><label>Número</label><input id="p-cbrNumero"></div>
-              <div class="field"><label>Año</label><input id="p-cbrAnio"></div>
+              <div class="field"><label>Foja</label><input id="p-cbrFoja" type="number" step="1"></div>
+              <div class="field"><label>Número</label><input id="p-cbrNumero" type="number" step="1"></div>
+              <div class="field"><label>Año</label><input id="p-cbrAnio" type="number" step="1"></div>
               <div class="field"><label>Localidad</label><input id="p-cbrLocalidad"></div>
             </div>
           </div>
@@ -374,6 +377,10 @@
         <h2>📊 Estado por contrato</h2>
         <select class="filter" id="resumen-filter"></select>
         <div id="resumen-table" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <h2>📈 Histograma mensual — Valor arriendo, pagado y descuentos</h2>
+        <div id="resumen-chart"></div>
       </div>
     </div>
 
@@ -699,7 +706,8 @@ function buildWorkbook(){
     MontoMensual: r.monto,
     MesesAdeudables: r.meses,
     TotalEsperado: r.totalEsperado,
-    TotalPagado: r.totalPagado + r.totalDescuentos,
+    TotalPagado: r.totalPagado,
+    DescuentosAplicados: r.totalDescuentos,
     Saldo: Math.max(r.saldo,0),
     Estado: r.saldo>0 ? 'Con deuda' : 'Al día'
   }));
@@ -794,6 +802,15 @@ let storageOK = true;
 const memoryStore = {};
 
 const money = n => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(n||0));
+// Convierte una fecha ISO (YYYY-MM-DD, la que usan los <input type="date">) al formato chileno DD-MM-AAAA.
+const formatDate = iso => {
+  if(!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return esc(iso);
+  return `${m[3]}-${m[2]}-${m[1]}`;
+};
+// Números (no monetarios) con separador de miles chileno, ej: 1.234.
+const formatNumber = n => (n===''||n===null||n===undefined||isNaN(Number(n))) ? '' : new Intl.NumberFormat('es-CL').format(Number(n));
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 async function loadKey(key){
@@ -862,6 +879,12 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingProp || uid() };
   propFields.forEach(f=> obj[f] = document.getElementById('p-'+f).value);
+  ['cbrFoja','cbrNumero','cbrAnio'].forEach(f=>{
+    if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.round(Number(obj[f])));
+  });
+  ['m2Construidos','m2Terreno'].forEach(f=>{
+    if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.ceil(Number(obj[f])));
+  });
   if(editingProp){ properties = properties.map(p=> p.id===editingProp ? obj : p); }
   else { properties.push(obj); }
   const ok = await saveKey('properties',properties);
@@ -902,32 +925,45 @@ function renderProperties(){
   if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
 
   const actions = p => `<td class="row-actions"><button onclick="editProperty('${p.id}')">Editar</button><button onclick="deleteProperty('${p.id}')">Eliminar</button></td>`;
+  const intFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? String(Math.round(Number(v))) : esc(v);
+  const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
+  const direccionCell = p => `<td><span class="truncate" title="${esc(p.direccion)}">${esc(p.direccion)}</span></td>`;
+  const num = v => (v==='' || v==null || isNaN(Number(v))) ? -Infinity : Number(v);
 
+  const rows1 = sortRows('prop1', properties, {
+    direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', m2Construidos: p=>num(p.m2Construidos), m2Terreno: p=>num(p.m2Terreno),
+    propietario: p=>p.propietario||'', rolAvaluo: p=>p.rolAvaluo||'', cbrFoja: p=>num(p.cbrFoja), cbrNumero: p=>num(p.cbrNumero),
+    cbrAnio: p=>num(p.cbrAnio), cbrLocalidad: p=>p.cbrLocalidad||''
+  });
   const seccion1 = `<h3>📜 Antecedentes de la Propiedad e Inscripción CBR</h3>
   <table><thead><tr>
-    <th>Dirección</th><th>Depto/Piso/Local</th><th>M² constr.</th><th>M² terreno</th><th>Propietario</th><th>Rol avalúo</th><th>Foja</th><th>Número</th><th>Año</th><th>Localidad</th><th></th>
+    ${th('prop1','direccion','Dirección')}${th('prop1','unidad','Depto/Piso/Local')}${th('prop1','m2Construidos','M² constr.')}${th('prop1','m2Terreno','M² terreno')}${th('prop1','propietario','Propietario')}${th('prop1','rolAvaluo','Rol avalúo')}${th('prop1','cbrFoja','Foja')}${th('prop1','cbrNumero','Número')}${th('prop1','cbrAnio','Año')}${th('prop1','cbrLocalidad','Localidad')}<th></th>
   </tr></thead><tbody>
-  ${properties.map(p=>`<tr>
-    <td>${esc(p.direccion)}</td>
+  ${rows1.map(p=>`<tr>
+    ${direccionCell(p)}
     <td>${esc(p.unidad)}</td>
-    <td class="mono">${esc(p.m2Construidos)}</td>
-    <td class="mono">${esc(p.m2Terreno)}</td>
+    <td class="mono">${ceilFmt(p.m2Construidos)}</td>
+    <td class="mono">${ceilFmt(p.m2Terreno)}</td>
     <td>${esc(p.propietario)}</td>
     <td class="mono">${esc(p.rolAvaluo)}</td>
-    <td class="mono">${esc(p.cbrFoja)}</td>
-    <td class="mono">${esc(p.cbrNumero)}</td>
-    <td class="mono">${esc(p.cbrAnio)}</td>
+    <td class="mono">${intFmt(p.cbrFoja)}</td>
+    <td class="mono">${intFmt(p.cbrNumero)}</td>
+    <td class="mono">${intFmt(p.cbrAnio)}</td>
     <td>${esc(p.cbrLocalidad)}</td>
     ${actions(p)}
   </tr>`).join('')}
   </tbody></table>`;
 
+  const rows2 = sortRows('prop2', properties, {
+    direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', clienteLuz: p=>p.clienteLuz||'', clienteAgua: p=>p.clienteAgua||'',
+    clienteGas: p=>p.clienteGas||'', medidorLuz: p=>p.medidorLuz||'', medidorAgua: p=>p.medidorAgua||'', medidorGas: p=>p.medidorGas||''
+  });
   const seccion2 = `<h3 style="margin-top:28px">🔧 Servicios por Propiedad</h3>
   <table><thead><tr>
-    <th>Dirección</th><th>Depto/Piso/Local</th><th>⚡ # Cliente Luz</th><th>💧 # Cliente Agua</th><th>🔥 # Cliente Gas</th><th>⚡ Medidor Luz</th><th>💧 Medidor Agua</th><th>🔥 Medidor Gas</th><th></th>
+    ${th('prop2','direccion','Dirección')}${th('prop2','unidad','Depto/Piso/Local')}${th('prop2','clienteLuz','⚡ # Cliente Luz')}${th('prop2','clienteAgua','💧 # Cliente Agua')}${th('prop2','clienteGas','🔥 # Cliente Gas')}${th('prop2','medidorLuz','⚡ Medidor Luz')}${th('prop2','medidorAgua','💧 Medidor Agua')}${th('prop2','medidorGas','🔥 Medidor Gas')}<th></th>
   </tr></thead><tbody>
-  ${properties.map(p=>`<tr>
-    <td>${esc(p.direccion)}</td>
+  ${rows2.map(p=>`<tr>
+    ${direccionCell(p)}
     <td>${esc(p.unidad)}</td>
     <td class="mono">${esc(p.clienteLuz)}</td>
     <td class="mono">${esc(p.clienteAgua)}</td>
@@ -939,12 +975,15 @@ function renderProperties(){
   </tr>`).join('')}
   </tbody></table>`;
 
+  const rows3 = sortRows('prop3', properties, {
+    direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', avaluoFiscal: p=>num(p.avaluoFiscal), valorComercial: p=>num(p.valorComercial), contribuciones: p=>num(p.contribuciones)
+  });
   const seccion3 = `<h3 style="margin-top:28px">💰 Antecedentes Comerciales</h3>
   <table><thead><tr>
-    <th>Dirección</th><th>Depto/Piso/Local</th><th>Avalúo fiscal</th><th>Valor comercial probable</th><th>Contribuciones</th><th></th>
+    ${th('prop3','direccion','Dirección')}${th('prop3','unidad','Depto/Piso/Local')}${th('prop3','avaluoFiscal','Avalúo fiscal')}${th('prop3','valorComercial','Valor comercial probable')}${th('prop3','contribuciones','Contribuciones')}<th></th>
   </tr></thead><tbody>
-  ${properties.map(p=>`<tr>
-    <td>${esc(p.direccion)}</td>
+  ${rows3.map(p=>`<tr>
+    ${direccionCell(p)}
     <td>${esc(p.unidad)}</td>
     <td class="mono">${p.avaluoFiscal?money(p.avaluoFiscal):''}</td>
     <td class="mono">${p.valorComercial?money(p.valorComercial):''}</td>
@@ -1009,10 +1048,14 @@ function tenantName(id){
 function renderTenants(){
   const el = document.getElementById('tenant-table');
   if(!tenants.length){ el.innerHTML='<div class="empty">Aún no hay arrendatarios registrados.</div>'; return; }
+  const tRows = sortRows('tenants', tenants, {
+    nombreSociedad: x=>x.nombreSociedad||'', rutSociedad: x=>x.rutSociedad||'', nombreRepresentante: x=>x.nombreRepresentante||'',
+    correo: x=>x.correo||'', telefono: x=>x.telefono||''
+  });
   el.innerHTML = `<table><thead><tr>
-    <th>Sociedad</th><th>Rut Sociedad</th><th>Representante</th><th>Correo</th><th>Teléfono</th><th></th>
+    ${th('tenants','nombreSociedad','Sociedad')}${th('tenants','rutSociedad','Rut Sociedad')}${th('tenants','nombreRepresentante','Representante')}${th('tenants','correo','Correo')}${th('tenants','telefono','Teléfono')}<th></th>
   </tr></thead><tbody>
-  ${tenants.map(t=>`<tr>
+  ${tRows.map(t=>`<tr>
     <td>${esc(t.nombreSociedad)}</td>
     <td class="mono">${esc(t.rutSociedad)}</td>
     <td>${esc(t.nombreRepresentante)}</td>
@@ -1084,13 +1127,17 @@ function renderContracts(){
   const el = document.getElementById('contract-table');
   const activos = contracts.filter(isActiveContract);
   if(!activos.length){ el.innerHTML='<div class="empty">Aún no hay contratos registrados. (Los contratos históricos se ven en la pestaña "Arrendatarios Históricos")</div>'; return; }
+  const rows = sortRows('contracts', activos, {
+    tenant: c=>tenantName(c.tenantId)||'', propiedad: c=>propAddress(c.propiedadId)||'', fechaInicioContrato: c=>c.fechaInicioContrato||'',
+    tipoContrato: c=>c.tipoContrato||'', montoArriendoPactado: c=>Number(c.montoArriendoPactado||0)
+  });
   el.innerHTML = `<table><thead><tr>
-    <th>Arrendatario</th><th>Propiedad</th><th>Inicio contrato</th><th>Tipo</th><th>Monto pactado</th><th></th>
+    ${th('contracts','tenant','Arrendatario')}${th('contracts','propiedad','Propiedad')}${th('contracts','fechaInicioContrato','Inicio contrato')}${th('contracts','tipoContrato','Tipo')}${th('contracts','montoArriendoPactado','Monto pactado')}<th></th>
   </tr></thead><tbody>
-  ${activos.map(c=>`<tr>
+  ${rows.map(c=>`<tr>
     <td>${esc(tenantName(c.tenantId))}</td>
     <td>${esc(propAddress(c.propiedadId))}</td>
-    <td class="mono">${esc(c.fechaInicioContrato)}</td>
+    <td class="mono">${formatDate(c.fechaInicioContrato)}</td>
     <td>${esc(c.tipoContrato)}</td>
     <td class="mono">${money(c.montoArriendoPactado)}</td>
     <td class="row-actions"><button onclick="editContract('${c.id}')">Editar</button><button onclick="deleteContract('${c.id}')">Eliminar</button></td>
@@ -1150,15 +1197,19 @@ async function deletePayment(id){
 function renderPayments(){
   const filter = document.getElementById('pay-filter').value;
   const el = document.getElementById('pay-table');
-  const list = payments.filter(p=> !filter || p.contratoId===filter)
-                        .sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
+  let list = payments.filter(p=> !filter || p.contratoId===filter)
+                      .sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
+  list = sortRows('payments', list, {
+    contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
+    descuentos: p=>Number(p.descuentos||0), medioPago: p=>p.medioPago||''
+  });
   if(!list.length){ el.innerHTML='<div class="empty">No hay pagos registrados.</div>'; return; }
   el.innerHTML = `<table><thead><tr>
-    <th>Contrato</th><th>Fecha pago</th><th>Monto pagado</th><th>Descuentos</th><th>Medio</th><th></th>
+    ${th('payments','contrato','Contrato')}${th('payments','fechaPago','Fecha pago')}${th('payments','montoPagado','Monto pagado')}${th('payments','descuentos','Descuentos')}${th('payments','medioPago','Medio')}<th></th>
   </tr></thead><tbody>
   ${list.map(p=>`<tr>
     <td>${esc(contractLabel(p.contratoId))}</td>
-    <td class="mono">${esc(p.fechaPago)}</td>
+    <td class="mono">${formatDate(p.fechaPago)}</td>
     <td class="mono">${money(p.montoPagado)}</td>
     <td class="mono">${money(p.descuentos)}</td>
     <td>${esc(p.medioPago)}</td>
@@ -1226,40 +1277,51 @@ document.getElementById('resumen-filter').addEventListener('change', renderResum
 
 function renderResumen(){
   renderResumenSelect();
-  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDeudaGlobal=0, enMora=0;
+  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDescuentosGlobal=0, totalDeudaGlobal=0, enMora=0;
   const allRows = computeResumenRows();
   allRows.forEach(r=>{
     totalEsperadoGlobal += r.totalEsperado;
-    totalPagadoGlobal += r.totalPagado + r.totalDescuentos;
+    totalPagadoGlobal += r.totalPagado;
+    totalDescuentosGlobal += r.totalDescuentos;
     if(r.saldo>0){ totalDeudaGlobal += r.saldo; enMora += 1; }
   });
 
   document.getElementById('summary-cards').innerHTML = `
     <div class="stat"><div class="label">Contratos activos</div><div class="value">${contracts.filter(isActiveContract).length}</div></div>
-    <div class="stat good"><div class="label">Total pagado (histórico)</div><div class="value">${money(totalPagadoGlobal)}</div></div>
+    <div class="stat good"><div class="label">Total pagado en efectivo/transferencia</div><div class="value">${money(totalPagadoGlobal)}</div></div>
+    <div class="stat"><div class="label">Total descuentos aplicados</div><div class="value">${money(totalDescuentosGlobal)}</div></div>
     <div class="stat"><div class="label">Total esperado a la fecha</div><div class="value">${money(totalEsperadoGlobal)}</div></div>
     <div class="stat warn"><div class="label">Deuda total (${enMora} en mora)</div><div class="value">${money(totalDeudaGlobal)}</div></div>
   `;
 
   const filtro = document.getElementById('resumen-filter').value;
-  const rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
+  let rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
+  rows = sortRows('resumen', rows, {
+    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>propAddress(r.c.propiedadId)||'', monto: r=>r.monto,
+    meses: r=>r.meses, totalEsperado: r=>r.totalEsperado, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos, saldo: r=>Math.max(r.saldo,0)
+  });
 
   const el = document.getElementById('resumen-table');
-  if(!rows.length){ el.innerHTML='<div class="empty">Registra contratos y pagos para ver el resumen.</div>'; return; }
-  el.innerHTML = `<table><thead><tr>
-    <th>Arrendatario</th><th>Propiedad</th><th>Monto mensual</th><th>Meses adeudables</th><th>Total esperado</th><th>Total pagado</th><th>Saldo</th><th>Estado</th>
-  </tr></thead><tbody>
-  ${rows.map(r=>`<tr>
-    <td>${esc(tenantName(r.c.tenantId))}</td>
-    <td>${esc(propAddress(r.c.propiedadId))}</td>
-    <td class="mono">${money(r.monto)}</td>
-    <td class="mono">${r.meses}</td>
-    <td class="mono">${money(r.totalEsperado)}</td>
-    <td class="mono">${money(r.totalPagado+r.totalDescuentos)}</td>
-    <td class="mono">${money(Math.max(r.saldo,0))}</td>
-    <td>${r.saldo>0 ? '<span class="tag tag-debt">Con deuda</span>' : '<span class="tag tag-ok">Al día</span>'}</td>
-  </tr>`).join('')}
-  </tbody></table>`;
+  if(!rows.length){ el.innerHTML='<div class="empty">Registra contratos y pagos para ver el resumen.</div>'; }
+  else {
+    el.innerHTML = `<table><thead><tr>
+      ${th('resumen','tenant','Arrendatario')}${th('resumen','propiedad','Propiedad')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses adeudables')}${th('resumen','totalEsperado','Total esperado')}${th('resumen','totalPagado','Total pagado')}${th('resumen','totalDescuentos','Descuentos aplicados')}${th('resumen','saldo','Saldo')}<th>Estado</th>
+    </tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td>${esc(tenantName(r.c.tenantId))}</td>
+      <td>${esc(propAddress(r.c.propiedadId))}</td>
+      <td class="mono">${money(r.monto)}</td>
+      <td class="mono">${r.meses}</td>
+      <td class="mono">${money(r.totalEsperado)}</td>
+      <td class="mono">${money(r.totalPagado)}</td>
+      <td class="mono">${money(r.totalDescuentos)}</td>
+      <td class="mono">${money(Math.max(r.saldo,0))}</td>
+      <td>${r.saldo>0 ? '<span class="tag tag-debt">Con deuda</span>' : '<span class="tag tag-ok">Al día</span>'}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+  }
+
+  renderResumenChart(filtro);
 }
 
 // ---------- ALERTAS (por contrato) ----------
@@ -1307,7 +1369,7 @@ function renderAlertas(){
   if(!alerts.length){ el.innerHTML='<div class="empty">No hay vencimientos ni ajustes de IPC dentro de los próximos 3 meses.</div>'; return; }
   el.innerHTML = alerts.map(a=>{
     const urgencyClass = a.vencido ? 'u1' : ('u'+a.meses);
-    const when = a.vencido ? `Venció el ${a.fecha}` : `${esc(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
+    const when = a.vencido ? `Venció el ${formatDate(a.fecha)}` : `${formatDate(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
     return `<div class="alert-card ${urgencyClass}">
       <div>
         <div class="title">${esc(a.tipo)} — ${esc(tenantName(a.c.tenantId))}</div>
@@ -1429,21 +1491,26 @@ function renderReadings(){
   const filter = document.getElementById('r-filter').value;
   const el = document.getElementById('reading-table');
   const all = computeReadingsWithConsumption();
-  const list = all.filter(r=> !filter || r.contratoId===filter)
-                   .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
+  let list = all.filter(r=> !filter || r.contratoId===filter)
+                .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
+  list = sortRows('readings', list, {
+    contrato: r=>contractLabel(r.contratoId)||'', servicio: r=>r.servicio||'', fechaLectura: r=>r.fechaLectura||'',
+    lecturaActual: r=>Number(r.lecturaActual||0), consumo: r=>(r.consumo===null?-Infinity:r.consumo),
+    valorUnitario: r=>Number(r.valorUnitario||0), monto: r=>r.monto, estadoEfectivo: r=>r.estadoEfectivo||''
+  });
   if(!list.length){ el.innerHTML='<div class="empty">No hay lecturas registradas.</div>'; return; }
   el.innerHTML = `<table><thead><tr>
-    <th>Arrendatario</th><th>Servicio</th><th>Fecha lectura</th><th>Lectura ant.</th><th>Lectura actual</th><th>Consumo</th><th>Valor unit.</th><th>Monto a pagar</th><th>Estado</th><th></th>
+    ${th('readings','contrato','Arrendatario')}${th('readings','servicio','Servicio')}${th('readings','fechaLectura','Fecha lectura')}<th>Lectura ant.</th>${th('readings','lecturaActual','Lectura actual')}${th('readings','consumo','Consumo')}${th('readings','valorUnitario','Valor unit.')}${th('readings','monto','Monto a pagar')}${th('readings','estadoEfectivo','Estado')}<th></th>
   </tr></thead><tbody>
   ${list.map(r=>{
     const tagClass = r.estadoEfectivo==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
     return `<tr>
     <td>${esc(contractLabel(r.contratoId))}</td>
     <td>${servicioIcono(r.servicio)}</td>
-    <td class="mono">${esc(r.fechaLectura)}</td>
-    <td class="mono">${r.lecturaAnterior===null?'—':r.lecturaAnterior}</td>
-    <td class="mono">${esc(r.lecturaActual)}</td>
-    <td class="mono">${r.consumo===null?'primera lectura':r.consumo}</td>
+    <td class="mono">${formatDate(r.fechaLectura)}</td>
+    <td class="mono">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)}</td>
+    <td class="mono">${formatNumber(r.lecturaActual)}</td>
+    <td class="mono">${r.consumo===null?'primera lectura':formatNumber(r.consumo)}</td>
     <td class="mono">${money(r.valorUnitario)}</td>
     <td class="mono">${money(r.monto)}</td>
     <td>
@@ -1516,7 +1583,7 @@ function renderHistorial(){
     else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
     else { estado='Pagado'; tagClass='tag-ok'; }
     const detalle = pagosMes.length
-      ? pagosMes.map(p=>`${esc(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}`).join('<br>')
+      ? pagosMes.map(p=>`${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}`).join('<br>')
       : '—';
     return `<tr>
       <td>${MESES_ES[month]} ${year}</td>
@@ -1537,7 +1604,7 @@ function renderHistoricos(){
   const historicos = contracts.filter(c=> !isActiveContract(c));
   if(!historicos.length){ el.innerHTML='<div class="empty">No hay arrendatarios históricos registrados.</div>'; return; }
 
-  const rows = historicos.map(c=>{
+  let rows = historicos.map(c=>{
     const pagosC = payments.filter(p=>p.contratoId===c.id).sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''));
     const totalPagado = pagosC.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const totalDescuentos = pagosC.reduce((s,p)=>s+Number(p.descuentos||0),0);
@@ -1546,8 +1613,14 @@ function renderHistoricos(){
     return { c, cantidad: pagosC.length, totalPagado, totalDescuentos, primerPago, ultimoPago };
   }).sort((a,b)=> (b.ultimoPago||'').localeCompare(a.ultimoPago||''));
 
+  rows = sortRows('historicos', rows, {
+    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>r.c.propiedadId?propAddress(r.c.propiedadId):'',
+    cantidad: r=>r.cantidad, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos,
+    primerPago: r=>r.primerPago==='—'?'':r.primerPago, ultimoPago: r=>r.ultimoPago==='—'?'':r.ultimoPago
+  });
+
   el.innerHTML = `<table><thead><tr>
-    <th>Arrendatario</th><th>Propiedad</th><th>Cant. pagos</th><th>Total pagado histórico</th><th>Total descuentos</th><th>Primer pago</th><th>Último pago</th>
+    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}
   </tr></thead><tbody>
   ${rows.map(r=>`<tr>
     <td>${esc(tenantName(r.c.tenantId))}</td>
@@ -1555,10 +1628,113 @@ function renderHistoricos(){
     <td class="mono">${r.cantidad}</td>
     <td class="mono">${money(r.totalPagado)}</td>
     <td class="mono">${money(r.totalDescuentos)}</td>
-    <td class="mono">${esc(r.primerPago)}</td>
-    <td class="mono">${esc(r.ultimoPago)}</td>
+    <td class="mono">${r.primerPago==="—"?"—":formatDate(r.primerPago)}</td>
+    <td class="mono">${r.ultimoPago==="—"?"—":formatDate(r.ultimoPago)}</td>
   </tr>`).join('')}
   </tbody></table>`;
+}
+
+// ---------- ORDEN DE TABLAS (clic en encabezado) ----------
+const sortState = {}; // { tableId: {key, dir} }  dir: 1 = asc, -1 = desc
+
+function toggleSort(tableId, key){
+  const cur = sortState[tableId];
+  if(cur && cur.key===key){ cur.dir = -cur.dir; }
+  else { sortState[tableId] = { key, dir: 1 }; }
+  renderAll();
+}
+
+function sortRows(tableId, rows, getters){
+  const state = sortState[tableId];
+  if(!state || !getters[state.key]) return rows;
+  const getter = getters[state.key];
+  return rows.slice().sort((a,b)=>{
+    let va = getter(a), vb = getter(b);
+    if(typeof va === 'string') va = va.toLowerCase();
+    if(typeof vb === 'string') vb = vb.toLowerCase();
+    if(va===''||va==null) return 1;
+    if(vb===''||vb==null) return -1;
+    if(va < vb) return -1*state.dir;
+    if(va > vb) return 1*state.dir;
+    return 0;
+  });
+}
+
+function th(tableId, key, label){
+  const s = sortState[tableId];
+  const arrow = (s && s.key===key) ? (s.dir===1 ? ' ▲' : ' ▼') : '';
+  return `<th class="sortable" onclick="toggleSort('${tableId}','${key}')">${label}${arrow}</th>`;
+}
+
+// ---------- HISTOGRAMA MENSUAL (Resumen & Deudas) ----------
+function renderResumenChart(contratoId){
+  const container = document.getElementById('resumen-chart');
+  if(!contratoId){
+    container.innerHTML = '<div class="empty">Selecciona un arrendatario específico en el filtro de arriba para ver su histograma mensual.</div>';
+    return;
+  }
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c){ container.innerHTML = '<div class="empty">Contrato no encontrado.</div>'; return; }
+  if(!c.fechaInicioContrato){ container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>'; return; }
+
+  let months = monthsBetween(c.fechaInicioContrato); // viene del más reciente al más antiguo
+  months = months.slice(0, 12).reverse(); // últimos 12 meses, en orden cronológico
+  const monto = Number(c.montoArriendoPactado||0);
+
+  const data = months.map(({year,month})=>{
+    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
+    const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
+    const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
+    return { label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2), monto, pagado, descuento };
+  });
+
+  container.innerHTML = buildBarChartSVG(data);
+}
+
+function buildBarChartSVG(data){
+  const w = Math.max(560, data.length*72);
+  const h = 300;
+  const padL = 64, padB = 46, padT = 16, padR = 16;
+  const chartW = w - padL - padR;
+  const chartH = h - padT - padB;
+  const maxVal = Math.max(1, ...data.map(d=>Math.max(d.monto, d.pagado, d.descuento)));
+  const groupW = chartW/data.length;
+  const barW = (groupW*0.7)/3;
+
+  const yTicks = 4;
+  const gridLines = Array.from({length:yTicks+1},(_,i)=>{
+    const val = maxVal*i/yTicks;
+    const y = padT + chartH - (val/maxVal)*chartH;
+    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
+      <text x="${padL-8}" y="${y+3}" font-size="9" text-anchor="end" fill="var(--ink-soft)">${formatNumber(Math.round(val))}</text>`;
+  }).join('');
+
+  const bars = data.map((d,i)=>{
+    const gx = padL + i*groupW + groupW*0.15;
+    const hMonto = (d.monto/maxVal)*chartH;
+    const hPagado = (d.pagado/maxVal)*chartH;
+    const hDesc = (d.descuento/maxVal)*chartH;
+    return `
+      <rect x="${gx}" y="${padT+chartH-hMonto}" width="${barW}" height="${hMonto}" fill="var(--border)"><title>Valor pactado: ${money(d.monto)}</title></rect>
+      <rect x="${gx+barW}" y="${padT+chartH-hPagado}" width="${barW}" height="${hPagado}" fill="var(--teal)"><title>Pagado: ${money(d.pagado)}</title></rect>
+      <rect x="${gx+2*barW}" y="${padT+chartH-hDesc}" width="${barW}" height="${hDesc}" fill="var(--gold)"><title>Descuento: ${money(d.descuento)}</title></rect>
+      <text x="${gx+barW*1.5}" y="${h-padB+16}" font-size="10" text-anchor="middle" fill="var(--ink-soft)">${esc(d.label)}</text>
+    `;
+  }).join('');
+
+  return `<div style="overflow-x:auto">
+  <svg viewBox="0 0 ${w} ${h}" style="width:${w}px;max-width:none;height:${h}px;">
+    ${gridLines}
+    ${bars}
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+chartH}" stroke="var(--border)"/>
+    <line x1="${padL}" y1="${padT+chartH}" x2="${w-padR}" y2="${padT+chartH}" stroke="var(--border)"/>
+  </svg>
+  </div>
+  <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap">
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--border);margin-right:5px;border-radius:2px;"></span>Valor arriendo pactado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:5px;border-radius:2px;"></span>Pagado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);margin-right:5px;border-radius:2px;"></span>Descuento aplicado</span>
+  </div>`;
 }
 
 function esc(s){
