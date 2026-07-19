@@ -498,8 +498,8 @@ function setGateChecking(isChecking){
   document.getElementById('drive-gate-action').style.display = isChecking ? 'none' : 'block';
 }
 
-function rememberConnectedHint(){ try{ localStorage.setItem(DRIVE_HINT_KEY, '1'); }catch(e){} }
-function hadConnectedBefore(){ try{ return localStorage.getItem(DRIVE_HINT_KEY) === '1'; }catch(e){ return false; } }
+function rememberConnectedHint(){ try{ localStorage.setItem(DRIVE_HINT_KEY, DRIVE_SCOPE); }catch(e){} }
+function hadConnectedBefore(){ try{ return localStorage.getItem(DRIVE_HINT_KEY) === DRIVE_SCOPE; }catch(e){ return false; } }
 function forgetConnectedHint(){ try{ localStorage.removeItem(DRIVE_HINT_KEY); }catch(e){} }
 
 function initGoogleDrive(){
