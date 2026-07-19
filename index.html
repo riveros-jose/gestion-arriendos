@@ -164,6 +164,7 @@
     <div class="nav-item" data-tab="resumen"><span class="num">04</span> Resumen &amp; Deudas</div>
     <div class="nav-item" data-tab="alertas"><span class="num">05</span> Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
     <div class="nav-item" data-tab="servicios"><span class="num">06</span> Servicios</div>
+    <div class="nav-item" data-tab="historial"><span class="num">07</span> Historial Mensual</div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -196,7 +197,10 @@
             </div>
           </div>
           <div class="line-group">
-            <div class="line-row"><div class="field"><label>M²</label><input id="p-m2" type="number" step="0.1"></div></div>
+            <div class="line-row">
+              <div class="field"><label>M² construidos</label><input id="p-m2Construidos" type="number" step="0.1"></div>
+              <div class="field"><label>M² de terreno</label><input id="p-m2Terreno" type="number" step="0.1"></div>
+            </div>
           </div>
           <div class="line-group">
             <h3>Inscripción CBR</h3>
@@ -352,7 +356,7 @@
         </form>
       </div>
       <div class="card">
-        <h2>Historial de pagos</h2>
+        <div class="toggle-form"><h2>Historial de pagos</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
         <select class="filter" id="pay-filter"></select>
         <div id="pay-table" class="table-wrap"></div>
       </div>
@@ -365,6 +369,7 @@
       <div class="summary-cards" id="summary-cards"></div>
       <div class="card">
         <h2>Estado por contrato</h2>
+        <select class="filter" id="resumen-filter"></select>
         <div id="resumen-table" class="table-wrap"></div>
       </div>
     </div>
@@ -409,6 +414,18 @@
         <h2>Lecturas registradas</h2>
         <select class="filter" id="r-filter"></select>
         <div id="reading-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- HISTORIAL MENSUAL -->
+    <div class="tab-section" id="tab-historial">
+      <h1>Historial Mensual</h1>
+      <div class="subtitle">Revisa mes a mes si ya registraste el pago de un contrato y en cuáles meses falta.</div>
+      <div class="card">
+        <div class="line-row" style="margin-bottom:16px">
+          <div class="field"><label>Contrato</label><select id="h-contratoId"></select></div>
+        </div>
+        <div id="historial-table" class="table-wrap"></div>
       </div>
     </div>
 
@@ -769,6 +786,7 @@ function renderAll(){
   renderAlertas();
   renderReadingSelects();
   renderReadings();
+  renderHistorial();
 }
 
 // ---------- NAV ----------
@@ -782,7 +800,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 });
 
 // ---------- PROPIEDADES ----------
-const propFields = ['direccion','unidad','m2','propietario','rolAvaluo','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial'];
+const propFields = ['direccion','unidad','m2Construidos','m2Terreno','propietario','rolAvaluo','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial'];
 
 document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -827,11 +845,13 @@ function renderProperties(){
   const el = document.getElementById('prop-table');
   if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
   el.innerHTML = `<table><thead><tr>
-    <th>Dirección</th><th>Unidad</th><th>Propietario</th><th>Rol avalúo</th><th>Valor comercial</th><th></th>
+    <th>Dirección</th><th>Unidad</th><th>M² constr.</th><th>M² terreno</th><th>Propietario</th><th>Rol avalúo</th><th>Valor comercial</th><th></th>
   </tr></thead><tbody>
   ${properties.map(p=>`<tr>
     <td>${esc(p.direccion)}</td>
     <td>${esc(p.unidad)}</td>
+    <td class="mono">${esc(p.m2Construidos)}</td>
+    <td class="mono">${esc(p.m2Terreno)}</td>
     <td>${esc(p.propietario)}</td>
     <td class="mono">${esc(p.rolAvaluo)}</td>
     <td class="mono">${p.valorComercial?money(p.valorComercial):''}</td>
@@ -1048,6 +1068,30 @@ function renderPayments(){
   </tbody></table>`;
 }
 
+document.getElementById('export-payments-btn').addEventListener('click', ()=>{
+  if(!payments.length){ alert('No hay pagos registrados para exportar.'); return; }
+  const rows = payments
+    .slice()
+    .sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''))
+    .map(p=>{
+      const c = contracts.find(x=>x.id===p.contratoId);
+      return {
+        Arrendatario: c ? tenantName(c.tenantId) : '—',
+        Propiedad: c ? propAddress(c.propiedadId) : '—',
+        FechaPago: p.fechaPago,
+        MontoPagado: Number(p.montoPagado||0),
+        Descuentos: Number(p.descuentos||0),
+        MedioPago: p.medioPago,
+        Comentarios: p.comentarios
+      };
+    });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
+  const fecha = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `pagos-y-descuentos-${fecha}.xlsx`);
+});
+
 // ---------- RESUMEN (por contrato) ----------
 function mesesTranscurridos(fechaInicio){
   if(!fechaInicio) return 0;
@@ -1072,10 +1116,19 @@ function computeResumenRows(){
   }).sort((a,b)=> b.saldo - a.saldo);
 }
 
+function renderResumenSelect(){
+  const sel = document.getElementById('resumen-filter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  if(contracts.some(c=>c.id===current)) sel.value = current;
+}
+document.getElementById('resumen-filter').addEventListener('change', renderResumen);
+
 function renderResumen(){
+  renderResumenSelect();
   let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDeudaGlobal=0, enMora=0;
-  const rows = computeResumenRows();
-  rows.forEach(r=>{
+  const allRows = computeResumenRows();
+  allRows.forEach(r=>{
     totalEsperadoGlobal += r.totalEsperado;
     totalPagadoGlobal += r.totalPagado + r.totalDescuentos;
     if(r.saldo>0){ totalDeudaGlobal += r.saldo; enMora += 1; }
@@ -1087,6 +1140,9 @@ function renderResumen(){
     <div class="stat"><div class="label">Total esperado a la fecha</div><div class="value">${money(totalEsperadoGlobal)}</div></div>
     <div class="stat warn"><div class="label">Deuda total (${enMora} en mora)</div><div class="value">${money(totalDeudaGlobal)}</div></div>
   `;
+
+  const filtro = document.getElementById('resumen-filter').value;
+  const rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
 
   const el = document.getElementById('resumen-table');
   if(!rows.length){ el.innerHTML='<div class="empty">Registra contratos y pagos para ver el resumen.</div>'; return; }
@@ -1291,6 +1347,77 @@ function renderReadings(){
       <button onclick="deleteReading('${r.id}')">Eliminar</button>
     </td>
   </tr>`;
+  }).join('')}
+  </tbody></table>`;
+}
+
+// ---------- HISTORIAL MENSUAL ----------
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function renderHistorialSelects(){
+  const sel = document.getElementById('h-contratoId');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Selecciona un contrato —</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  if(contracts.some(c=>c.id===current)) sel.value = current;
+}
+document.getElementById('h-contratoId').addEventListener('change', renderHistorial);
+
+function sameYearMonth(fechaStr, year, month){
+  if(!fechaStr) return false;
+  const parts = fechaStr.split('-');
+  return Number(parts[0])===year && (Number(parts[1])-1)===month;
+}
+
+function monthsBetween(startDateStr){
+  const start = new Date(startDateStr+'T00:00:00');
+  const now = new Date();
+  const months = [];
+  let y = start.getFullYear(), m = start.getMonth();
+  const endY = now.getFullYear(), endM = now.getMonth();
+  let guard = 0;
+  while((y < endY || (y===endY && m<=endM)) && guard < 600){
+    months.push({year:y, month:m});
+    m++; if(m>11){ m=0; y++; }
+    guard++;
+  }
+  return months.reverse(); // más reciente primero
+}
+
+function renderHistorial(){
+  renderHistorialSelects();
+  const el = document.getElementById('historial-table');
+  const contratoId = document.getElementById('h-contratoId').value;
+  if(!contratoId){ el.innerHTML = '<div class="empty">Selecciona un contrato para ver su historial mes a mes.</div>'; return; }
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c || !c.fechaInicioContrato){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>'; return; }
+
+  const months = monthsBetween(c.fechaInicioContrato);
+  const monto = Number(c.montoArriendoPactado||0);
+
+  el.innerHTML = `<table><thead><tr>
+    <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
+  </tr></thead><tbody>
+  ${months.map(({year,month})=>{
+    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
+    const totalPagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
+    const totalDesc = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
+    const saldo = monto - (totalPagado+totalDesc);
+    let estado, tagClass;
+    if(pagosMes.length===0){ estado='Sin pago'; tagClass='tag-debt'; }
+    else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
+    else { estado='Pagado'; tagClass='tag-ok'; }
+    const detalle = pagosMes.length
+      ? pagosMes.map(p=>`${esc(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}`).join('<br>')
+      : '—';
+    return `<tr>
+      <td>${MESES_ES[month]} ${year}</td>
+      <td class="mono">${money(monto)}</td>
+      <td class="mono">${money(totalPagado)}</td>
+      <td class="mono">${money(totalDesc)}</td>
+      <td class="mono">${money(Math.max(saldo,0))}</td>
+      <td><span class="tag ${tagClass}">${estado}</span></td>
+      <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
+    </tr>`;
   }).join('')}
   </tbody></table>`;
 }
