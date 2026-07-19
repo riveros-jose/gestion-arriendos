@@ -533,8 +533,13 @@ function loadFromWorkbook(arrayBuffer){
   payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
 }
 
+let driveSyncBusy = false;
+let driveSyncQueued = false;
+
 async function driveSync(isInitialLoad){
   if(!driveToken){ showDriveGate(); setGateChecking(false); return; }
+  if(driveSyncBusy){ driveSyncQueued = true; return; }
+  driveSyncBusy = true;
   try{
     if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
     if(driveFileId===null){ driveFileId = await driveFindFile(driveFolderId); }
@@ -561,6 +566,12 @@ async function driveSync(isInitialLoad){
     driveToken = null;
     setDriveStatus('sesión expirada, reconectando…', false);
     if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+  } finally {
+    driveSyncBusy = false;
+    if(driveSyncQueued){
+      driveSyncQueued = false;
+      driveSync(false); // hubo cambios mientras sincronizábamos: los empujamos ahora
+    }
   }
 }
 
