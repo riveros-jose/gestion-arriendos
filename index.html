@@ -147,11 +147,11 @@
   <div class="drive-gate-card">
     <div class="drive-gate-icon">☁️</div>
     <h2>Conecta tu Google Drive</h2>
-    <p id="drive-gate-desc">Para usar esta app necesitas conectar tu cuenta de Google. Los registros se guardan en un archivo Excel dentro de la carpeta <strong>RentaPro</strong> — esta app no tiene acceso a nada más de tu cuenta que no hayas autorizado.</p>
+    <p id="drive-gate-desc">Para usar esta app necesitas conectar tu cuenta de Google. Los registros se guardan en un archivo Excel dentro de la carpeta <strong>RentaPro</strong> en tu Drive. Para poder leer ese archivo aunque lo subas o reemplaces tú mismo desde drive.google.com, esta app pide acceso a tu Drive completo (no solo a los archivos que ella crea).</p>
     <div id="drive-gate-checking" style="display:none" class="drive-gate-checking">Verificando tu sesión de Google…</div>
     <div id="drive-gate-action">
       <button class="btn btn-primary" id="drive-gate-connect-btn">Conectar con Google Drive</button>
-      <p id="drive-gate-msg" class="drive-gate-fine">Puedes revocar este acceso cuando quieras desde tu cuenta de Google.</p>
+      <p id="drive-gate-msg" class="drive-gate-fine">Puedes revocar este acceso cuando quieras desde <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">tu cuenta de Google</a>.</p>
     </div>
   </div>
 </div>
@@ -454,11 +454,12 @@ const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.goo
 // la carpeta en Drive: https://drive.google.com/drive/folders/ESTE_ES_EL_ID
 const SHARED_FOLDER_ID = '';
 
-// Con carpeta compartida se necesita el scope amplio de Drive (para poder ver carpetas compartidas
-// por otras cuentas). Sin carpeta compartida, se usa el scope mínimo (solo archivos creados por la app).
-const DRIVE_SCOPE = SHARED_FOLDER_ID
-  ? 'https://www.googleapis.com/auth/drive'
-  : 'https://www.googleapis.com/auth/drive.file';
+// Usamos el scope amplio de Drive siempre (no solo en modo compartido). El scope mínimo
+// (drive.file) solo deja ver archivos que la propia app creó — si el usuario sube o
+// reemplaza el archivo a mano desde drive.google.com (como al migrar datos), ese archivo
+// queda invisible para la app y por eso terminaba creando uno nuevo en blanco cada vez.
+// Con el scope amplio, la app puede ver y editar cualquier archivo/carpeta de tu Drive.
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 
 const DRIVE_FOLDER_NAME = 'RentaPro';
 const DRIVE_FILENAME = 'registros-arriendos.xlsx';
@@ -567,7 +568,8 @@ document.getElementById('drive-gate-connect-btn').addEventListener('click', requ
 document.getElementById('drive-reload-btn').addEventListener('click', ()=>{
   if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
   if(!confirm('Esto va a reemplazar lo que ves en pantalla por lo que esté guardado ahora mismo en el Excel de Drive (incluyendo ediciones manuales). ¿Continuar?')) return;
-  driveFileId = null; // fuerza a volver a buscar el archivo por si cambió
+  driveFileId = null;   // fuerza a volver a buscar el archivo por si cambió
+  driveFolderId = null; // fuerza a volver a ubicar la carpeta RentaPro por si había quedado una referencia vieja
   setDriveStatus('recargando desde Excel…', true);
   driveSync(true);
 });
@@ -607,11 +609,38 @@ async function driveFindOrCreateFolder(){
 }
 
 async function driveFindFile(folderId){
-  const q = encodeURIComponent(`name='${DRIVE_FILENAME}' and '${folderId}' in parents and trashed=false`);
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, { headers:{ Authorization:'Bearer '+driveToken } });
+  // 1) Búsqueda exacta dentro de la carpeta esperada
+  const qExact = encodeURIComponent(`name='${DRIVE_FILENAME}' and '${folderId}' in parents and trashed=false`);
+  let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qExact}&spaces=drive&fields=files(id,name,parents,size)`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
-  const data = await res.json();
-  return (data.files && data.files.length) ? data.files[0].id : null;
+  let data = await res.json();
+  if(data.files && data.files.length){
+    // Drive permite nombres duplicados en una misma carpeta. No adivinamos cuál es el correcto:
+    // solo avisamos para que el usuario borre el que sobra manualmente en Drive.
+    if(data.files.length > 1){
+      document.getElementById('drive-note').textContent = `⚠ Hay ${data.files.length} archivos llamados "${DRIVE_FILENAME}" en tu carpeta RentaPro. Borra los que sobren en Drive para evitar resultados inconsistentes.`;
+      console.warn('Archivos duplicados encontrados:', data.files);
+    }
+    return data.files[0].id;
+  }
+
+  // 2) Respaldo: busca el archivo en cualquier carpeta a la que esta app tenga acceso
+  //    (con el scope amplio de Drive, esto puede encontrar el archivo sin importar cómo se creó).
+  const qBroad = encodeURIComponent(`name contains 'registros-arriendos' and trashed=false`);
+  res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qBroad}&spaces=drive&fields=files(id,name,parents,size)`, { headers:{ Authorization:'Bearer '+driveToken } });
+  if(res.status===401) throw new Error('token expirado');
+  data = await res.json();
+  const matches = (data.files||[]).filter(f => f.name.trim().toLowerCase() === DRIVE_FILENAME.toLowerCase());
+  if(matches.length){
+    if(matches.length > 1){
+      document.getElementById('drive-note').textContent = `⚠ Hay ${matches.length} archivos llamados "${DRIVE_FILENAME}" en tu Drive. Borra los que sobren para evitar resultados inconsistentes.`;
+      console.warn('Archivos duplicados encontrados:', matches);
+    }
+    const match = matches[0];
+    if(match.parents && match.parents[0]) driveFolderId = match.parents[0]; // adopta la carpeta real donde vive el archivo
+    return match.id;
+  }
+  return null;
 }
 
 async function driveCreateXlsxFile(arrayBuffer, folderId){
@@ -726,6 +755,15 @@ async function driveSync(isInitialLoad){
       await saveKey('payments',payments);
       await saveKey('readings',readings);
       renderAll();
+    } else if(isInitialLoad && !driveFileId){
+      // No se encontró ningún archivo existente al conectar: nunca crear uno nuevo en silencio.
+      const proceed = confirm('No encontramos un archivo "registros-arriendos.xlsx" en tu Drive.\n\n¿Confirmas que quieres crear uno NUEVO (vacío)?\n\nSi ya tenías datos cargados antes, cancela esto y revisa tu carpeta RentaPro en Drive — puede que el archivo esté en otro lugar o con otro nombre.');
+      if(!proceed){
+        setDriveStatus('cancelado — revisa tu carpeta RentaPro en Drive', false);
+        return;
+      }
+      const buf = buildWorkbook();
+      driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
     } else {
       const buf = buildWorkbook();
       if(!driveFileId){
