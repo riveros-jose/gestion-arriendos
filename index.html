@@ -379,8 +379,16 @@
         <div id="resumen-table" class="table-wrap"></div>
       </div>
       <div class="card">
-        <h2>📈 Histograma mensual — Valor arriendo, pagado y descuentos</h2>
+        <h2>📈 Histograma — Valor arriendo, pagado y descuentos</h2>
+        <div class="line-row" style="margin-bottom:16px;max-width:420px">
+          <div class="field"><label>Año</label><select id="chart-year-filter"></select></div>
+          <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
+        </div>
         <div id="resumen-chart"></div>
+      </div>
+      <div class="card">
+        <h2>⚠️ Meses impagos o parcialmente pagados</h2>
+        <div id="resumen-impagos" class="table-wrap"></div>
       </div>
     </div>
 
@@ -699,19 +707,6 @@ function buildWorkbook(){
 
   const payRows = payments.length ? payments.map(p=>({...p, contrato_label: contractLabel(p.contratoId)})) : [{}];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payRows), 'Pagos');
-
-  const resumenRows = computeResumenRows().map(r=>({
-    Arrendatario: tenantName(r.c.tenantId),
-    Propiedad: propAddress(r.c.propiedadId),
-    MontoMensual: r.monto,
-    MesesAdeudables: r.meses,
-    TotalEsperado: r.totalEsperado,
-    TotalPagado: r.totalPagado,
-    DescuentosAplicados: r.totalDescuentos,
-    Saldo: Math.max(r.saldo,0),
-    Estado: r.saldo>0 ? 'Con deuda' : 'Al día'
-  }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows.length?resumenRows:[{}]), 'Resumen');
 
   const readingRows = readings.length ? computeReadingsWithConsumption().map(r=>({
     ...r,
@@ -1253,12 +1248,25 @@ function mesesTranscurridos(fechaInicio){
   return Math.max(months,0);
 }
 
+// Para el CÁLCULO DE DEUDA (no para vencimiento de contrato ni ajuste de IPC, que siguen usando la
+// fecha real de inicio): si hay una brecha entre el inicio del contrato y el primer pago registrado,
+// asumimos que esos meses previos sí se pagaron (no quedan como "adeudados"). No crea registros nuevos,
+// solo cambia desde qué fecha se cuenta la deuda para este contrato en particular.
+function effectiveDebtStartDate(contratoId){
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c || !c.fechaInicioContrato) return c ? c.fechaInicioContrato : '';
+  const fechasPago = payments.filter(p=>p.contratoId===contratoId && p.fechaPago).map(p=>p.fechaPago).sort();
+  if(!fechasPago.length) return c.fechaInicioContrato;
+  const primerPago = fechasPago[0];
+  return primerPago > c.fechaInicioContrato ? primerPago : c.fechaInicioContrato;
+}
+
 function computeResumenRows(){
   return contracts.filter(isActiveContract).map(c=>{
     const pagosC = payments.filter(p=>p.contratoId===c.id);
     const totalPagado = pagosC.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const totalDescuentos = pagosC.reduce((s,p)=>s+Number(p.descuentos||0),0);
-    const meses = mesesTranscurridos(c.fechaInicioContrato);
+    const meses = mesesTranscurridos(effectiveDebtStartDate(c.id));
     const monto = Number(c.montoArriendoPactado||0);
     const totalEsperado = meses*monto;
     const saldo = totalEsperado - (totalPagado + totalDescuentos);
@@ -1305,7 +1313,7 @@ function renderResumen(){
   if(!rows.length){ el.innerHTML='<div class="empty">Registra contratos y pagos para ver el resumen.</div>'; }
   else {
     el.innerHTML = `<table><thead><tr>
-      ${th('resumen','tenant','Arrendatario')}${th('resumen','propiedad','Propiedad')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses adeudables')}${th('resumen','totalEsperado','Total esperado')}${th('resumen','totalPagado','Total pagado')}${th('resumen','totalDescuentos','Descuentos aplicados')}${th('resumen','saldo','Saldo')}<th>Estado</th>
+      ${th('resumen','tenant','Arrendatario')}${th('resumen','propiedad','Propiedad')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses transcurridos')}${th('resumen','totalEsperado','Total esperado')}${th('resumen','totalPagado','Total pagado')}${th('resumen','totalDescuentos','Descuentos aplicados')}${th('resumen','saldo','Saldo')}<th>Estado</th>
     </tr></thead><tbody>
     ${rows.map(r=>`<tr>
       <td>${esc(tenantName(r.c.tenantId))}</td>
@@ -1567,7 +1575,7 @@ function renderHistorial(){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !c.fechaInicioContrato){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>'; return; }
 
-  const months = monthsBetween(c.fechaInicioContrato);
+  const months = monthsBetween(effectiveDebtStartDate(contratoId));
   const monto = Number(c.montoArriendoPactado||0);
 
   el.innerHTML = `<table><thead><tr>
@@ -1667,67 +1675,106 @@ function th(tableId, key, label){
 }
 
 // ---------- HISTOGRAMA MENSUAL (Resumen & Deudas) ----------
-function renderResumenChart(contratoId){
-  const container = document.getElementById('resumen-chart');
-  if(!contratoId){
-    container.innerHTML = '<div class="empty">Selecciona un arrendatario específico en el filtro de arriba para ver su histograma mensual.</div>';
-    return;
-  }
+// Serie completa mes a mes desde el inicio del contrato hasta hoy, en orden cronológico (el más antiguo primero).
+function computeContratoMonthlySeries(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
-  if(!c){ container.innerHTML = '<div class="empty">Contrato no encontrado.</div>'; return; }
-  if(!c.fechaInicioContrato){ container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>'; return; }
-
-  let months = monthsBetween(c.fechaInicioContrato); // viene del más reciente al más antiguo
-  months = months.slice(0, 12).reverse(); // últimos 12 meses, en orden cronológico
+  if(!c || !c.fechaInicioContrato) return [];
+  const months = monthsBetween(effectiveDebtStartDate(contratoId)).slice().reverse();
   const monto = Number(c.montoArriendoPactado||0);
-
-  const data = months.map(({year,month})=>{
+  return months.map(({year,month})=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
     const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
-    return { label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2), monto, pagado, descuento };
+    return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
-
-  container.innerHTML = buildBarChartSVG(data);
 }
 
-function buildBarChartSVG(data){
-  const w = Math.max(560, data.length*72);
-  const h = 300;
-  const padL = 64, padB = 46, padT = 16, padR = 16;
-  const chartW = w - padL - padR;
-  const chartH = h - padT - padB;
-  const maxVal = Math.max(1, ...data.map(d=>Math.max(d.monto, d.pagado, d.descuento)));
-  const groupW = chartW/data.length;
-  const barW = (groupW*0.7)/3;
+document.getElementById('chart-year-filter').addEventListener('change', ()=>{
+  const cid = document.getElementById('resumen-filter').value;
+  renderResumenChart(cid);
+});
+document.getElementById('chart-group-filter').addEventListener('change', ()=>{
+  const cid = document.getElementById('resumen-filter').value;
+  renderResumenChart(cid);
+});
 
-  const yTicks = 4;
-  const gridLines = Array.from({length:yTicks+1},(_,i)=>{
-    const val = maxVal*i/yTicks;
-    const y = padT + chartH - (val/maxVal)*chartH;
-    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
-      <text x="${padL-8}" y="${y+3}" font-size="9" text-anchor="end" fill="var(--ink-soft)">${formatNumber(Math.round(val))}</text>`;
-  }).join('');
+function renderResumenChart(contratoId){
+  const container = document.getElementById('resumen-chart');
+  const yearSel = document.getElementById('chart-year-filter');
+  const groupSel = document.getElementById('chart-group-filter');
 
-  const bars = data.map((d,i)=>{
-    const gx = padL + i*groupW + groupW*0.15;
-    const hMonto = (d.monto/maxVal)*chartH;
-    const hPagado = (d.pagado/maxVal)*chartH;
-    const hDesc = (d.descuento/maxVal)*chartH;
+  if(!contratoId){
+    yearSel.innerHTML = '<option value="">—</option>';
+    container.innerHTML = '<div class="empty">Selecciona un arrendatario específico en el filtro de arriba para ver su histograma.</div>';
+    renderResumenImpagos(contratoId);
+    return;
+  }
+  const series = computeContratoMonthlySeries(contratoId);
+  if(!series.length){
+    yearSel.innerHTML = '<option value="">—</option>';
+    container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>';
+    renderResumenImpagos(contratoId);
+    return;
+  }
+
+  const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>b-a);
+  const currentYear = yearSel.value;
+  yearSel.innerHTML = '<option value="">Todos los años</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(years.map(String).includes(currentYear)) yearSel.value = currentYear;
+
+  const yearFilter = yearSel.value;
+  const groupBy = groupSel.value;
+  const filtered = yearFilter ? series.filter(d=>d.year===Number(yearFilter)) : series;
+
+  let rows;
+  if(groupBy==='anio'){
+    const byYear = {};
+    filtered.forEach(d=>{
+      if(!byYear[d.year]) byYear[d.year] = {monto:0,pagado:0,descuento:0};
+      byYear[d.year].monto += d.monto;
+      byYear[d.year].pagado += d.pagado;
+      byYear[d.year].descuento += d.descuento;
+    });
+    rows = Object.keys(byYear).sort((a,b)=>b-a).map(y=>({ label: y, ...byYear[y] }));
+  } else {
+    // más reciente arriba
+    rows = filtered.slice().reverse().map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento }));
+  }
+
+  container.innerHTML = buildHorizontalBarChartSVG(rows);
+  renderResumenImpagos(contratoId);
+}
+
+function buildHorizontalBarChartSVG(rows){
+  if(!rows.length) return '<div class="empty">No hay datos para este filtro.</div>';
+  const labelW = 90, barAreaW = 460;
+  const barH = 14, barGap = 3, groupGap = 16;
+  const groupH = barH*3 + barGap*2 + groupGap;
+  const padT = 10, padL = labelW + 10, padR = 90;
+  const w = padL + barAreaW + padR;
+  const h = padT + rows.length*groupH + 10;
+  const maxVal = Math.max(1, ...rows.map(d=>Math.max(d.monto,d.pagado,d.descuento)));
+
+  const groups = rows.map((d,i)=>{
+    const gy = padT + i*groupH;
+    const wMonto = Math.max((d.monto/maxVal)*barAreaW, d.monto>0?2:0);
+    const wPagado = Math.max((d.pagado/maxVal)*barAreaW, d.pagado>0?2:0);
+    const wDesc = Math.max((d.descuento/maxVal)*barAreaW, d.descuento>0?2:0);
     return `
-      <rect x="${gx}" y="${padT+chartH-hMonto}" width="${barW}" height="${hMonto}" fill="var(--border)"><title>Valor pactado: ${money(d.monto)}</title></rect>
-      <rect x="${gx+barW}" y="${padT+chartH-hPagado}" width="${barW}" height="${hPagado}" fill="var(--teal)"><title>Pagado: ${money(d.pagado)}</title></rect>
-      <rect x="${gx+2*barW}" y="${padT+chartH-hDesc}" width="${barW}" height="${hDesc}" fill="var(--gold)"><title>Descuento: ${money(d.descuento)}</title></rect>
-      <text x="${gx+barW*1.5}" y="${h-padB+16}" font-size="10" text-anchor="middle" fill="var(--ink-soft)">${esc(d.label)}</text>
+      <text x="${padL-10}" y="${gy+barH*1.5+barGap}" font-size="11" text-anchor="end" fill="var(--ink)" font-weight="600">${esc(d.label)}</text>
+      <rect x="${padL}" y="${gy}" width="${wMonto}" height="${barH}" rx="2" fill="var(--border)"/>
+      <text x="${padL+wMonto+6}" y="${gy+barH-3}" font-size="9" fill="var(--ink-soft)">${money(d.monto)}</text>
+      <rect x="${padL}" y="${gy+barH+barGap}" width="${wPagado}" height="${barH}" rx="2" fill="var(--teal)"/>
+      <text x="${padL+wPagado+6}" y="${gy+barH*2+barGap-3}" font-size="9" fill="var(--ink-soft)">${money(d.pagado)}</text>
+      <rect x="${padL}" y="${gy+2*(barH+barGap)}" width="${wDesc}" height="${barH}" rx="2" fill="var(--gold)"/>
+      <text x="${padL+wDesc+6}" y="${gy+barH*3+barGap*2-3}" font-size="9" fill="var(--ink-soft)">${money(d.descuento)}</text>
     `;
   }).join('');
 
   return `<div style="overflow-x:auto">
-  <svg viewBox="0 0 ${w} ${h}" style="width:${w}px;max-width:none;height:${h}px;">
-    ${gridLines}
-    ${bars}
-    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+chartH}" stroke="var(--border)"/>
-    <line x1="${padL}" y1="${padT+chartH}" x2="${w-padR}" y2="${padT+chartH}" stroke="var(--border)"/>
+  <svg viewBox="0 0 ${w} ${h}" style="width:${w}px;max-width:100%;height:${h}px;">
+    <line x1="${padL}" y1="0" x2="${padL}" y2="${h}" stroke="var(--border)"/>
+    ${groups}
   </svg>
   </div>
   <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap">
@@ -1735,6 +1782,29 @@ function buildBarChartSVG(data){
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:5px;border-radius:2px;"></span>Pagado</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);margin-right:5px;border-radius:2px;"></span>Descuento aplicado</span>
   </div>`;
+}
+
+// Detalle de meses (dentro de toda la vida del contrato) que quedaron sin pagar o solo parcialmente cubiertos.
+function renderResumenImpagos(contratoId){
+  const el = document.getElementById('resumen-impagos');
+  if(!contratoId){ el.innerHTML = '<div class="empty">Selecciona un arrendatario específico arriba para ver el detalle de meses impagos.</div>'; return; }
+  const series = computeContratoMonthlySeries(contratoId);
+  const impagos = series
+    .filter(d => (d.pagado + d.descuento) < d.monto)
+    .map(d => ({...d, faltante: d.monto - d.pagado - d.descuento}))
+    .reverse(); // más reciente arriba
+  if(!impagos.length){ el.innerHTML = '<div class="empty">No hay meses impagos ni parciales — este arrendatario está al día en toda su historia.</div>'; return; }
+  const totalFaltante = impagos.reduce((s,d)=>s+d.faltante,0);
+  el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">${impagos.length} mes${impagos.length>1?'es':''} con saldo pendiente · total: <strong>${money(totalFaltante)}</strong></div>
+  <table><thead><tr><th>Mes</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Faltante</th></tr></thead><tbody>
+  ${impagos.map(d=>`<tr>
+    <td>${MESES_ES[d.month]} ${d.year}</td>
+    <td class="mono">${money(d.monto)}</td>
+    <td class="mono">${money(d.pagado)}</td>
+    <td class="mono">${money(d.descuento)}</td>
+    <td class="mono" style="color:var(--brick);font-weight:600">${money(d.faltante)}</td>
+  </tr>`).join('')}
+  </tbody></table>`;
 }
 
 function esc(s){
