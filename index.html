@@ -103,6 +103,7 @@
   .line-group{border-top:1px solid var(--border);padding-top:16px;margin-top:16px;}
   .line-group:first-child{border-top:none;margin-top:0;padding-top:0;}
   .line-group h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);margin:0 0 10px;font-weight:700;}
+  .table-wrap h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);margin:0 0 10px;font-weight:700;}
   .line-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 
@@ -158,13 +159,14 @@
 <div class="app">
   <div class="sidebar">
     <div class="brand">Cartera<span>Gestión de Arriendos</span></div>
-    <div class="nav-item active" data-tab="propiedades"><span class="num">01</span> Propiedades</div>
-    <div class="nav-item" data-tab="arrendatarios"><span class="num">02</span> Arrendatarios &amp; Contratos</div>
-    <div class="nav-item" data-tab="pagos"><span class="num">03</span> Pagos</div>
-    <div class="nav-item" data-tab="resumen"><span class="num">04</span> Resumen &amp; Deudas</div>
-    <div class="nav-item" data-tab="alertas"><span class="num">05</span> Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
-    <div class="nav-item" data-tab="servicios"><span class="num">06</span> Servicios</div>
-    <div class="nav-item" data-tab="historial"><span class="num">07</span> Historial Mensual</div>
+    <div class="nav-item active" data-tab="propiedades"><span class="num">01</span> 🏠 Propiedades</div>
+    <div class="nav-item" data-tab="arrendatarios"><span class="num">02</span> 📄 Arrendatarios &amp; Contratos</div>
+    <div class="nav-item" data-tab="pagos"><span class="num">03</span> 💵 Pagos</div>
+    <div class="nav-item" data-tab="resumen"><span class="num">04</span> 📊 Resumen &amp; Deudas</div>
+    <div class="nav-item" data-tab="alertas"><span class="num">05</span> 🔔 Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
+    <div class="nav-item" data-tab="servicios"><span class="num">06</span> 🔧 Servicios</div>
+    <div class="nav-item" data-tab="historial"><span class="num">07</span> 📅 Historial Mensual</div>
+    <div class="nav-item" data-tab="historicos"><span class="num">08</span> 🗂️ Arrendatarios Históricos</div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -183,10 +185,10 @@
 
     <!-- PROPIEDADES -->
     <div class="tab-section active" id="tab-propiedades">
-      <h1>Propiedades</h1>
+      <h1>🏠 Propiedades</h1>
       <div class="subtitle">Registro de inmuebles de la cartera.</div>
       <div class="card">
-        <div class="toggle-form"><h2 id="prop-form-title">Nueva propiedad</h2></div>
+        <div class="toggle-form"><h2 id="prop-form-title">🏠 Nueva propiedad</h2></div>
         <form id="form-propiedad">
           <input type="hidden" id="p-id">
 
@@ -203,7 +205,7 @@
             </div>
           </div>
           <div class="line-group">
-            <h3>Inscripción CBR</h3>
+            <h3>📜 Inscripción CBR</h3>
             <div class="line-row">
               <div class="field"><label>Propietario</label><input id="p-propietario"></div>
               <div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div>
@@ -216,23 +218,24 @@
             </div>
           </div>
           <div class="line-group">
-            <h3>Servicios</h3>
+            <h3>🔧 Servicios</h3>
             <div class="line-row">
-              <div class="field"><label># Cliente Luz</label><input id="p-clienteLuz"></div>
-              <div class="field"><label># Cliente Agua</label><input id="p-clienteAgua"></div>
-              <div class="field"><label># Cliente Gas</label><input id="p-clienteGas"></div>
+              <div class="field"><label>⚡ # Cliente Luz</label><input id="p-clienteLuz"></div>
+              <div class="field"><label>💧 # Cliente Agua</label><input id="p-clienteAgua"></div>
+              <div class="field"><label>🔥 # Cliente Gas</label><input id="p-clienteGas"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
-              <div class="field"><label>Medidor Luz</label><input id="p-medidorLuz"></div>
-              <div class="field"><label>Medidor Agua</label><input id="p-medidorAgua"></div>
-              <div class="field"><label>Medidor Gas</label><input id="p-medidorGas"></div>
+              <div class="field"><label>⚡ Medidor Luz</label><input id="p-medidorLuz"></div>
+              <div class="field"><label>💧 Medidor Agua</label><input id="p-medidorAgua"></div>
+              <div class="field"><label>🔥 Medidor Gas</label><input id="p-medidorGas"></div>
             </div>
           </div>
           <div class="line-group">
-            <h3>Antecedentes Comerciales</h3>
+            <h3>💰 Antecedentes Comerciales</h3>
             <div class="line-row">
               <div class="field"><label>Avalúo fiscal ($)</label><input id="p-avaluoFiscal" type="number"></div>
               <div class="field"><label>Valor comercial probable ($)</label><input id="p-valorComercial" type="number"></div>
+              <div class="field"><label>Contribuciones ($)</label><input id="p-contribuciones" type="number"></div>
             </div>
           </div>
 
@@ -244,29 +247,29 @@
         </form>
       </div>
       <div class="card">
-        <h2>Propiedades registradas</h2>
+        <h2>📋 Propiedades registradas</h2>
         <div id="prop-table" class="table-wrap"></div>
       </div>
     </div>
 
     <!-- ARRENDATARIOS Y CONTRATOS -->
     <div class="tab-section" id="tab-arrendatarios">
-      <h1>Arrendatarios &amp; Contratos</h1>
+      <h1>📄 Arrendatarios &amp; Contratos</h1>
       <div class="subtitle">Un arrendatario puede tener más de un contrato (más de una propiedad arrendada).</div>
 
       <div class="card">
-        <h2 id="t-form-title">Nuevo arrendatario</h2>
+        <h2 id="t-form-title">🏢 Nuevo arrendatario</h2>
         <form id="form-arrendatario">
           <input type="hidden" id="t-id">
           <div class="line-group">
-            <h3>Información de la Sociedad</h3>
+            <h3>🏢 Información de la Sociedad</h3>
             <div class="line-row">
               <div class="field"><label>Nombre sociedad</label><input id="t-nombreSociedad" required></div>
               <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad"></div>
             </div>
           </div>
           <div class="line-group">
-            <h3>Información del Representante</h3>
+            <h3>👤 Información del Representante</h3>
             <div class="line-row">
               <div class="field"><label>Nombre representante</label><input id="t-nombreRepresentante"></div>
               <div class="field"><label>Rut representante</label><input id="t-rutRepresentante"></div>
@@ -285,16 +288,16 @@
       </div>
 
       <div class="card">
-        <h2>Arrendatarios registrados</h2>
+        <h2>📋 Arrendatarios registrados</h2>
         <div id="tenant-table" class="table-wrap"></div>
       </div>
 
       <div class="card">
-        <h2 id="c-form-title">Nuevo contrato</h2>
+        <h2 id="c-form-title">📝 Nuevo contrato</h2>
         <form id="form-contrato">
           <input type="hidden" id="c-id">
           <div class="line-group">
-            <h3>Información del Contrato</h3>
+            <h3>📝 Información del Contrato</h3>
             <div class="line-row">
               <div class="field"><label>Arrendatario</label><select id="c-tenantId" required></select></div>
               <div class="field"><label>Propiedad</label><select id="c-propiedadId" required></select></div>
@@ -325,17 +328,17 @@
       </div>
 
       <div class="card">
-        <h2>Contratos registrados</h2>
+        <h2>📋 Contratos registrados</h2>
         <div id="contract-table" class="table-wrap"></div>
       </div>
     </div>
 
     <!-- PAGOS -->
     <div class="tab-section" id="tab-pagos">
-      <h1>Pagos</h1>
+      <h1>💵 Pagos</h1>
       <div class="subtitle">Registro de pagos de arriendo por contrato.</div>
       <div class="card">
-        <h2 id="pay-form-title">Nuevo pago</h2>
+        <h2 id="pay-form-title">💵 Nuevo pago</h2>
         <form id="form-pago">
           <input type="hidden" id="pay-id">
           <div class="grid">
@@ -356,7 +359,7 @@
         </form>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>Historial de pagos</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
+        <div class="toggle-form"><h2>💵 Historial de pagos</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
         <select class="filter" id="pay-filter"></select>
         <div id="pay-table" class="table-wrap"></div>
       </div>
@@ -364,11 +367,11 @@
 
     <!-- RESUMEN -->
     <div class="tab-section" id="tab-resumen">
-      <h1>Resumen &amp; Deudas</h1>
+      <h1>📊 Resumen &amp; Deudas</h1>
       <div class="subtitle">Estado de pago por contrato, a la fecha de hoy.</div>
       <div class="summary-cards" id="summary-cards"></div>
       <div class="card">
-        <h2>Estado por contrato</h2>
+        <h2>📊 Estado por contrato</h2>
         <select class="filter" id="resumen-filter"></select>
         <div id="resumen-table" class="table-wrap"></div>
       </div>
@@ -376,25 +379,25 @@
 
     <!-- ALERTAS -->
     <div class="tab-section" id="tab-alertas">
-      <h1>Alertas</h1>
+      <h1>🔔 Alertas</h1>
       <div class="subtitle">Avisos de vencimiento de contrato y de ajuste de IPC, con 3, 2 y 1 mes de anticipación.</div>
       <div class="card">
-        <h2>Próximos vencimientos y ajustes</h2>
+        <h2>🔔 Próximos vencimientos y ajustes</h2>
         <div id="alertas-list"></div>
       </div>
     </div>
 
     <!-- SERVICIOS -->
     <div class="tab-section" id="tab-servicios">
-      <h1>Servicios</h1>
+      <h1>🔧 Servicios</h1>
       <div class="subtitle">Monitoreo de lecturas y pago de luz, agua y gas por arrendatario. El consumo y el monto se calculan solos a partir de la lectura anterior.</div>
       <div class="card">
-        <h2 id="r-form-title">Nueva lectura</h2>
+        <h2 id="r-form-title">🔧 Nueva lectura</h2>
         <form id="form-lectura">
           <input type="hidden" id="r-id">
           <div class="grid">
             <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
-            <div class="field"><label>Servicio</label><select id="r-servicio"><option>Luz</option><option>Agua</option><option>Gas</option></select></div>
+            <div class="field"><label>Servicio</label><select id="r-servicio"><option value="Luz">⚡ Luz</option><option value="Agua">💧 Agua</option><option value="Gas">🔥 Gas</option></select></div>
             <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required></div>
@@ -411,7 +414,7 @@
         </form>
       </div>
       <div class="card">
-        <h2>Lecturas registradas</h2>
+        <h2>🔧 Lecturas registradas</h2>
         <select class="filter" id="r-filter"></select>
         <div id="reading-table" class="table-wrap"></div>
       </div>
@@ -419,13 +422,22 @@
 
     <!-- HISTORIAL MENSUAL -->
     <div class="tab-section" id="tab-historial">
-      <h1>Historial Mensual</h1>
+      <h1>📅 Historial Mensual</h1>
       <div class="subtitle">Revisa mes a mes si ya registraste el pago de un contrato y en cuáles meses falta.</div>
       <div class="card">
         <div class="line-row" style="margin-bottom:16px">
           <div class="field"><label>Contrato</label><select id="h-contratoId"></select></div>
         </div>
         <div id="historial-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- ARRENDATARIOS HISTÓRICOS -->
+    <div class="tab-section" id="tab-historicos">
+      <h1>🗂️ Arrendatarios Históricos</h1>
+      <div class="subtitle">Arrendatarios que ya no están activos, pero cuyos pagos se conservan para no perder el registro. Es solo de consulta — no forman parte de la deuda ni de las alertas vigentes.</div>
+      <div class="card">
+        <div id="historicos-table" class="table-wrap"></div>
       </div>
     </div>
 
@@ -682,7 +694,12 @@ function loadFromWorkbook(arrayBuffer){
   const readingSheet = wb.Sheets['Servicios'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
-  contracts = contractSheet ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id) : [];
+  contracts = contractSheet
+    ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id).map(c=>({
+        ...c,
+        activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
+      }))
+    : [];
   payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
   // De la hoja Servicios solo recuperamos los campos originales (consumo/monto se recalculan solos).
   readings = readingSheet
@@ -787,6 +804,7 @@ function renderAll(){
   renderReadingSelects();
   renderReadings();
   renderHistorial();
+  renderHistoricos();
 }
 
 // ---------- NAV ----------
@@ -800,7 +818,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 });
 
 // ---------- PROPIEDADES ----------
-const propFields = ['direccion','unidad','m2Construidos','m2Terreno','propietario','rolAvaluo','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial'];
+const propFields = ['direccion','unidad','m2Construidos','m2Terreno','propietario','rolAvaluo','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial','contribuciones'];
 
 document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -821,7 +839,7 @@ document.getElementById('p-cancel').addEventListener('click', resetPropForm);
 function resetPropForm(){
   editingProp = null;
   document.getElementById('form-propiedad').reset();
-  document.getElementById('prop-form-title').textContent='Nueva propiedad';
+  document.getElementById('prop-form-title').textContent='🏠 Nueva propiedad';
   document.getElementById('p-cancel').style.display='none';
 }
 function editProperty(id){
@@ -829,7 +847,7 @@ function editProperty(id){
   if(!p) return;
   editingProp = id;
   propFields.forEach(f=> document.getElementById('p-'+f).value = p[f] || '');
-  document.getElementById('prop-form-title').textContent='Editar propiedad';
+  document.getElementById('prop-form-title').textContent='🏠 Editar propiedad';
   document.getElementById('p-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -844,8 +862,12 @@ async function deleteProperty(id){
 function renderProperties(){
   const el = document.getElementById('prop-table');
   if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
-  el.innerHTML = `<table><thead><tr>
-    <th>Dirección</th><th>Unidad</th><th>M² constr.</th><th>M² terreno</th><th>Propietario</th><th>Rol avalúo</th><th>Valor comercial</th><th></th>
+
+  const actions = p => `<td class="row-actions"><button onclick="editProperty('${p.id}')">Editar</button><button onclick="deleteProperty('${p.id}')">Eliminar</button></td>`;
+
+  const seccion1 = `<h3>📜 Antecedentes de la Propiedad e Inscripción CBR</h3>
+  <table><thead><tr>
+    <th>Dirección</th><th>Depto/Piso/Local</th><th>M² constr.</th><th>M² terreno</th><th>Propietario</th><th>Rol avalúo</th><th>Foja</th><th>Número</th><th>Año</th><th>Localidad</th><th></th>
   </tr></thead><tbody>
   ${properties.map(p=>`<tr>
     <td>${esc(p.direccion)}</td>
@@ -854,10 +876,46 @@ function renderProperties(){
     <td class="mono">${esc(p.m2Terreno)}</td>
     <td>${esc(p.propietario)}</td>
     <td class="mono">${esc(p.rolAvaluo)}</td>
-    <td class="mono">${p.valorComercial?money(p.valorComercial):''}</td>
-    <td class="row-actions"><button onclick="editProperty('${p.id}')">Editar</button><button onclick="deleteProperty('${p.id}')">Eliminar</button></td>
+    <td class="mono">${esc(p.cbrFoja)}</td>
+    <td class="mono">${esc(p.cbrNumero)}</td>
+    <td class="mono">${esc(p.cbrAnio)}</td>
+    <td>${esc(p.cbrLocalidad)}</td>
+    ${actions(p)}
   </tr>`).join('')}
   </tbody></table>`;
+
+  const seccion2 = `<h3 style="margin-top:28px">🔧 Servicios por Propiedad</h3>
+  <table><thead><tr>
+    <th>Dirección</th><th>Depto/Piso/Local</th><th>⚡ # Cliente Luz</th><th>💧 # Cliente Agua</th><th>🔥 # Cliente Gas</th><th>⚡ Medidor Luz</th><th>💧 Medidor Agua</th><th>🔥 Medidor Gas</th><th></th>
+  </tr></thead><tbody>
+  ${properties.map(p=>`<tr>
+    <td>${esc(p.direccion)}</td>
+    <td>${esc(p.unidad)}</td>
+    <td class="mono">${esc(p.clienteLuz)}</td>
+    <td class="mono">${esc(p.clienteAgua)}</td>
+    <td class="mono">${esc(p.clienteGas)}</td>
+    <td class="mono">${esc(p.medidorLuz)}</td>
+    <td class="mono">${esc(p.medidorAgua)}</td>
+    <td class="mono">${esc(p.medidorGas)}</td>
+    ${actions(p)}
+  </tr>`).join('')}
+  </tbody></table>`;
+
+  const seccion3 = `<h3 style="margin-top:28px">💰 Antecedentes Comerciales</h3>
+  <table><thead><tr>
+    <th>Dirección</th><th>Depto/Piso/Local</th><th>Avalúo fiscal</th><th>Valor comercial probable</th><th>Contribuciones</th><th></th>
+  </tr></thead><tbody>
+  ${properties.map(p=>`<tr>
+    <td>${esc(p.direccion)}</td>
+    <td>${esc(p.unidad)}</td>
+    <td class="mono">${p.avaluoFiscal?money(p.avaluoFiscal):''}</td>
+    <td class="mono">${p.valorComercial?money(p.valorComercial):''}</td>
+    <td class="mono">${p.contribuciones?money(p.contribuciones):''}</td>
+    ${actions(p)}
+  </tr>`).join('')}
+  </tbody></table>`;
+
+  el.innerHTML = seccion1 + seccion2 + seccion3;
 }
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
@@ -882,7 +940,7 @@ document.getElementById('t-cancel').addEventListener('click', resetTenantForm);
 function resetTenantForm(){
   editingTenant = null;
   document.getElementById('form-arrendatario').reset();
-  document.getElementById('t-form-title').textContent='Nuevo arrendatario';
+  document.getElementById('t-form-title').textContent='🏢 Nuevo arrendatario';
   document.getElementById('t-cancel').style.display='none';
 }
 function editTenant(id){
@@ -890,7 +948,7 @@ function editTenant(id){
   if(!t) return;
   editingTenant = id;
   tenantFields.forEach(f=> document.getElementById('t-'+f).value = t[f] || '');
-  document.getElementById('t-form-title').textContent='Editar arrendatario';
+  document.getElementById('t-form-title').textContent='🏢 Editar arrendatario';
   document.getElementById('t-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -929,6 +987,7 @@ function renderTenants(){
 
 // ---------- CONTRATOS (Propiedad + condiciones, referencian a un arrendatario) ----------
 const contractFields = ['tenantId','propiedadId','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
+function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function renderContractSelects(){
   const sel = document.getElementById('c-propiedadId');
@@ -937,7 +996,7 @@ function renderContractSelects(){
 
 document.getElementById('form-contrato').addEventListener('submit', async e=>{
   e.preventDefault();
-  const obj = { id: editingContract || uid() };
+  const obj = { id: editingContract || uid(), activo: true };
   contractFields.forEach(f=> obj[f] = document.getElementById('c-'+f).value);
   if(editingContract){ contracts = contracts.map(c=> c.id===editingContract ? obj : c); }
   else { contracts.push(obj); }
@@ -954,7 +1013,7 @@ document.getElementById('c-cancel').addEventListener('click', resetContractForm)
 function resetContractForm(){
   editingContract = null;
   document.getElementById('form-contrato').reset();
-  document.getElementById('c-form-title').textContent='Nuevo contrato';
+  document.getElementById('c-form-title').textContent='📝 Nuevo contrato';
   document.getElementById('c-cancel').style.display='none';
 }
 function editContract(id){
@@ -962,7 +1021,7 @@ function editContract(id){
   if(!c) return;
   editingContract = id;
   contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
-  document.getElementById('c-form-title').textContent='Editar contrato';
+  document.getElementById('c-form-title').textContent='📝 Editar contrato';
   document.getElementById('c-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -985,11 +1044,12 @@ function contractLabel(id){
 }
 function renderContracts(){
   const el = document.getElementById('contract-table');
-  if(!contracts.length){ el.innerHTML='<div class="empty">Aún no hay contratos registrados.</div>'; return; }
+  const activos = contracts.filter(isActiveContract);
+  if(!activos.length){ el.innerHTML='<div class="empty">Aún no hay contratos registrados. (Los contratos históricos se ven en la pestaña "Arrendatarios Históricos")</div>'; return; }
   el.innerHTML = `<table><thead><tr>
     <th>Arrendatario</th><th>Propiedad</th><th>Inicio contrato</th><th>Tipo</th><th>Monto pactado</th><th></th>
   </tr></thead><tbody>
-  ${contracts.map(c=>`<tr>
+  ${activos.map(c=>`<tr>
     <td>${esc(tenantName(c.tenantId))}</td>
     <td>${esc(propAddress(c.propiedadId))}</td>
     <td class="mono">${esc(c.fechaInicioContrato)}</td>
@@ -1004,9 +1064,10 @@ function renderContracts(){
 const payFields = ['contratoId','fechaPago','montoPagado','descuentos','medioPago','comentarios'];
 
 function renderPaySelects(){
-  const opts = '<option value="">— Selecciona contrato —</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const activos = contracts.filter(isActiveContract);
+  const opts = '<option value="">— Selecciona contrato —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
   document.getElementById('pay-contratoId').innerHTML = opts;
-  document.getElementById('pay-filter').innerHTML = '<option value="">Todos los contratos</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  document.getElementById('pay-filter').innerHTML = '<option value="">Todos los contratos</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
 }
 document.getElementById('pay-filter').addEventListener('change', renderPayments);
 
@@ -1029,7 +1090,7 @@ document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
 function resetPayForm(){
   editingPay = null;
   document.getElementById('form-pago').reset();
-  document.getElementById('pay-form-title').textContent='Nuevo pago';
+  document.getElementById('pay-form-title').textContent='💵 Nuevo pago';
   document.getElementById('pay-cancel').style.display='none';
 }
 function editPayment(id){
@@ -1037,7 +1098,7 @@ function editPayment(id){
   if(!p) return;
   editingPay = id;
   payFields.forEach(f=> document.getElementById('pay-'+f).value = p[f] || '');
-  document.getElementById('pay-form-title').textContent='Editar pago';
+  document.getElementById('pay-form-title').textContent='💵 Editar pago';
   document.getElementById('pay-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1104,7 +1165,7 @@ function mesesTranscurridos(fechaInicio){
 }
 
 function computeResumenRows(){
-  return contracts.map(c=>{
+  return contracts.filter(isActiveContract).map(c=>{
     const pagosC = payments.filter(p=>p.contratoId===c.id);
     const totalPagado = pagosC.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const totalDescuentos = pagosC.reduce((s,p)=>s+Number(p.descuentos||0),0);
@@ -1119,8 +1180,9 @@ function computeResumenRows(){
 function renderResumenSelect(){
   const sel = document.getElementById('resumen-filter');
   const current = sel.value;
-  sel.innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  if(contracts.some(c=>c.id===current)) sel.value = current;
+  const activos = contracts.filter(isActiveContract);
+  sel.innerHTML = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  if(activos.some(c=>c.id===current)) sel.value = current;
 }
 document.getElementById('resumen-filter').addEventListener('change', renderResumen);
 
@@ -1135,7 +1197,7 @@ function renderResumen(){
   });
 
   document.getElementById('summary-cards').innerHTML = `
-    <div class="stat"><div class="label">Contratos activos</div><div class="value">${contracts.length}</div></div>
+    <div class="stat"><div class="label">Contratos activos</div><div class="value">${contracts.filter(isActiveContract).length}</div></div>
     <div class="stat good"><div class="label">Total pagado (histórico)</div><div class="value">${money(totalPagadoGlobal)}</div></div>
     <div class="stat"><div class="label">Total esperado a la fecha</div><div class="value">${money(totalEsperadoGlobal)}</div></div>
     <div class="stat warn"><div class="label">Deuda total (${enMora} en mora)</div><div class="value">${money(totalDeudaGlobal)}</div></div>
@@ -1182,7 +1244,7 @@ function nextIpcDate(fechaInicio, intervalo){
 }
 function buildAlerts(){
   const alerts = [];
-  contracts.forEach(c=>{
+  contracts.filter(isActiveContract).forEach(c=>{
     if(c.duracionMeses){
       const venc = addMonths(c.fechaInicioContrato, Number(c.duracionMeses));
       const m = monthsUntil(toISO(venc));
@@ -1222,9 +1284,10 @@ function renderAlertas(){
 const readingFields = ['contratoId','servicio','fechaLectura','lecturaActual','valorUnitario','estado','comentarios'];
 
 function renderReadingSelects(){
-  const opts = '<option value="">— Selecciona arrendatario —</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const activos = contracts.filter(isActiveContract);
+  const opts = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
   document.getElementById('r-contratoId').innerHTML = opts;
-  document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
 }
 document.getElementById('r-filter').addEventListener('change', renderReadings);
 
@@ -1248,7 +1311,7 @@ document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
 function resetReadingForm(){
   editingReading = null;
   document.getElementById('form-lectura').reset();
-  document.getElementById('r-form-title').textContent='Nueva lectura';
+  document.getElementById('r-form-title').textContent='🔧 Nueva lectura';
   document.getElementById('r-cancel').style.display='none';
 }
 function editReading(id){
@@ -1257,7 +1320,7 @@ function editReading(id){
   editingReading = id;
   readingFields.forEach(f=> document.getElementById('r-'+f).value = r[f] || '');
   document.getElementById('r-estado').value = r.estado || 'Pendiente';
-  document.getElementById('r-form-title').textContent='Editar lectura';
+  document.getElementById('r-form-title').textContent='🔧 Editar lectura';
   document.getElementById('r-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1317,6 +1380,13 @@ function computeReadingsWithConsumption(){
   });
 }
 
+function servicioIcono(s){
+  if(s==='Luz') return '⚡ Luz';
+  if(s==='Agua') return '💧 Agua';
+  if(s==='Gas') return '🔥 Gas';
+  return esc(s);
+}
+
 function renderReadings(){
   const filter = document.getElementById('r-filter').value;
   const el = document.getElementById('reading-table');
@@ -1331,7 +1401,7 @@ function renderReadings(){
     const tagClass = r.estadoEfectivo==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
     return `<tr>
     <td>${esc(contractLabel(r.contratoId))}</td>
-    <td>${esc(r.servicio)}</td>
+    <td>${servicioIcono(r.servicio)}</td>
     <td class="mono">${esc(r.fechaLectura)}</td>
     <td class="mono">${r.lecturaAnterior===null?'—':r.lecturaAnterior}</td>
     <td class="mono">${esc(r.lecturaActual)}</td>
@@ -1357,8 +1427,9 @@ const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agos
 function renderHistorialSelects(){
   const sel = document.getElementById('h-contratoId');
   const current = sel.value;
-  sel.innerHTML = '<option value="">— Selecciona un contrato —</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  if(contracts.some(c=>c.id===current)) sel.value = current;
+  const activos = contracts.filter(isActiveContract);
+  sel.innerHTML = '<option value="">— Selecciona un contrato —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  if(activos.some(c=>c.id===current)) sel.value = current;
 }
 document.getElementById('h-contratoId').addEventListener('change', renderHistorial);
 
@@ -1419,6 +1490,36 @@ function renderHistorial(){
       <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
     </tr>`;
   }).join('')}
+  </tbody></table>`;
+}
+
+// ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
+function renderHistoricos(){
+  const el = document.getElementById('historicos-table');
+  const historicos = contracts.filter(c=> !isActiveContract(c));
+  if(!historicos.length){ el.innerHTML='<div class="empty">No hay arrendatarios históricos registrados.</div>'; return; }
+
+  const rows = historicos.map(c=>{
+    const pagosC = payments.filter(p=>p.contratoId===c.id).sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''));
+    const totalPagado = pagosC.reduce((s,p)=>s+Number(p.montoPagado||0),0);
+    const totalDescuentos = pagosC.reduce((s,p)=>s+Number(p.descuentos||0),0);
+    const primerPago = pagosC.length ? pagosC[0].fechaPago : '—';
+    const ultimoPago = pagosC.length ? pagosC[pagosC.length-1].fechaPago : '—';
+    return { c, cantidad: pagosC.length, totalPagado, totalDescuentos, primerPago, ultimoPago };
+  }).sort((a,b)=> (b.ultimoPago||'').localeCompare(a.ultimoPago||''));
+
+  el.innerHTML = `<table><thead><tr>
+    <th>Arrendatario</th><th>Propiedad</th><th>Cant. pagos</th><th>Total pagado histórico</th><th>Total descuentos</th><th>Primer pago</th><th>Último pago</th>
+  </tr></thead><tbody>
+  ${rows.map(r=>`<tr>
+    <td>${esc(tenantName(r.c.tenantId))}</td>
+    <td>${r.c.propiedadId ? esc(propAddress(r.c.propiedadId)) : '<span style="color:var(--ink-soft)">Sin identificar</span>'}</td>
+    <td class="mono">${r.cantidad}</td>
+    <td class="mono">${money(r.totalPagado)}</td>
+    <td class="mono">${money(r.totalDescuentos)}</td>
+    <td class="mono">${esc(r.primerPago)}</td>
+    <td class="mono">${esc(r.ultimoPago)}</td>
+  </tr>`).join('')}
   </tbody></table>`;
 }
 
