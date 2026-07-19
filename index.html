@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -60,6 +60,7 @@
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
   .tag-debt{background:var(--brick-soft);color:var(--brick);}
+  .tag-pending{background:#FBF1DC;color:#8A6410;}
   .row-actions{display:flex;gap:8px;}
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
@@ -162,6 +163,7 @@
     <div class="nav-item" data-tab="pagos"><span class="num">03</span> Pagos</div>
     <div class="nav-item" data-tab="resumen"><span class="num">04</span> Resumen &amp; Deudas</div>
     <div class="nav-item" data-tab="alertas"><span class="num">05</span> Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
+    <div class="nav-item" data-tab="servicios"><span class="num">06</span> Servicios</div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -172,6 +174,7 @@
     <div class="drive-bar">
       <span class="dot" id="drive-dot"></span>
       <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
+      <button class="btn btn-secondary" id="drive-reload-btn" title="Vuelve a leer el Excel de Drive (por si lo editaste a mano)">Recargar desde Excel</button>
       <button class="btn btn-secondary" id="drive-disconnect-btn" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
       <button class="btn btn-secondary" id="drive-connect-btn">Conectar con Google Drive</button>
     </div>
@@ -196,14 +199,12 @@
             <div class="line-row"><div class="field"><label>M²</label><input id="p-m2" type="number" step="0.1"></div></div>
           </div>
           <div class="line-group">
-            <div class="line-row"><div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div></div>
-          </div>
-          <div class="line-group">
-            <div class="line-row"><div class="field"><label>Propietario</label><input id="p-propietario"></div></div>
-          </div>
-          <div class="line-group">
             <h3>Inscripción CBR</h3>
             <div class="line-row">
+              <div class="field"><label>Propietario</label><input id="p-propietario"></div>
+              <div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div>
+            </div>
+            <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Foja</label><input id="p-cbrFoja"></div>
               <div class="field"><label>Número</label><input id="p-cbrNumero"></div>
               <div class="field"><label>Año</label><input id="p-cbrAnio"></div>
@@ -211,26 +212,24 @@
             </div>
           </div>
           <div class="line-group">
-            <h3># Cliente Luz / Agua / Gas</h3>
+            <h3>Servicios</h3>
             <div class="line-row">
               <div class="field"><label># Cliente Luz</label><input id="p-clienteLuz"></div>
               <div class="field"><label># Cliente Agua</label><input id="p-clienteAgua"></div>
               <div class="field"><label># Cliente Gas</label><input id="p-clienteGas"></div>
             </div>
-          </div>
-          <div class="line-group">
-            <h3>Medidores Luz / Agua / Gas</h3>
-            <div class="line-row">
+            <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Medidor Luz</label><input id="p-medidorLuz"></div>
               <div class="field"><label>Medidor Agua</label><input id="p-medidorAgua"></div>
               <div class="field"><label>Medidor Gas</label><input id="p-medidorGas"></div>
             </div>
           </div>
           <div class="line-group">
-            <div class="line-row"><div class="field"><label>Avalúo fiscal ($)</label><input id="p-avaluoFiscal" type="number"></div></div>
-          </div>
-          <div class="line-group">
-            <div class="line-row"><div class="field"><label>Valor comercial probable ($)</label><input id="p-valorComercial" type="number"></div></div>
+            <h3>Antecedentes Comerciales</h3>
+            <div class="line-row">
+              <div class="field"><label>Avalúo fiscal ($)</label><input id="p-avaluoFiscal" type="number"></div>
+              <div class="field"><label>Valor comercial probable ($)</label><input id="p-valorComercial" type="number"></div>
+            </div>
           </div>
 
           <div class="btn-row">
@@ -380,6 +379,39 @@
       </div>
     </div>
 
+    <!-- SERVICIOS -->
+    <div class="tab-section" id="tab-servicios">
+      <h1>Servicios</h1>
+      <div class="subtitle">Monitoreo de lecturas y pago de luz, agua y gas por arrendatario. El consumo y el monto se calculan solos a partir de la lectura anterior.</div>
+      <div class="card">
+        <h2 id="r-form-title">Nueva lectura</h2>
+        <form id="form-lectura">
+          <input type="hidden" id="r-id">
+          <div class="grid">
+            <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
+            <div class="field"><label>Servicio</label><select id="r-servicio"><option>Luz</option><option>Agua</option><option>Gas</option></select></div>
+            <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required></div>
+            <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required></div>
+            <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required></div>
+            <div class="field"><label>Estado de pago</label>
+              <select id="r-estado"><option selected>Pendiente</option><option>Pagado</option></select>
+            </div>
+            <div class="field full"><label>Comentarios</label><textarea id="r-comentarios"></textarea></div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Guardar lectura</button>
+            <button type="button" class="btn btn-secondary" id="r-cancel" style="display:none">Cancelar edición</button>
+          </div>
+          <div class="status-msg" id="r-status"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Lecturas registradas</h2>
+        <select class="filter" id="r-filter"></select>
+        <div id="reading-table" class="table-wrap"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -503,6 +535,14 @@ function requestDriveConnection(){
 document.getElementById('drive-connect-btn').addEventListener('click', requestDriveConnection);
 document.getElementById('drive-gate-connect-btn').addEventListener('click', requestDriveConnection);
 
+document.getElementById('drive-reload-btn').addEventListener('click', ()=>{
+  if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
+  if(!confirm('Esto va a reemplazar lo que ves en pantalla por lo que esté guardado ahora mismo en el Excel de Drive (incluyendo ediciones manuales). ¿Continuar?')) return;
+  driveFileId = null; // fuerza a volver a buscar el archivo por si cambió
+  setDriveStatus('recargando desde Excel…', true);
+  driveSync(true);
+});
+
 document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
   if(!confirm('Esto cerrará tu sesión de Google Drive en este navegador y pedirá reconectar. ¿Continuar?')) return;
   if(driveToken && google.accounts && google.accounts.oauth2){ google.accounts.oauth2.revoke(driveToken, ()=>{}); }
@@ -607,6 +647,12 @@ function buildWorkbook(){
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows.length?resumenRows:[{}]), 'Resumen');
 
+  const readingRows = readings.length ? computeReadingsWithConsumption().map(r=>({
+    ...r,
+    arrendatario_propiedad: contractLabel(r.contratoId)
+  })) : [{}];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(readingRows), 'Servicios');
+
   return XLSX.write(wb, { type:'array', bookType:'xlsx' });
 }
 
@@ -616,10 +662,18 @@ function loadFromWorkbook(arrayBuffer){
   const tenantSheet = wb.Sheets['Arrendatarios'];
   const contractSheet = wb.Sheets['Contratos'];
   const paySheet = wb.Sheets['Pagos'];
+  const readingSheet = wb.Sheets['Servicios'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
   contracts = contractSheet ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id) : [];
   payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
+  // De la hoja Servicios solo recuperamos los campos originales (consumo/monto se recalculan solos).
+  readings = readingSheet
+    ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=>({
+        id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
+        lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
+      }))
+    : [];
 }
 
 async function driveSync(isInitialLoad){
@@ -636,6 +690,7 @@ async function driveSync(isInitialLoad){
       await saveKey('tenants',tenants);
       await saveKey('contracts',contracts);
       await saveKey('payments',payments);
+      await saveKey('readings',readings);
       renderAll();
     } else {
       const buf = buildWorkbook();
@@ -661,8 +716,8 @@ async function driveSync(isInitialLoad){
 function pushToDriveIfConnected(){ if(driveToken) driveSync(false); }
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
-let properties = [], tenants = [], contracts = [], payments = [];
-let editingProp = null, editingTenant = null, editingContract = null, editingPay = null;
+let properties = [], tenants = [], contracts = [], payments = [], readings = [];
+let editingProp = null, editingTenant = null, editingContract = null, editingPay = null, editingReading = null;
 let storageOK = true;
 const memoryStore = {};
 
@@ -697,6 +752,7 @@ async function init(){
   tenants = await loadKey('tenants');
   contracts = await loadKey('contracts');
   payments = await loadKey('payments');
+  readings = await loadKey('readings');
   if(!storageOK){ document.getElementById('storage-banner').style.display='block'; }
   renderAll();
 }
@@ -711,6 +767,8 @@ function renderAll(){
   renderPayments();
   renderResumen();
   renderAlertas();
+  renderReadingSelects();
+  renderReadings();
 }
 
 // ---------- NAV ----------
@@ -724,7 +782,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 });
 
 // ---------- PROPIEDADES ----------
-const propFields = ['direccion','unidad','m2','rolAvaluo','propietario','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial'];
+const propFields = ['direccion','unidad','m2','propietario','rolAvaluo','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial'];
 
 document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -1102,6 +1160,139 @@ function renderAlertas(){
       <div class="when">${when}</div>
     </div>`;
   }).join('');
+}
+
+// ---------- SERVICIOS (lecturas de luz/agua/gas) ----------
+const readingFields = ['contratoId','servicio','fechaLectura','lecturaActual','valorUnitario','estado','comentarios'];
+
+function renderReadingSelects(){
+  const opts = '<option value="">— Selecciona arrendatario —</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  document.getElementById('r-contratoId').innerHTML = opts;
+  document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+}
+document.getElementById('r-filter').addEventListener('change', renderReadings);
+
+document.getElementById('form-lectura').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const obj = { id: editingReading || uid() };
+  readingFields.forEach(f=> obj[f] = document.getElementById('r-'+f).value);
+  if(!obj.estado) obj.estado = 'Pendiente';
+  if(editingReading){ readings = readings.map(r=> r.id===editingReading ? obj : r); }
+  else { readings.push(obj); }
+  const ok = await saveKey('readings',readings);
+  document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
+  document.getElementById('r-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  setTimeout(()=>document.getElementById('r-status').textContent='',ok?1500:4000);
+  resetReadingForm();
+  renderAll();
+  pushToDriveIfConnected();
+});
+document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
+
+function resetReadingForm(){
+  editingReading = null;
+  document.getElementById('form-lectura').reset();
+  document.getElementById('r-form-title').textContent='Nueva lectura';
+  document.getElementById('r-cancel').style.display='none';
+}
+function editReading(id){
+  const r = readings.find(x=>x.id===id);
+  if(!r) return;
+  editingReading = id;
+  readingFields.forEach(f=> document.getElementById('r-'+f).value = r[f] || '');
+  document.getElementById('r-estado').value = r.estado || 'Pendiente';
+  document.getElementById('r-form-title').textContent='Editar lectura';
+  document.getElementById('r-cancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function deleteReading(id){
+  if(!confirm('¿Eliminar esta lectura?')) return;
+  readings = readings.filter(r=>r.id!==id);
+  await saveKey('readings',readings);
+  renderAll();
+  pushToDriveIfConnected();
+}
+async function setReadingEstado(id, estado){
+  const r = readings.find(x=>x.id===id);
+  if(!r) return;
+  r.estado = estado;
+  readings = readings.map(x=> x.id===id ? r : x);
+  await saveKey('readings',readings);
+  renderAll();
+  pushToDriveIfConnected();
+}
+
+// Calcula consumo y monto de cada lectura comparándola con la lectura anterior
+// del mismo contrato + mismo servicio (por fecha).
+const DIAS_PARA_ATRASO = 15;
+
+function diasDesde(fechaStr){
+  if(!fechaStr) return 0;
+  const fecha = new Date(fechaStr+'T00:00:00');
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  return Math.floor((hoy - fecha) / 86400000);
+}
+
+// El estado que el usuario guarda (Pendiente/Pagado) es la fuente de verdad para "Pagado".
+// "Atrasado" nunca se guarda: se calcula solo, en el momento, según los días transcurridos.
+function estadoEfectivo(r){
+  if(r.estado === 'Pagado') return 'Pagado';
+  return diasDesde(r.fechaLectura) > DIAS_PARA_ATRASO ? 'Atrasado' : 'Pendiente';
+}
+
+function computeReadingsWithConsumption(){
+  const groups = {};
+  readings.forEach(r=>{
+    const key = r.contratoId+'|'+r.servicio;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+  Object.values(groups).forEach(list=> list.sort((a,b)=> (a.fechaLectura||'').localeCompare(b.fechaLectura||'')));
+
+  return readings.map(r=>{
+    const key = r.contratoId+'|'+r.servicio;
+    const list = groups[key];
+    const idx = list.findIndex(x=>x.id===r.id);
+    const prev = idx>0 ? list[idx-1] : null;
+    const lecturaAnterior = prev ? Number(prev.lecturaActual||0) : null;
+    const consumo = lecturaAnterior===null ? null : Math.max(Number(r.lecturaActual||0) - lecturaAnterior, 0);
+    const monto = consumo===null ? 0 : consumo * Number(r.valorUnitario||0);
+    return { ...r, lecturaAnterior, consumo, monto, estadoEfectivo: estadoEfectivo(r) };
+  });
+}
+
+function renderReadings(){
+  const filter = document.getElementById('r-filter').value;
+  const el = document.getElementById('reading-table');
+  const all = computeReadingsWithConsumption();
+  const list = all.filter(r=> !filter || r.contratoId===filter)
+                   .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
+  if(!list.length){ el.innerHTML='<div class="empty">No hay lecturas registradas.</div>'; return; }
+  el.innerHTML = `<table><thead><tr>
+    <th>Arrendatario</th><th>Servicio</th><th>Fecha lectura</th><th>Lectura ant.</th><th>Lectura actual</th><th>Consumo</th><th>Valor unit.</th><th>Monto a pagar</th><th>Estado</th><th></th>
+  </tr></thead><tbody>
+  ${list.map(r=>{
+    const tagClass = r.estadoEfectivo==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
+    return `<tr>
+    <td>${esc(contractLabel(r.contratoId))}</td>
+    <td>${esc(r.servicio)}</td>
+    <td class="mono">${esc(r.fechaLectura)}</td>
+    <td class="mono">${r.lecturaAnterior===null?'—':r.lecturaAnterior}</td>
+    <td class="mono">${esc(r.lecturaActual)}</td>
+    <td class="mono">${r.consumo===null?'primera lectura':r.consumo}</td>
+    <td class="mono">${money(r.valorUnitario)}</td>
+    <td class="mono">${money(r.monto)}</td>
+    <td>
+      <span class="tag ${tagClass}">${esc(r.estadoEfectivo)}</span>
+    </td>
+    <td class="row-actions">
+      <button onclick="editReading('${r.id}')">Editar</button>
+      ${r.estadoEfectivo!=='Pagado' ? `<button onclick="setReadingEstado('${r.id}','Pagado')">Marcar pagado</button>` : ''}
+      <button onclick="deleteReading('${r.id}')">Eliminar</button>
+    </td>
+  </tr>`;
+  }).join('')}
+  </tbody></table>`;
 }
 
 function esc(s){
