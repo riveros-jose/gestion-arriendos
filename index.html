@@ -864,8 +864,26 @@ function buildWorkbook(){
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
+// Convierte una celda de fecha real de Excel (objeto Date, leída con cellDates:true) de vuelta a
+// texto ISO "AAAA-MM-DD" — el formato que usa el resto de la app (inputs, comparaciones de mes, etc.).
+// Si la celda ya viene como texto (archivos antiguos), se deja tal cual.
+function excelCellToISODate(v){
+  if(v instanceof Date && !isNaN(v)){
+    const y = v.getUTCFullYear();
+    const m = String(v.getUTCMonth()+1).padStart(2,'0');
+    const d = String(v.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  return v;
+}
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaLectura','fechaTermino'];
+function normalizeDates(obj){
+  DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
+  return obj;
+}
+
 function loadFromWorkbook(arrayBuffer){
-  const wb = XLSX.read(new Uint8Array(arrayBuffer), { type:'array' });
+  const wb = XLSX.read(new Uint8Array(arrayBuffer), { type:'array', cellDates: true });
   const propSheet = wb.Sheets['Propiedades'];
   const tenantSheet = wb.Sheets['Arrendatarios'];
   const contractSheet = wb.Sheets['Contratos'];
@@ -874,15 +892,15 @@ function loadFromWorkbook(arrayBuffer){
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
   contracts = contractSheet
-    ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id).map(c=>({
+    ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id).map(c=> normalizeDates({
         ...c,
         activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
       }))
     : [];
-  payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
+  payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id).map(normalizeDates) : [];
   // De la hoja Servicios solo recuperamos los campos originales (consumo/monto se recalculan solos).
   readings = readingSheet
-    ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=>({
+    ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=> normalizeDates({
         id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
         lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
       }))
