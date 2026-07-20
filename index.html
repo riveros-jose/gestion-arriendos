@@ -774,6 +774,32 @@ function styleWorksheet(ws, widths){
   }
 }
 
+// Da formato real a las columnas de fecha (como fecha, no texto) y de plata (entero con formato $ CLP),
+// según el nombre de cada columna en "headers" (mismo orden con el que se armaron las filas).
+const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaLectura','fechaTermino'];
+const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto'];
+function applyColumnFormats(ws, headers){
+  if(!ws['!ref']) return;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  headers.forEach((h,C)=>{
+    const esFecha = DATE_COLUMNS.includes(h);
+    const esMoneda = MONEY_COLUMNS.includes(h);
+    if(!esFecha && !esMoneda) return;
+    for(let R = 1; R <= range.e.r; R++){
+      const addr = XLSX.utils.encode_cell({ r:R, c:C });
+      const cell = ws[addr];
+      if(!cell || cell.v==='' || cell.v==null) continue;
+      if(esFecha){
+        const d = new Date(String(cell.v)+'T00:00:00');
+        if(!isNaN(d)){ cell.t = 'd'; cell.v = d; cell.z = 'dd-mm-yyyy'; }
+      } else if(esMoneda){
+        const n = Number(cell.v);
+        if(!isNaN(n)){ cell.t = 'n'; cell.v = Math.round(n); cell.z = '"$"#,##0'; }
+      }
+    }
+  });
+}
+
 function buildWorkbook(){
   const wb = XLSX.utils.book_new();
 
@@ -785,6 +811,7 @@ function buildWorkbook(){
     valorComercial: p.valorComercial, contribuciones: p.contribuciones
   })) : [{}];
   const wsProp = XLSX.utils.json_to_sheet(propRows);
+  applyColumnFormats(wsProp, ['id','direccion','unidad','m2Construidos','m2Terreno','propietario','rolAvaluo','cbrFoja','cbrNumero','cbrAnio','cbrLocalidad','clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas','avaluoFiscal','valorComercial','contribuciones']);
   styleWorksheet(wsProp, [10,28,16,11,10,22,12,8,8,7,14,10,10,10,11,11,11,14,16,14]);
   XLSX.utils.book_append_sheet(wb, wsProp, 'Propiedades');
 
@@ -807,6 +834,7 @@ function buildWorkbook(){
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral','activo','fechaTermino','deudaPactada']);
   styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,32,8,14,14]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
@@ -817,6 +845,7 @@ function buildWorkbook(){
     medioPago: p.medioPago, comentarios: p.comentarios, contratoId: p.contratoId
   })) : [{}];
   const wsPay = XLSX.utils.json_to_sheet(payRows);
+  applyColumnFormats(wsPay, ['id','contrato','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios','contratoId']);
   styleWorksheet(wsPay, [10,32,12,14,12,14,14,28,10]);
   XLSX.utils.book_append_sheet(wb, wsPay, 'Pagos');
 
@@ -828,6 +857,7 @@ function buildWorkbook(){
     comentarios: r.comentarios, contratoId: r.contratoId
   })) : [{}];
   const wsRead = XLSX.utils.json_to_sheet(readingRows);
+  applyColumnFormats(wsRead, ['id','arrendatario','servicio','fechaLectura','lecturaAnterior','lecturaActual','consumo','valorUnitario','monto','estado','estadoEfectivo','comentarios','contratoId']);
   styleWorksheet(wsRead, [10,32,8,12,10,10,10,12,12,10,10,28,10]);
   XLSX.utils.book_append_sheet(wb, wsRead, 'Servicios');
 
@@ -1443,15 +1473,16 @@ document.getElementById('export-payments-btn').addEventListener('click', ()=>{
       return {
         Direccion: direccion,
         Nemo: nemo,
-        FechaPago: p.fechaPago,
-        MontoPagado: Number(p.montoPagado||0),
-        Descuentos: Number(p.descuentos||0),
-        ValorArriendo: Number(p.valorArriendo||0),
+        fechaPago: p.fechaPago,
+        montoPagado: Number(p.montoPagado||0),
+        descuentos: Number(p.descuentos||0),
+        valorArriendo: Number(p.valorArriendo||0),
         MedioPago: p.medioPago,
         Comentarios: p.comentarios
       };
     });
   const ws = XLSX.utils.json_to_sheet(rows);
+  applyColumnFormats(ws, ['Direccion','Nemo','fechaPago','montoPagado','descuentos','valorArriendo','MedioPago','Comentarios']);
   styleWorksheet(ws, [30,22,12,14,12,14,14,28]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
