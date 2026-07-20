@@ -54,7 +54,7 @@
   .btn-danger{background:var(--brick-soft);color:var(--brick);}
   .btn-row{display:flex;gap:10px;margin-top:18px;}
   table{width:100%;border-collapse:collapse;font-size:13.5px;}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);resize:horizontal;overflow:hidden;min-width:48px;}
   th.sortable{cursor:pointer;user-select:none;}
   th.sortable:hover{color:var(--teal-dark);}
   td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap;}
@@ -351,6 +351,7 @@
             <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
             <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="number" required></div>
             <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="number" value="0"></div>
+            <div class="field"><label>Valor arriendo del periodo ($)</label><input id="pay-valorArriendo" type="number" placeholder="Vacío = usa el del contrato"></div>
             <div class="field"><label>Medio de pago</label>
               <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
             </div>
@@ -1173,6 +1174,40 @@ async function deleteContract(id){
   renderAll();
   pushToDriveIfConnected();
 }
+
+async function terminateContract(id){
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return;
+  const label = tenantName(c.tenantId) + ' — ' + propAddress(c.propiedadId);
+  if(!confirm(`Vas a finalizar el contrato de:\n${label}\n\nEl arrendatario pasará a "Arrendatarios Históricos" y dejará de contar en la deuda vigente y alertas. Sus pagos se conservan. ¿Continuar?`)) return;
+
+  const hoy = new Date().toISOString().slice(0,10);
+  let fechaTermino = prompt('Fecha de término del contrato (formato AAAA-MM-DD):', hoy);
+  if(fechaTermino===null) return; // canceló
+  fechaTermino = fechaTermino.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaTermino) || isNaN(new Date(fechaTermino+'T00:00:00'))){
+    alert('Fecha inválida. Usa el formato AAAA-MM-DD, por ejemplo: '+hoy);
+    return;
+  }
+
+  let deuda = prompt('Monto de deuda pactada al término (en $, deja 0 si no hay deuda):', '0');
+  if(deuda===null) return; // canceló
+  deuda = deuda.replace(/[.$\s]/g,'');
+  if(deuda==='' || isNaN(Number(deuda)) || Number(deuda)<0){
+    alert('Monto inválido. Ingresa solo números, por ejemplo: 500000');
+    return;
+  }
+
+  c.activo = false;
+  c.fechaTermino = fechaTermino;
+  c.deudaPactada = Number(deuda);
+  contracts = contracts.map(x=> x.id===id ? c : x);
+  await saveKey('contracts',contracts);
+  renderAll();
+  pushToDriveIfConnected();
+  alert('Contrato finalizado. Lo encontrarás en la pestaña "Arrendatarios Históricos".');
+}
+
 function propAddress(id){
   const p = properties.find(x=>x.id===id);
   return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
@@ -1199,13 +1234,13 @@ function renderContracts(){
     <td class="mono">${formatDate(c.fechaInicioContrato)}</td>
     <td>${esc(c.tipoContrato)}</td>
     <td class="mono">${money(c.montoArriendoPactado)}</td>
-    <td class="row-actions"><button onclick="editContract('${c.id}')">Editar</button><button onclick="deleteContract('${c.id}')">Eliminar</button></td>
+    <td class="row-actions"><button onclick="editContract('${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteContract('${c.id}')">Eliminar</button></td>
   </tr>`).join('')}
   </tbody></table>`;
 }
 
 // ---------- PAGOS ----------
-const payFields = ['contratoId','fechaPago','montoPagado','descuentos','medioPago','comentarios'];
+const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
 
 function renderPaySelects(){
   const activos = contracts.filter(isActiveContract);
@@ -1327,12 +1362,14 @@ function effectiveDebtStartDate(contratoId){
 
 function computeResumenRows(){
   return contracts.filter(isActiveContract).map(c=>{
-    const pagosC = payments.filter(p=>p.contratoId===c.id);
-    const totalPagado = pagosC.reduce((s,p)=>s+Number(p.montoPagado||0),0);
-    const totalDescuentos = pagosC.reduce((s,p)=>s+Number(p.descuentos||0),0);
-    const meses = mesesTranscurridos(effectiveDebtStartDate(c.id));
+    // Se calcula desde la serie mensual, que usa el valor de arriendo vigente EN CADA PERIODO
+    // (columna valorArriendo de los pagos), no el valor actual del contrato.
+    const series = computeContratoMonthlySeries(c.id);
+    const totalPagado = series.reduce((s,d)=>s+d.pagado,0);
+    const totalDescuentos = series.reduce((s,d)=>s+d.descuento,0);
+    const totalEsperado = series.reduce((s,d)=>s+d.monto,0);
+    const meses = series.length;
     const monto = Number(c.montoArriendoPactado||0);
-    const totalEsperado = meses*monto;
     const saldo = totalEsperado - (totalPagado + totalDescuentos);
     return {c, monto, meses, totalEsperado, totalPagado, totalDescuentos, saldo};
   }).sort((a,b)=> b.saldo - a.saldo);
@@ -1398,7 +1435,7 @@ function renderResumen(){
 
 // ---------- ALERTAS (por contrato) ----------
 function addMonths(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setMonth(d.getMonth()+n); return d; }
-function toISO(d){ return d.toISOString().slice(0,10); }
+function toISO(d){ return (d instanceof Date && !isNaN(d)) ? d.toISOString().slice(0,10) : ''; }
 function monthsUntil(targetDate){
   const now = new Date(); now.setHours(0,0,0,0);
   const target = new Date(targetDate); target.setHours(0,0,0,0);
@@ -1417,7 +1454,7 @@ function nextIpcDate(fechaInicio, intervalo){
 function buildAlerts(){
   const alerts = [];
   contracts.filter(isActiveContract).forEach(c=>{
-    if(c.duracionMeses){
+    if(c.duracionMeses && c.fechaInicioContrato){
       const venc = addMonths(c.fechaInicioContrato, Number(c.duracionMeses));
       const m = monthsUntil(toISO(venc));
       if(m===1||m===2||m===3){ alerts.push({c, tipo:'Vencimiento de contrato', meses:m, fecha:toISO(venc)}); }
@@ -1639,17 +1676,14 @@ function renderHistorial(){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !c.fechaInicioContrato){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>'; return; }
 
-  const months = monthsBetween(effectiveDebtStartDate(contratoId));
-  const monto = Number(c.montoArriendoPactado||0);
+  const series = computeContratoMonthlySeries(contratoId).slice().reverse(); // más reciente arriba
 
   el.innerHTML = `<table><thead><tr>
     <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
   </tr></thead><tbody>
-  ${months.map(({year,month})=>{
-    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
-    const totalPagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
-    const totalDesc = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
-    const saldo = monto - (totalPagado+totalDesc);
+  ${series.map(d=>{
+    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+    const saldo = d.monto - (d.pagado+d.descuento);
     let estado, tagClass;
     if(pagosMes.length===0){ estado='Sin pago'; tagClass='tag-debt'; }
     else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
@@ -1658,10 +1692,10 @@ function renderHistorial(){
       ? pagosMes.map(p=>`${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}`).join('<br>')
       : '—';
     return `<tr>
-      <td>${MESES_ES[month]} ${year}</td>
-      <td class="mono">${money(monto)}</td>
-      <td class="mono">${money(totalPagado)}</td>
-      <td class="mono">${money(totalDesc)}</td>
+      <td>${MESES_ES[d.month]} ${d.year}</td>
+      <td class="mono">${money(d.monto)}</td>
+      <td class="mono">${money(d.pagado)}</td>
+      <td class="mono">${money(d.descuento)}</td>
       <td class="mono">${money(Math.max(saldo,0))}</td>
       <td><span class="tag ${tagClass}">${estado}</span></td>
       <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
@@ -1688,11 +1722,12 @@ function renderHistoricos(){
   rows = sortRows('historicos', rows, {
     tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>r.c.propiedadId?propAddress(r.c.propiedadId):'',
     cantidad: r=>r.cantidad, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos,
-    primerPago: r=>r.primerPago==='—'?'':r.primerPago, ultimoPago: r=>r.ultimoPago==='—'?'':r.ultimoPago
+    primerPago: r=>r.primerPago==='—'?'':r.primerPago, ultimoPago: r=>r.ultimoPago==='—'?'':r.ultimoPago,
+    fechaTermino: r=>r.c.fechaTermino||'', deudaPactada: r=>Number(r.c.deudaPactada||0)
   });
 
   el.innerHTML = `<table><thead><tr>
-    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}
+    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}${th('historicos','fechaTermino','Fecha término')}${th('historicos','deudaPactada','Deuda pactada')}
   </tr></thead><tbody>
   ${rows.map(r=>`<tr>
     <td>${esc(tenantName(r.c.tenantId))}</td>
@@ -1702,6 +1737,8 @@ function renderHistoricos(){
     <td class="mono">${money(r.totalDescuentos)}</td>
     <td class="mono">${r.primerPago==="—"?"—":formatDate(r.primerPago)}</td>
     <td class="mono">${r.ultimoPago==="—"?"—":formatDate(r.ultimoPago)}</td>
+    <td class="mono">${r.c.fechaTermino?formatDate(r.c.fechaTermino):'—'}</td>
+    <td class="mono">${Number(r.c.deudaPactada)>0?('<span style="color:var(--brick);font-weight:600">'+money(r.c.deudaPactada)+'</span>'):'—'}</td>
   </tr>`).join('')}
   </tbody></table>`;
 }
@@ -1744,11 +1781,16 @@ function computeContratoMonthlySeries(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !c.fechaInicioContrato) return [];
   const months = monthsBetween(effectiveDebtStartDate(contratoId)).slice().reverse();
-  const monto = Number(c.montoArriendoPactado||0);
+  const montoContrato = Number(c.montoArriendoPactado||0);
   return months.map(({year,month})=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
     const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
+    // El valor esperado del mes es el "valor arriendo" registrado en los pagos de ese periodo
+    // (el arriendo puede haber cambiado en el tiempo). Si el mes no tiene pagos con ese dato,
+    // se usa el valor vigente del contrato como aproximación.
+    const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
+    const monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : montoContrato;
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
 }
