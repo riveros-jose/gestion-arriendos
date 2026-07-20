@@ -269,6 +269,7 @@
           <div class="line-group">
             <h3>🏢 Información de la Sociedad</h3>
             <div class="line-row">
+              <div class="field"><label>Nemo arrendatario</label><input id="t-nemoArrendatario" placeholder="Ej: Imprenta, Cine, Marcelo…"></div>
               <div class="field"><label>Nombre sociedad</label><input id="t-nombreSociedad" required></div>
               <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad"></div>
             </div>
@@ -1056,7 +1057,7 @@ function renderProperties(){
 }
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
-const tenantFields = ['nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
+const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
 
 document.getElementById('form-arrendatario').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -1105,17 +1106,23 @@ function tenantName(id){
   const t = tenants.find(x=>x.id===id);
   return t ? t.nombreSociedad : '—';
 }
+function tenantProperties(tenantId){
+  const dirs = contracts.filter(c=>c.tenantId===tenantId).map(c=>propAddress(c.propiedadId));
+  return dirs.length ? dirs.join(', ') : '—';
+}
 function renderTenants(){
   const el = document.getElementById('tenant-table');
   if(!tenants.length){ el.innerHTML='<div class="empty">Aún no hay arrendatarios registrados.</div>'; return; }
   const tRows = sortRows('tenants', tenants, {
-    nombreSociedad: x=>x.nombreSociedad||'', rutSociedad: x=>x.rutSociedad||'', nombreRepresentante: x=>x.nombreRepresentante||'',
+    nemoArrendatario: x=>x.nemoArrendatario||'', nombreSociedad: x=>x.nombreSociedad||'', rutSociedad: x=>x.rutSociedad||'', nombreRepresentante: x=>x.nombreRepresentante||'',
     correo: x=>x.correo||'', telefono: x=>x.telefono||''
   });
   el.innerHTML = `<table><thead><tr>
-    ${th('tenants','nombreSociedad','Sociedad')}${th('tenants','rutSociedad','Rut Sociedad')}${th('tenants','nombreRepresentante','Representante')}${th('tenants','correo','Correo')}${th('tenants','telefono','Teléfono')}<th></th>
+    ${th('tenants','nemoArrendatario','Nemo')}<th>Dirección(es)</th>${th('tenants','nombreSociedad','Sociedad')}${th('tenants','rutSociedad','Rut Sociedad')}${th('tenants','nombreRepresentante','Representante')}${th('tenants','correo','Correo')}${th('tenants','telefono','Teléfono')}<th></th>
   </tr></thead><tbody>
   ${tRows.map(t=>`<tr>
+    <td><strong>${esc(t.nemoArrendatario)}</strong></td>
+    <td><span class="truncate" title="${esc(tenantProperties(t.id))}">${esc(tenantProperties(t.id))}</span></td>
     <td>${esc(t.nombreSociedad)}</td>
     <td class="mono">${esc(t.rutSociedad)}</td>
     <td>${esc(t.nombreRepresentante)}</td>
@@ -1212,10 +1219,16 @@ function propAddress(id){
   const p = properties.find(x=>x.id===id);
   return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
 }
+function tenantNemo(id){
+  const t = tenants.find(x=>x.id===id);
+  return t ? (t.nemoArrendatario || '') : '';
+}
 function contractLabel(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return '—';
-  return tenantName(c.tenantId) + ' — ' + propAddress(c.propiedadId);
+  const nemo = tenantNemo(c.tenantId);
+  const identificador = nemo || tenantName(c.tenantId);
+  return propAddress(c.propiedadId) + ' — ' + identificador;
 }
 function renderContracts(){
   const el = document.getElementById('contract-table');
