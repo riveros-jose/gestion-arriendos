@@ -400,7 +400,8 @@
       <div class="card">
         <div class="toggle-form"><h2>📅 Historial de pagos</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
         <div class="line-row" style="margin-bottom:16px">
-          <div class="field"><label>Contrato</label><select id="h-contratoId"></select></div>
+          <div class="field"><label>Contrato vigente</label><select id="h-contratoId-activo"></select></div>
+          <div class="field"><label>Contrato histórico</label><select id="h-contratoId-historico"></select></div>
           <div class="field" id="h-mesano-wrap" style="display:none"><label>Mes / Año</label><select id="h-mesano-filter"></select></div>
         </div>
         <div id="historial-table" class="table-wrap"></div>
@@ -1870,15 +1871,29 @@ function renderReadings(){
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 function renderHistorialSelects(){
-  const sel = document.getElementById('h-contratoId');
-  const current = sel.value;
+  const selActivo = document.getElementById('h-contratoId-activo');
+  const selHist = document.getElementById('h-contratoId-historico');
+  const currentActivo = selActivo.value;
+  const currentHist = selHist.value;
+
   const activos = contracts.filter(isActiveContract);
-  sel.innerHTML = '<option value="">— Todos los contratos —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  if(activos.some(c=>c.id===current)) sel.value = current;
-  document.getElementById('h-mesano-wrap').style.display = sel.value ? 'none' : 'block';
+  const historicos = contracts.filter(c=>!isActiveContract(c));
+
+  selActivo.innerHTML = '<option value="">— Ninguno —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  selHist.innerHTML = '<option value="">— Ninguno —</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+
+  if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
+  if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
+
+  const contratoId = selActivo.value || selHist.value;
+  document.getElementById('h-mesano-wrap').style.display = contratoId ? 'none' : 'block';
 }
-document.getElementById('h-contratoId').addEventListener('change', ()=>{
-  document.getElementById('h-mesano-wrap').style.display = document.getElementById('h-contratoId').value ? 'none' : 'block';
+document.getElementById('h-contratoId-activo').addEventListener('change', ()=>{
+  if(document.getElementById('h-contratoId-activo').value) document.getElementById('h-contratoId-historico').value = '';
+  renderHistorial();
+});
+document.getElementById('h-contratoId-historico').addEventListener('change', ()=>{
+  if(document.getElementById('h-contratoId-historico').value) document.getElementById('h-contratoId-activo').value = '';
   renderHistorial();
 });
 document.getElementById('h-mesano-filter').addEventListener('change', renderHistorial);
@@ -1928,12 +1943,12 @@ function renderHistorialTodos(){
                       .sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
   list = sortRows('payments-todos', list, {
     contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
-    descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>Number(p.valorArriendo||0), medioPago: p=>p.medioPago||''
+    descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>Number(p.valorArriendo||0), comentarios: p=>p.comentarios||''
   });
 
   if(!list.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para este filtro.</div>'; return; }
   el.innerHTML = `<table><thead><tr>
-    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Monto pagado')}${th('payments-todos','descuentos','Descuentos')}${th('payments-todos','valorArriendo','Valor arriendo')}${th('payments-todos','medioPago','Medio')}<th></th>
+    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Monto pagado')}${th('payments-todos','descuentos','Descuentos')}${th('payments-todos','valorArriendo','Valor arriendo')}${th('payments-todos','comentarios','Comentarios')}<th></th>
   </tr></thead><tbody>
   ${list.map(p=>{
     const full = contractLabel(p.contratoId);
@@ -1943,7 +1958,7 @@ function renderHistorialTodos(){
     <td class="mono">${money(p.montoPagado)}</td>
     <td class="mono">${money(p.descuentos)}</td>
     <td class="mono">${p.valorArriendo?money(p.valorArriendo):'—'}</td>
-    <td>${esc(p.medioPago)}</td>
+    <td>${esc(p.comentarios)}</td>
     <td class="row-actions"><button onclick="editPayment('${p.id}')">Editar</button><button onclick="deletePayment('${p.id}')">Eliminar</button></td>
   </tr>`;
   }).join('')}
@@ -1952,7 +1967,7 @@ function renderHistorialTodos(){
 
 function renderHistorial(){
   renderHistorialSelects();
-  const contratoId = document.getElementById('h-contratoId').value;
+  const contratoId = document.getElementById('h-contratoId-activo').value || document.getElementById('h-contratoId-historico').value;
   if(!contratoId){ renderHistorialTodos(); return; }
 
   const el = document.getElementById('historial-table');
@@ -1973,7 +1988,7 @@ function renderHistorial(){
     else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
     else { estado='Pagado'; tagClass='tag-ok'; }
     const detalle = pagosMes.length
-      ? pagosMes.map(p=>`<div style="margin-bottom:3px">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}
+      ? pagosMes.map(p=>`<div style="margin-bottom:3px">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''}${p.comentarios?(' · '+esc(p.comentarios)):''}
         <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
         <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
       </div>`).join('')
