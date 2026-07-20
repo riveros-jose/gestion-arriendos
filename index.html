@@ -135,6 +135,7 @@
   .prop-field .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);font-weight:600;}
   .prop-field .val{font-size:13.5px;color:var(--ink);font-family:'IBM Plex Mono',monospace;word-break:break-word;}
   .prop-service-group{display:flex;flex-direction:column;gap:10px;}
+  .prop-card-section{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);font-weight:700;margin:14px 0 8px;padding-top:12px;border-top:1px dashed var(--border);}
   .collapsible-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
   .collapsible-header:hover h2{color:var(--teal-dark);}
   .collapse-arrow{font-size:14px;color:var(--ink-soft);transition:transform .15s;}
@@ -280,6 +281,7 @@
       </div>
       <div class="card">
         <h2>📋 Propiedades registradas</h2>
+        <input type="text" id="prop-search" class="filter" placeholder="🔎 Buscar propiedad (dirección, unidad, propietario…)" style="width:100%;max-width:420px;margin-bottom:14px;">
         <div class="subtabs" id="prop-subtabs">
           <button type="button" class="subtab-btn active" data-subtab="prop1">📜 Antecedentes e Inscripción CBR</button>
           <button type="button" class="subtab-btn" data-subtab="prop2">🔧 Servicios</button>
@@ -354,9 +356,9 @@
       <div class="card">
         <div class="collapsible-header" onclick="toggleCollapse('tenants')">
           <h2>📋 Arrendatarios y contratos registrados</h2>
-          <span class="collapse-arrow" id="tenants-arrow">▸</span>
+          <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
         </div>
-        <div id="tenants-list-wrap" style="display:none">
+        <div id="tenants-list-wrap" style="display:block">
           <div id="tenant-table" class="table-wrap"></div>
         </div>
       </div>
@@ -978,7 +980,7 @@ function pushToDriveIfConnected(){ if(driveToken) driveSync(false); }
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
 let properties = [], tenants = [], contracts = [], payments = [], readings = [];
-const collapseState = { tenants:false, contracts:false };
+const collapseState = { tenants:true, contracts:false };
 function toggleCollapse(key){
   collapseState[key] = !collapseState[key];
   const wrap = document.getElementById(key+'-list-wrap');
@@ -1123,16 +1125,26 @@ function propField(label, value){
   return `<div class="prop-field"><span class="lbl">${esc(label)}</span><span class="val">${value===''||value==null?'—':value}</span></div>`;
 }
 
+function propertyMatchesSearch(p, term){
+  if(!term) return true;
+  const haystack = [p.direccion,p.unidad,p.propietario,p.rolAvaluo,p.cbrLocalidad,p.clienteLuz,p.clienteAgua,p.clienteGas]
+    .map(v=>String(v||'').toLowerCase()).join(' ');
+  return haystack.includes(term);
+}
+
 function renderProperties(){
   const el = document.getElementById('prop-table');
   if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
+  const term = (document.getElementById('prop-search').value||'').trim().toLowerCase();
+  const list = properties.filter(p=>propertyMatchesSearch(p,term));
+  if(!list.length){ el.innerHTML=`<div class="empty">No se encontraron propiedades para "${esc(term)}".</div>`; return; }
 
   const intFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? String(Math.round(Number(v))) : esc(v);
   const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
   const num = v => (v==='' || v==null || isNaN(Number(v))) ? -Infinity : Number(v);
 
   if(propActiveSubtab==='prop1'){
-    const rows = sortRows('prop1', properties, {
+    const rows = sortRows('prop1', list, {
       direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', m2Construidos: p=>num(p.m2Construidos), m2Terreno: p=>num(p.m2Terreno),
       propietario: p=>p.propietario||'', rolAvaluo: p=>p.rolAvaluo||'', cbrFoja: p=>num(p.cbrFoja), cbrNumero: p=>num(p.cbrNumero),
       cbrAnio: p=>num(p.cbrAnio), cbrLocalidad: p=>p.cbrLocalidad||''
@@ -1153,7 +1165,7 @@ function renderProperties(){
         </div>
       </div>`).join('');
   } else if(propActiveSubtab==='prop2'){
-    const rows = sortRows('prop2', properties, {
+    const rows = sortRows('prop2', list, {
       direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', clienteLuz: p=>p.clienteLuz||'', clienteAgua: p=>p.clienteAgua||'',
       clienteGas: p=>p.clienteGas||'', medidorLuz: p=>p.medidorLuz||'', medidorAgua: p=>p.medidorAgua||'', medidorGas: p=>p.medidorGas||''
     });
@@ -1175,7 +1187,7 @@ function renderProperties(){
         </div>
       </div>`).join('');
   } else {
-    const rows = sortRows('prop3', properties, {
+    const rows = sortRows('prop3', list, {
       direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', avaluoFiscal: p=>num(p.avaluoFiscal), valorComercial: p=>num(p.valorComercial), contribuciones: p=>num(p.contribuciones)
     });
     el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop3','direccion','Dirección')}${sortChip('prop3','avaluoFiscal','Avalúo fiscal')}${sortChip('prop3','valorComercial','Valor comercial')}${sortChip('prop3','contribuciones','Contribuciones')}</div>` +
@@ -1189,6 +1201,7 @@ function renderProperties(){
   }
 }
 let propActiveSubtab = 'prop1';
+document.getElementById('prop-search').addEventListener('input', renderProperties);
 document.getElementById('prop-subtabs').addEventListener('click', e=>{
   const btn = e.target.closest('.subtab-btn');
   if(!btn) return;
@@ -1341,6 +1354,24 @@ async function reactivateContract(id){
   pushToDriveIfConnected();
 }
 
+// Cierra a mano el saldo pendiente de un histórico (por ejemplo, si se decide condonar o dar
+// por incobrable lo que falta) — deja la deuda pactada igual a lo ya cobrado, así el saldo
+// remanente queda en $0 y el contrato deja de aparecer en el selector de "Nuevo pago".
+async function closeDebtManually(id){
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return;
+  const cobrado = payments
+    .filter(p=>p.contratoId===id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+    .reduce((s,p)=>s+Number(p.montoPagado||0)+Number(p.descuentos||0),0);
+  const saldoActual = computeCobranzaSaldo(c);
+  if(!confirm(`Vas a cerrar manualmente la deuda de este contrato (por ejemplo, para condonarla o darla por incobrable).\n\nSaldo pendiente actual: ${money(Math.max(saldoActual,0))}\n\nAl confirmar, la deuda pactada quedará fijada en ${money(cobrado)} (lo que realmente se alcanzó a cobrar) y el saldo pasará a $0. Esto no se puede deshacer automáticamente. ¿Continuar?`)) return;
+  c.deudaPactada = cobrado;
+  contracts = contracts.map(x=> x.id===id ? c : x);
+  await saveKey('contracts',contracts);
+  renderAll();
+  pushToDriveIfConnected();
+}
+
 function propAddress(id){
   const p = properties.find(x=>x.id===id);
   return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
@@ -1395,14 +1426,21 @@ function renderTenantsContracts(){
         <div><span class="prop-card-dir">${esc(t.nemoArrendatario || t.nombreSociedad)}</span>${t.nemoArrendatario?` <span class="prop-card-unidad">${esc(t.nombreSociedad)}</span>`:''}</div>
         <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
+      <div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div>
       <div class="prop-fields-grid">
-        ${propField('Estado', '<span class="tag tag-ok">Vigente</span>')}
-        ${propField('Propiedad(es)', esc(propAddresses(c)))}
+        ${propField('Nombre sociedad', esc(t.nombreSociedad))}
         ${propField('Rut Sociedad', esc(t.rutSociedad))}
+      </div>
+      <div class="prop-card-section">👤 Representante</div>
+      <div class="prop-fields-grid">
         ${propField('Representante', esc(t.nombreRepresentante))}
         ${propField('Rut Representante', esc(t.rutRepresentante))}
         ${propField('Correo', esc(t.correo))}
         ${propField('Teléfono', esc(t.telefono))}
+      </div>
+      <div class="prop-card-section">📝 Contrato</div>
+      <div class="prop-fields-grid">
+        ${propField('Propiedad(es)', esc(propAddresses(c)))}
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
         ${propField('Monto pactado', money(c.montoArriendoPactado))}
       </div>
@@ -2010,7 +2048,7 @@ function renderHistoricos(){
   });
 
   el.innerHTML = `<table><thead><tr>
-    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','fechaTermino','Fecha término')}${th('historicos','deudaPactada','Deuda pactada')}${th('historicos','saldoRemanente','Saldo remanente')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}<th>Estado</th><th></th>
+    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','fechaTermino','Fecha término')}${th('historicos','deudaPactada','Deuda pactada')}${th('historicos','saldoRemanente','Deuda Final')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}<th>Estado</th><th></th>
   </tr></thead><tbody>
   ${rows.map(r=>{
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
@@ -2028,7 +2066,10 @@ function renderHistoricos(){
     <td class="mono">${r.primerPago==="—"?"—":formatDate(r.primerPago)}</td>
     <td class="mono">${r.ultimoPago==="—"?"—":formatDate(r.ultimoPago)}</td>
     <td><span class="tag ${tagClass}">${estado}</span></td>
-    <td class="row-actions"><button onclick="reactivateContract('${r.c.id}')">Reactivar</button></td>
+    <td class="row-actions">
+      ${tieneDeuda && r.saldoRemanente>0 ? `<button onclick="closeDebtManually('${r.c.id}')">Cerrar deuda</button>` : ''}
+      <button onclick="reactivateContract('${r.c.id}')">Reactivar</button>
+    </td>
   </tr>`;
   }).join('')}
   </tbody></table>`;
