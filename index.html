@@ -129,6 +129,7 @@
   .prop-card{border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#fdfdfc;}
   .prop-card-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
   .prop-card-dir{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink);}
+  .card-index{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink-soft);}
   .prop-card-unidad{font-size:13px;color:var(--ink-soft);}
   .prop-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 16px;}
   .prop-field{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -265,9 +266,9 @@
               <div class="field"><label>🔥 # Cliente Gas</label><input id="p-clienteGas"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
-              <div class="field"><label>⚡ Medidor Luz</label><input id="p-medidorLuz"></div>
-              <div class="field"><label>💧 Medidor Agua</label><input id="p-medidorAgua"></div>
-              <div class="field"><label>🔥 Medidor Gas</label><input id="p-medidorGas"></div>
+              <div class="field"><label>Medidor Luz</label><input id="p-medidorLuz"></div>
+              <div class="field"><label>Medidor Agua</label><input id="p-medidorAgua"></div>
+              <div class="field"><label>Medidor Gas</label><input id="p-medidorGas"></div>
             </div>
           </div>
           <div class="line-group">
@@ -384,11 +385,11 @@
             <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
             <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="number" required></div>
             <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="number" value="0"></div>
-            <div class="field"><label>Valor arriendo del periodo ($) — opcional</label><input id="pay-valorArriendo" type="number" placeholder="Se autocompleta con el valor actual del contrato"></div>
             <div class="field"><label>Medio de pago</label>
               <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
             </div>
             <div class="field full"><label>Comentarios</label><textarea id="pay-comentarios"></textarea></div>
+            <div class="field"><label>Valor arriendo del periodo ($) — opcional</label><input id="pay-valorArriendo" type="number" placeholder="Se autocompleta con el valor actual del contrato"></div>
           </div>
           <div class="btn-row">
             <button type="submit" class="btn btn-primary">Registrar pago</button>
@@ -1119,9 +1120,9 @@ function sortChip(tableId, key, label){
   return `<button type="button" class="subtab-btn sort-chip ${activeClass}" onclick="toggleSort('${tableId}','${key}')">${label}${arrow}</button>`;
 }
 
-function propCardHeader(p){
+function propCardHeader(p, idx){
   return `<div class="prop-card-header">
-    <div><span class="prop-card-dir">${esc(p.direccion)}</span>${p.unidad?` <span class="prop-card-unidad">${esc(p.unidad)}</span>`:''}</div>
+    <div>${idx?`<span class="card-index">${idx})</span> `:''}<span class="prop-card-dir">${esc(p.direccion)}</span>${p.unidad?` <span class="prop-card-unidad">${esc(p.unidad)}</span>`:''}</div>
     <div class="row-actions"><button onclick="editProperty('${p.id}')">Editar</button><button onclick="deleteProperty('${p.id}')">Eliminar</button></div>
   </div>`;
 }
@@ -1154,7 +1155,7 @@ function renderProperties(){
       cbrAnio: p=>num(p.cbrAnio), cbrLocalidad: p=>p.cbrLocalidad||''
     });
     el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop1','direccion','Dirección')}${sortChip('prop1','m2Construidos','M² constr.')}${sortChip('prop1','propietario','Propietario')}${sortChip('prop1','rolAvaluo','Rol avalúo')}${sortChip('prop1','cbrAnio','Año')}</div>` +
-      rows.map(p=>`<div class="prop-card">${propCardHeader(p)}
+      rows.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
           ${propField('M² construidos', ceilFmt(p.m2Construidos))}
           ${propField('M² terreno', ceilFmt(p.m2Terreno))}
@@ -1174,7 +1175,7 @@ function renderProperties(){
       clienteGas: p=>p.clienteGas||'', medidorLuz: p=>p.medidorLuz||'', medidorAgua: p=>p.medidorAgua||'', medidorGas: p=>p.medidorGas||''
     });
     el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop2','direccion','Dirección')}${sortChip('prop2','clienteLuz','⚡ Cliente Luz')}${sortChip('prop2','clienteAgua','💧 Cliente Agua')}${sortChip('prop2','clienteGas','🔥 Cliente Gas')}</div>` +
-      rows.map(p=>`<div class="prop-card">${propCardHeader(p)}
+      rows.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
           <div class="prop-service-group">
             ${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}
@@ -1195,7 +1196,7 @@ function renderProperties(){
       direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', avaluoFiscal: p=>num(p.avaluoFiscal), valorComercial: p=>num(p.valorComercial), contribuciones: p=>num(p.contribuciones)
     });
     el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop3','direccion','Dirección')}${sortChip('prop3','avaluoFiscal','Avalúo fiscal')}${sortChip('prop3','valorComercial','Valor comercial')}${sortChip('prop3','contribuciones','Contribuciones')}</div>` +
-      rows.map(p=>`<div class="prop-card">${propCardHeader(p)}
+      rows.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
         <div class="prop-fields-grid">
           ${propField('Avalúo fiscal', p.avaluoFiscal?money(p.avaluoFiscal):'—')}
           ${propField('Valor comercial probable', p.valorComercial?money(p.valorComercial):'—')}
@@ -1423,11 +1424,12 @@ function renderTenantsContracts(){
     fechaInicioContrato: c=>c.fechaInicioContrato||'', montoArriendoPactado: c=>Number(c.montoArriendoPactado||0)
   });
   el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('tenants','nemo','Nemo')}${sortChip('tenants','nombreSociedad','Sociedad')}${sortChip('tenants','fechaInicioContrato','Inicio contrato')}${sortChip('tenants','montoArriendoPactado','Monto pactado')}</div>` +
-  rows.map(c=>{
+  rows.map((c,idx)=>{
     const t = tenants.find(x=>x.id===c.tenantId) || {};
+    const fechaFin = (c.fechaInicioContrato && c.duracionMeses) ? formatDate(toISO(addMonths(c.fechaInicioContrato, Number(c.duracionMeses)))) : '—';
     return `<div class="prop-card">
       <div class="prop-card-header">
-        <div><span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
+        <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
         <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
       <div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div>
@@ -1445,7 +1447,9 @@ function renderTenantsContracts(){
       <div class="prop-card-section">📝 Contrato</div>
       <div class="prop-fields-grid">
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
+        ${propField('Fin contrato', fechaFin)}
         ${propField('Monto pactado', money(c.montoArriendoPactado))}
+        ${propField('Comentarios', esc(c.infoGeneral))}
       </div>
     </div>`;
   }).join('');
@@ -1716,9 +1720,24 @@ function renderAlertas(){
         <div class="title">${esc(a.tipo)} — ${esc(tenantName(a.c.tenantId))}</div>
         <div class="sub">${esc(propAddresses(a.c))}</div>
       </div>
-      <div class="when">${when}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="when">${when}</div>
+        ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="renewContract('${a.c.id}')">Renovar 1 año</button>` : ''}
+      </div>
     </div>`;
   }).join('');
+}
+
+async function renewContract(id){
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return;
+  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
+  if(!confirm(`Vas a renovar el contrato de:\n${label}\n\nSe extiende la fecha de fin del contrato en 1 año más (12 meses) desde el vencimiento actual. ¿Continuar?`)) return;
+  c.duracionMeses = Number(c.duracionMeses||0) + 12;
+  contracts = contracts.map(x=> x.id===id ? c : x);
+  await saveKey('contracts',contracts);
+  renderAll();
+  pushToDriveIfConnected();
 }
 
 // ---------- SERVICIOS (lecturas de luz/agua/gas) ----------
@@ -1926,6 +1945,7 @@ function monthsBetween(startDateStr){
 
 // Vista plana: todos los pagos de todos los contratos, con el contrato truncado a 50 caracteres
 // y un filtro por mes/año, para cuando no se elige un contrato específico.
+let historialTodosVerTodo = false;
 function renderHistorialTodos(){
   const el = document.getElementById('historial-table');
   const mesanoSel = document.getElementById('h-mesano-filter');
@@ -1947,10 +1967,14 @@ function renderHistorialTodos(){
   });
 
   if(!list.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para este filtro.</div>'; return; }
+
+  const total = list.length;
+  const mostrar = historialTodosVerTodo ? list : list.slice(0,12);
+
   el.innerHTML = `<table><thead><tr>
-    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Monto pagado')}${th('payments-todos','descuentos','Descuentos')}${th('payments-todos','valorArriendo','Valor arriendo')}${th('payments-todos','comentarios','Comentarios')}<th></th>
+    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Monto pagado')}${th('payments-todos','descuentos','Descuentos')}${th('payments-todos','valorArriendo','Valor arriendo')}<th></th>${th('payments-todos','comentarios','Comentarios')}
   </tr></thead><tbody>
-  ${list.map(p=>{
+  ${mostrar.map(p=>{
     const full = contractLabel(p.contratoId);
     return `<tr>
     <td title="${esc(full)}">${esc(truncateText(full,50))}</td>
@@ -1958,13 +1982,19 @@ function renderHistorialTodos(){
     <td class="mono">${money(p.montoPagado)}</td>
     <td class="mono">${money(p.descuentos)}</td>
     <td class="mono">${p.valorArriendo?money(p.valorArriendo):'—'}</td>
-    <td>${esc(p.comentarios)}</td>
     <td class="row-actions"><button onclick="editPayment('${p.id}')">Editar</button><button onclick="deletePayment('${p.id}')">Eliminar</button></td>
+    <td>${esc(p.comentarios)}</td>
   </tr>`;
   }).join('')}
-  </tbody></table>`;
+  </tbody></table>
+  ${total>12 ? `<div style="text-align:center;margin-top:12px">
+    <button type="button" class="btn btn-secondary" onclick="historialTodosVerTodo=!historialTodosVerTodo;renderHistorialTodos();">
+      ${historialTodosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
+    </button>
+  </div>` : ''}`;
 }
 
+let historialMensualVerTodo = false;
 function renderHistorial(){
   renderHistorialSelects();
   const contratoId = document.getElementById('h-contratoId-activo').value || document.getElementById('h-contratoId-historico').value;
@@ -1974,7 +2004,8 @@ function renderHistorial(){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !effectiveDebtStartDate(contratoId)){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio ni pagos registrados.</div>'; return; }
 
-  const series = computeContratoMonthlySeries(contratoId).slice().reverse(); // más reciente arriba
+  const seriesTotal = computeContratoMonthlySeries(contratoId).slice().reverse(); // más reciente arriba
+  const series = historialMensualVerTodo ? seriesTotal : seriesTotal.slice(0,12);
 
   el.innerHTML = `<table><thead><tr>
     <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
@@ -2003,7 +2034,12 @@ function renderHistorial(){
       <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
     </tr>`;
   }).join('')}
-  </tbody></table>`;
+  </tbody></table>
+  ${seriesTotal.length>12 ? `<div style="text-align:center;margin-top:12px">
+    <button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">
+      ${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}
+    </button>
+  </div>` : ''}`;
 }
 
 // ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
@@ -2038,13 +2074,13 @@ function renderHistoricos(){
   });
 
   el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('historicos','saldoRemanente','Deuda Final')}${sortChip('historicos','tenant','Arrendatario')}${sortChip('historicos','fechaTermino','Fecha término')}${sortChip('historicos','ultimoPago','Último pago')}</div>` +
-  rows.map(r=>{
+  rows.map((r,idx)=>{
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
     const tagClass = !tieneDeuda ? 'tag-ok' : (r.saldoRemanente>0 ? 'tag-debt' : 'tag-ok');
     const estado = !tieneDeuda ? 'Cerrado (sin deuda)' : (r.saldoRemanente>0 ? 'Cerrado (con deuda)' : 'Cerrado (deuda cobrada)');
     return `<div class="prop-card">
       <div class="prop-card-header">
-        <div><span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span></div>
+        <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span></div>
         <div class="row-actions">
           ${tieneDeuda && r.saldoRemanente>0 ? `<button onclick="closeDebtManually('${r.c.id}')">Cerrar deuda</button>` : ''}
           <button onclick="reactivateContract('${r.c.id}')">Reactivar</button>
@@ -2125,7 +2161,7 @@ document.getElementById('chart-group-filter').addEventListener('change', ()=>{
 
 // Aplica el filtro de año y la agrupación (mes/año) a una serie, devolviendo filas listas para el gráfico.
 function applyYearGroupFilter(series, yearSel, groupSel){
-  const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>b-a);
+  const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>a-b);
   const currentYear = yearSel.value;
   yearSel.innerHTML = '<option value="">Todos los años</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
   if(years.map(String).includes(currentYear)) yearSel.value = currentYear;
@@ -2142,9 +2178,9 @@ function applyYearGroupFilter(series, yearSel, groupSel){
       byYear[d.year].pagado += d.pagado;
       byYear[d.year].descuento += d.descuento;
     });
-    return Object.keys(byYear).sort((a,b)=>b-a).map(y=>({ label: y, ...byYear[y] }));
+    return Object.keys(byYear).sort((a,b)=>a-b).map(y=>({ label: y, ...byYear[y] }));
   }
-  return filtered.slice().reverse().map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento })); // más reciente arriba
+  return filtered.map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento })); // más antiguo arriba
 }
 
 // Serie mensual AGREGADA de todos los contratos activos: para cada mes, suma lo esperado, pagado y
