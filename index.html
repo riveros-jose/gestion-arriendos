@@ -306,7 +306,10 @@
             <h3>📝 Información del Contrato</h3>
             <div class="line-row">
               <div class="field"><label>Arrendatario</label><select id="c-tenantId" required></select></div>
-              <div class="field"><label>Propiedad</label><select id="c-propiedadId" required></select></div>
+              <div class="field">
+                <label>Propiedad(es) — Ctrl/Cmd + clic para elegir varias</label>
+                <select id="c-propiedadId" multiple size="5" required></select>
+              </div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required></div>
@@ -753,32 +756,82 @@ async function driveReadXlsxFile(fileId){
   return await res.arrayBuffer();
 }
 
+// Aplica ancho de columnas y un encabezado con color/negrita a una hoja, para que sea legible
+// al abrirla directo en Excel o Google Sheets.
+function styleWorksheet(ws, widths){
+  if(!ws['!ref']) return;
+  ws['!cols'] = widths.map(w => ({ wch: w }));
+  ws['!rows'] = [{ hpx: 24 }];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let C = range.s.c; C <= range.e.c; C++){
+    const addr = XLSX.utils.encode_cell({ r:0, c:C });
+    if(!ws[addr]) continue;
+    ws[addr].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { patternType: 'solid', fgColor: { rgb: '2B6F5C' } },
+      alignment: { vertical: 'center', horizontal: 'left' }
+    };
+  }
+}
+
 function buildWorkbook(){
   const wb = XLSX.utils.book_new();
 
-  const propRows = properties.length ? properties.map(p=>({...p})) : [{}];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(propRows), 'Propiedades');
+  const propRows = properties.length ? properties.map(p=>({
+    id: p.id, direccion: p.direccion, unidad: p.unidad, m2Construidos: p.m2Construidos, m2Terreno: p.m2Terreno,
+    propietario: p.propietario, rolAvaluo: p.rolAvaluo, cbrFoja: p.cbrFoja, cbrNumero: p.cbrNumero, cbrAnio: p.cbrAnio,
+    cbrLocalidad: p.cbrLocalidad, clienteLuz: p.clienteLuz, clienteAgua: p.clienteAgua, clienteGas: p.clienteGas,
+    medidorLuz: p.medidorLuz, medidorAgua: p.medidorAgua, medidorGas: p.medidorGas, avaluoFiscal: p.avaluoFiscal,
+    valorComercial: p.valorComercial, contribuciones: p.contribuciones
+  })) : [{}];
+  const wsProp = XLSX.utils.json_to_sheet(propRows);
+  styleWorksheet(wsProp, [10,28,16,11,10,22,12,8,8,7,14,10,10,10,11,11,11,14,16,14]);
+  XLSX.utils.book_append_sheet(wb, wsProp, 'Propiedades');
 
-  const tenantRows = tenants.length ? tenants.map(t=>({...t})) : [{}];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tenantRows), 'Arrendatarios');
+  const tenantRows = tenants.length ? tenants.map(t=>({
+    id: t.id, nemoArrendatario: t.nemoArrendatario, nombreSociedad: t.nombreSociedad, rutSociedad: t.rutSociedad,
+    nombreRepresentante: t.nombreRepresentante, rutRepresentante: t.rutRepresentante, correo: t.correo, telefono: t.telefono
+  })) : [{}];
+  const wsTen = XLSX.utils.json_to_sheet(tenantRows);
+  styleWorksheet(wsTen, [10,22,30,16,24,16,28,16]);
+  XLSX.utils.book_append_sheet(wb, wsTen, 'Arrendatarios');
 
   const contractRows = contracts.length ? contracts.map(c=>({
-    ...c,
-    arrendatario_nombre: tenantName(c.tenantId),
-    propiedad_direccion: propAddress(c.propiedadId)
+    id: c.id,
+    direccion: propAddresses(c),
+    nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
+    tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
+    fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato,
+    tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
+    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, infoGeneral: c.infoGeneral,
+    activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||''
   })) : [{}];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(contractRows), 'Contratos');
+  const wsCon = XLSX.utils.json_to_sheet(contractRows);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,32,8,14,14]);
+  XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
-  const payRows = payments.length ? payments.map(p=>({...p, contrato_label: contractLabel(p.contratoId)})) : [{}];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payRows), 'Pagos');
+  const payRows = payments.length ? payments.map(p=>({
+    id: p.id,
+    contrato: contractLabel(p.contratoId),
+    fechaPago: p.fechaPago, montoPagado: p.montoPagado, descuentos: p.descuentos, valorArriendo: p.valorArriendo,
+    medioPago: p.medioPago, comentarios: p.comentarios, contratoId: p.contratoId
+  })) : [{}];
+  const wsPay = XLSX.utils.json_to_sheet(payRows);
+  styleWorksheet(wsPay, [10,32,12,14,12,14,14,28,10]);
+  XLSX.utils.book_append_sheet(wb, wsPay, 'Pagos');
 
   const readingRows = readings.length ? computeReadingsWithConsumption().map(r=>({
-    ...r,
-    arrendatario_propiedad: contractLabel(r.contratoId)
+    id: r.id,
+    arrendatario: contractLabel(r.contratoId),
+    servicio: r.servicio, fechaLectura: r.fechaLectura, lecturaAnterior: r.lecturaAnterior, lecturaActual: r.lecturaActual,
+    consumo: r.consumo, valorUnitario: r.valorUnitario, monto: r.monto, estado: r.estado, estadoEfectivo: r.estadoEfectivo,
+    comentarios: r.comentarios, contratoId: r.contratoId
   })) : [{}];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(readingRows), 'Servicios');
+  const wsRead = XLSX.utils.json_to_sheet(readingRows);
+  styleWorksheet(wsRead, [10,32,8,12,10,10,10,12,12,10,10,28,10]);
+  XLSX.utils.book_append_sheet(wb, wsRead, 'Servicios');
 
-  return XLSX.write(wb, { type:'array', bookType:'xlsx' });
+  return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
 function loadFromWorkbook(arrayBuffer){
@@ -974,7 +1027,7 @@ function editProperty(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 async function deleteProperty(id){
-  if(contracts.some(c=>c.propiedadId===id)){ alert('Esta propiedad tiene contratos asociados. Elimina primero esos contratos.'); return; }
+  if(contracts.some(c=>contractPropertyIds(c).includes(id))){ alert('Esta propiedad tiene contratos asociados. Elimina primero esos contratos.'); return; }
   if(!confirm('¿Eliminar esta propiedad?')) return;
   properties = properties.filter(p=>p.id!==id);
   await saveKey('properties',properties);
@@ -1107,7 +1160,7 @@ function tenantName(id){
   return t ? t.nombreSociedad : '—';
 }
 function tenantProperties(tenantId){
-  const dirs = contracts.filter(c=>c.tenantId===tenantId).map(c=>propAddress(c.propiedadId));
+  const dirs = contracts.filter(c=>c.tenantId===tenantId).map(c=>propAddresses(c));
   return dirs.length ? dirs.join(', ') : '—';
 }
 function renderTenants(){
@@ -1134,19 +1187,28 @@ function renderTenants(){
 }
 
 // ---------- CONTRATOS (Propiedad + condiciones, referencian a un arrendatario) ----------
-const contractFields = ['tenantId','propiedadId','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
+const contractFields = ['tenantId','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function renderContractSelects(){
   const sel = document.getElementById('c-propiedadId');
-  sel.innerHTML = '<option value="">— Selecciona propiedad —</option>' + properties.map(p=>`<option value="${p.id}">${esc(p.direccion)} ${esc(p.unidad||'')}</option>`).join('');
+  sel.innerHTML = properties.map(p=>`<option value="${p.id}">${esc(p.direccion)} ${esc(p.unidad||'')}</option>`).join('');
 }
 
 document.getElementById('form-contrato').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingContract || uid(), activo: true };
   contractFields.forEach(f=> obj[f] = document.getElementById('c-'+f).value);
-  if(editingContract){ contracts = contracts.map(c=> c.id===editingContract ? obj : c); }
+  const propiedadIds = Array.from(document.getElementById('c-propiedadId').selectedOptions).map(o=>o.value);
+  if(!propiedadIds.length){ alert('Selecciona al menos una propiedad para el contrato.'); return; }
+  obj.propiedadIds = propiedadIds;
+  if(editingContract){
+    const anterior = contracts.find(c=>c.id===editingContract) || {};
+    obj.activo = anterior.activo!==undefined ? anterior.activo : true;
+    if(anterior.fechaTermino) obj.fechaTermino = anterior.fechaTermino;
+    if(anterior.deudaPactada!==undefined) obj.deudaPactada = anterior.deudaPactada;
+    contracts = contracts.map(c=> c.id===editingContract ? obj : c);
+  }
   else { contracts.push(obj); }
   const ok = await saveKey('contracts',contracts);
   document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
@@ -1161,6 +1223,7 @@ document.getElementById('c-cancel').addEventListener('click', resetContractForm)
 function resetContractForm(){
   editingContract = null;
   document.getElementById('form-contrato').reset();
+  Array.from(document.getElementById('c-propiedadId').options).forEach(o=>o.selected=false);
   document.getElementById('c-form-title').textContent='📝 Nuevo contrato';
   document.getElementById('c-cancel').style.display='none';
 }
@@ -1169,6 +1232,8 @@ function editContract(id){
   if(!c) return;
   editingContract = id;
   contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
+  const seleccionadas = contractPropertyIds(c);
+  Array.from(document.getElementById('c-propiedadId').options).forEach(o=>{ o.selected = seleccionadas.includes(o.value); });
   document.getElementById('c-form-title').textContent='📝 Editar contrato';
   document.getElementById('c-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1185,7 +1250,7 @@ async function deleteContract(id){
 async function terminateContract(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const label = tenantName(c.tenantId) + ' — ' + propAddress(c.propiedadId);
+  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
   if(!confirm(`Vas a finalizar el contrato de:\n${label}\n\nEl arrendatario pasará a "Arrendatarios Históricos" y dejará de contar en la deuda vigente y alertas. Sus pagos se conservan. ¿Continuar?`)) return;
 
   const hoy = new Date().toISOString().slice(0,10);
@@ -1219,6 +1284,21 @@ function propAddress(id){
   const p = properties.find(x=>x.id===id);
   return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
 }
+// Devuelve SIEMPRE un arreglo de ids de propiedad para un contrato, sin importar si viene del
+// formato nuevo (propiedadIds: varias) o del formato antiguo (propiedadId: una sola) —
+// así los contratos ya guardados antes de este cambio siguen funcionando igual.
+function contractPropertyIds(c){
+  if(!c) return [];
+  if(Array.isArray(c.propiedadIds)) return c.propiedadIds.filter(Boolean);
+  if(typeof c.propiedadIds === 'string' && c.propiedadIds) return c.propiedadIds.split(',').map(s=>s.trim()).filter(Boolean);
+  if(c.propiedadId) return [c.propiedadId];
+  return [];
+}
+function propAddresses(c){
+  const ids = contractPropertyIds(c);
+  if(!ids.length) return '—';
+  return ids.map(id=>propAddress(id)).join(' + ');
+}
 function tenantNemo(id){
   const t = tenants.find(x=>x.id===id);
   return t ? (t.nemoArrendatario || '') : '';
@@ -1228,14 +1308,14 @@ function contractLabel(id){
   if(!c) return '—';
   const nemo = tenantNemo(c.tenantId);
   const identificador = nemo || tenantName(c.tenantId);
-  return propAddress(c.propiedadId) + ' — ' + identificador;
+  return propAddresses(c) + ' — ' + identificador;
 }
 function renderContracts(){
   const el = document.getElementById('contract-table');
   const activos = contracts.filter(isActiveContract);
   if(!activos.length){ el.innerHTML='<div class="empty">Aún no hay contratos registrados. (Los contratos históricos se ven en la pestaña "Arrendatarios Históricos")</div>'; return; }
   const rows = sortRows('contracts', activos, {
-    tenant: c=>tenantName(c.tenantId)||'', propiedad: c=>propAddress(c.propiedadId)||'', fechaInicioContrato: c=>c.fechaInicioContrato||'',
+    tenant: c=>tenantName(c.tenantId)||'', propiedad: c=>propAddresses(c)||'', fechaInicioContrato: c=>c.fechaInicioContrato||'',
     tipoContrato: c=>c.tipoContrato||'', montoArriendoPactado: c=>Number(c.montoArriendoPactado||0)
   });
   el.innerHTML = `<table><thead><tr>
@@ -1243,7 +1323,7 @@ function renderContracts(){
   </tr></thead><tbody>
   ${rows.map(c=>`<tr>
     <td>${esc(tenantName(c.tenantId))}</td>
-    <td>${esc(propAddress(c.propiedadId))}</td>
+    <td>${esc(propAddresses(c))}</td>
     <td class="mono">${formatDate(c.fechaInicioContrato)}</td>
     <td>${esc(c.tipoContrato)}</td>
     <td class="mono">${money(c.montoArriendoPactado)}</td>
@@ -1358,21 +1438,25 @@ document.getElementById('export-payments-btn').addEventListener('click', ()=>{
     .sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''))
     .map(p=>{
       const c = contracts.find(x=>x.id===p.contratoId);
+      const direccion = c ? propAddresses(c) : '—';
+      const nemo = c ? (tenantNemo(c.tenantId) || tenantName(c.tenantId)) : '—';
       return {
-        Arrendatario: c ? tenantName(c.tenantId) : '—',
-        Propiedad: c ? propAddress(c.propiedadId) : '—',
+        Direccion: direccion,
+        Nemo: nemo,
         FechaPago: p.fechaPago,
         MontoPagado: Number(p.montoPagado||0),
         Descuentos: Number(p.descuentos||0),
+        ValorArriendo: Number(p.valorArriendo||0),
         MedioPago: p.medioPago,
         Comentarios: p.comentarios
       };
     });
   const ws = XLSX.utils.json_to_sheet(rows);
+  styleWorksheet(ws, [30,22,12,14,12,14,14,28]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
   const fecha = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `pagos-y-descuentos-${fecha}.xlsx`);
+  XLSX.writeFile(wb, `pagos-y-descuentos-${fecha}.xlsx`, { cellStyles: true });
 });
 
 // ---------- RESUMEN (por contrato) ----------
@@ -1523,7 +1607,7 @@ function renderAlertas(){
     return `<div class="alert-card ${urgencyClass}">
       <div>
         <div class="title">${esc(a.tipo)} — ${esc(tenantName(a.c.tenantId))}</div>
-        <div class="sub">${esc(propAddress(a.c.propiedadId))}</div>
+        <div class="sub">${esc(propAddresses(a.c))}</div>
       </div>
       <div class="when">${when}</div>
     </div>`;
@@ -1761,7 +1845,7 @@ function renderHistoricos(){
   }).sort((a,b)=> (b.ultimoPago||'').localeCompare(a.ultimoPago||''));
 
   rows = sortRows('historicos', rows, {
-    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>r.c.propiedadId?propAddress(r.c.propiedadId):'',
+    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>contractPropertyIds(r.c).length?propAddresses(r.c):'',
     cantidad: r=>r.cantidad, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos,
     primerPago: r=>r.primerPago==='—'?'':r.primerPago, ultimoPago: r=>r.ultimoPago==='—'?'':r.ultimoPago,
     fechaTermino: r=>r.c.fechaTermino||'', deudaPactada: r=>Number(r.c.deudaPactada||0)
@@ -1772,7 +1856,7 @@ function renderHistoricos(){
   </tr></thead><tbody>
   ${rows.map(r=>`<tr>
     <td>${esc(tenantName(r.c.tenantId))}</td>
-    <td>${r.c.propiedadId ? esc(propAddress(r.c.propiedadId)) : '<span style="color:var(--ink-soft)">Sin identificar</span>'}</td>
+    <td>${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : '<span style="color:var(--ink-soft)">Sin identificar</span>'}</td>
     <td class="mono">${r.cantidad}</td>
     <td class="mono">${money(r.totalPagado)}</td>
     <td class="mono">${money(r.totalDescuentos)}</td>
