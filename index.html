@@ -134,6 +134,7 @@
   .prop-field{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .prop-field .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);font-weight:600;}
   .prop-field .val{font-size:13.5px;color:var(--ink);font-family:'IBM Plex Mono',monospace;word-break:break-word;}
+  .prop-service-group{display:flex;flex-direction:column;gap:10px;}
   .collapsible-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
   .collapsible-header:hover h2{color:var(--teal-dark);}
   .collapse-arrow{font-size:14px;color:var(--ink-soft);transition:transform .15s;}
@@ -1138,9 +1139,11 @@ function renderProperties(){
     });
     el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop1','direccion','Dirección')}${sortChip('prop1','m2Construidos','M² constr.')}${sortChip('prop1','propietario','Propietario')}${sortChip('prop1','rolAvaluo','Rol avalúo')}${sortChip('prop1','cbrAnio','Año')}</div>` +
       rows.map(p=>`<div class="prop-card">${propCardHeader(p)}
-        <div class="prop-fields-grid">
+        <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
           ${propField('M² construidos', ceilFmt(p.m2Construidos))}
           ${propField('M² terreno', ceilFmt(p.m2Terreno))}
+        </div>
+        <div class="prop-fields-grid">
           ${propField('Propietario', esc(p.propietario))}
           ${propField('Rol avalúo', esc(p.rolAvaluo))}
           ${propField('Foja (Paulina/Antonio)', intFmt(p.cbrFoja))}
@@ -1156,13 +1159,19 @@ function renderProperties(){
     });
     el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop2','direccion','Dirección')}${sortChip('prop2','clienteLuz','⚡ Cliente Luz')}${sortChip('prop2','clienteAgua','💧 Cliente Agua')}${sortChip('prop2','clienteGas','🔥 Cliente Gas')}</div>` +
       rows.map(p=>`<div class="prop-card">${propCardHeader(p)}
-        <div class="prop-fields-grid">
-          ${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}
-          ${propField('💧 # Cliente Agua', esc(p.clienteAgua))}
-          ${propField('🔥 # Cliente Gas', esc(p.clienteGas))}
-          ${propField('⚡ Medidor Luz', esc(p.medidorLuz))}
-          ${propField('💧 Medidor Agua', esc(p.medidorAgua))}
-          ${propField('🔥 Medidor Gas', esc(p.medidorGas))}
+        <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+          <div class="prop-service-group">
+            ${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}
+            ${propField('Medidor Luz', esc(p.medidorLuz))}
+          </div>
+          <div class="prop-service-group">
+            ${propField('💧 # Cliente Agua', esc(p.clienteAgua))}
+            ${propField('Medidor Agua', esc(p.medidorAgua))}
+          </div>
+          <div class="prop-service-group">
+            ${propField('🔥 # Cliente Gas', esc(p.clienteGas))}
+            ${propField('Medidor Gas', esc(p.medidorGas))}
+          </div>
         </div>
       </div>`).join('');
   } else {
@@ -1318,6 +1327,20 @@ async function terminateContract(id){
   alert('Contrato finalizado. Lo encontrarás en la pestaña "Arrendatarios Históricos".');
 }
 
+async function reactivateContract(id){
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return;
+  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
+  if(!confirm(`Vas a reactivar el contrato de:\n${label}\n\nVolverá a "Arrendatarios & Contratos" como Vigente, a la deuda vigente y a las alertas. Se borra la fecha de término y la deuda pactada quedará en $0 (puedes volver a fijarla si finalizas de nuevo). ¿Continuar?`)) return;
+  c.activo = true;
+  c.fechaTermino = '';
+  c.deudaPactada = 0;
+  contracts = contracts.map(x=> x.id===id ? c : x);
+  await saveKey('contracts',contracts);
+  renderAll();
+  pushToDriveIfConnected();
+}
+
 function propAddress(id){
   const p = properties.find(x=>x.id===id);
   return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
@@ -1364,23 +1387,27 @@ function renderTenantsContracts(){
     representante: c=>{ const t=tenants.find(x=>x.id===c.tenantId); return t?(t.nombreRepresentante||''):''; },
     fechaInicioContrato: c=>c.fechaInicioContrato||'', montoArriendoPactado: c=>Number(c.montoArriendoPactado||0)
   });
-  el.innerHTML = `<table><thead><tr>
-    ${th('tenants','nemo','Nemo')}${th('tenants','propiedad','Propiedad(es)')}${th('tenants','nombreSociedad','Sociedad')}${th('tenants','representante','Representante')}<th>Contacto</th>${th('tenants','fechaInicioContrato','Inicio contrato')}${th('tenants','montoArriendoPactado','Monto pactado')}<th></th>
-  </tr></thead><tbody>
-  ${rows.map(c=>{
+  el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('tenants','nemo','Nemo')}${sortChip('tenants','nombreSociedad','Sociedad')}${sortChip('tenants','fechaInicioContrato','Inicio contrato')}${sortChip('tenants','montoArriendoPactado','Monto pactado')}</div>` +
+  rows.map(c=>{
     const t = tenants.find(x=>x.id===c.tenantId) || {};
-    return `<tr>
-    <td><strong>${esc(t.nemoArrendatario)}</strong></td>
-    <td><span class="truncate" title="${esc(propAddresses(c))}">${esc(propAddresses(c))}</span></td>
-    <td>${esc(t.nombreSociedad)}</td>
-    <td>${esc(t.nombreRepresentante)}</td>
-    <td>${esc(t.correo)}${t.correo&&t.telefono?'<br>':''}${esc(t.telefono)}</td>
-    <td class="mono">${formatDate(c.fechaInicioContrato)}</td>
-    <td class="mono">${money(c.montoArriendoPactado)}</td>
-    <td class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></td>
-  </tr>`;
-  }).join('')}
-  </tbody></table>`;
+    return `<div class="prop-card">
+      <div class="prop-card-header">
+        <div><span class="prop-card-dir">${esc(t.nemoArrendatario || t.nombreSociedad)}</span>${t.nemoArrendatario?` <span class="prop-card-unidad">${esc(t.nombreSociedad)}</span>`:''}</div>
+        <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
+      </div>
+      <div class="prop-fields-grid">
+        ${propField('Estado', '<span class="tag tag-ok">Vigente</span>')}
+        ${propField('Propiedad(es)', esc(propAddresses(c)))}
+        ${propField('Rut Sociedad', esc(t.rutSociedad))}
+        ${propField('Representante', esc(t.nombreRepresentante))}
+        ${propField('Rut Representante', esc(t.rutRepresentante))}
+        ${propField('Correo', esc(t.correo))}
+        ${propField('Teléfono', esc(t.telefono))}
+        ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
+        ${propField('Monto pactado', money(c.montoArriendoPactado))}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ---------- PAGOS ----------
@@ -1983,12 +2010,12 @@ function renderHistoricos(){
   });
 
   el.innerHTML = `<table><thead><tr>
-    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','fechaTermino','Fecha término')}${th('historicos','deudaPactada','Deuda pactada')}${th('historicos','saldoRemanente','Saldo remanente')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}<th>Estado</th>
+    ${th('historicos','tenant','Arrendatario')}${th('historicos','propiedad','Propiedad')}${th('historicos','fechaTermino','Fecha término')}${th('historicos','deudaPactada','Deuda pactada')}${th('historicos','saldoRemanente','Saldo remanente')}${th('historicos','cantidad','Cant. pagos')}${th('historicos','totalPagado','Total pagado histórico')}${th('historicos','totalDescuentos','Total descuentos')}${th('historicos','primerPago','Primer pago')}${th('historicos','ultimoPago','Último pago')}<th>Estado</th><th></th>
   </tr></thead><tbody>
   ${rows.map(r=>{
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
     const tagClass = !tieneDeuda ? 'tag-ok' : (r.saldoRemanente>0 ? 'tag-debt' : 'tag-ok');
-    const estado = !tieneDeuda ? 'Sin deuda' : (r.saldoRemanente>0 ? 'Cobranza pendiente' : 'Cobrado');
+    const estado = !tieneDeuda ? 'Cerrado (sin deuda)' : (r.saldoRemanente>0 ? 'Cerrado (con deuda)' : 'Cerrado (deuda cobrada)');
     return `<tr>
     <td>${esc(tenantName(r.c.tenantId))}</td>
     <td>${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : '<span style="color:var(--ink-soft)">Sin identificar</span>'}</td>
@@ -2001,6 +2028,7 @@ function renderHistoricos(){
     <td class="mono">${r.primerPago==="—"?"—":formatDate(r.primerPago)}</td>
     <td class="mono">${r.ultimoPago==="—"?"—":formatDate(r.ultimoPago)}</td>
     <td><span class="tag ${tagClass}">${estado}</span></td>
+    <td class="row-actions"><button onclick="reactivateContract('${r.c.id}')">Reactivar</button></td>
   </tr>`;
   }).join('')}
   </tbody></table>`;
