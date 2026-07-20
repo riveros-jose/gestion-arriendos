@@ -110,6 +110,19 @@
   .table-wrap h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);margin:0 0 10px;font-weight:700;}
   .line-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .table-wrap table th:first-child, .table-wrap table td:first-child{
+    position:sticky; left:0; z-index:2; background:var(--card);
+    box-shadow:2px 0 4px -2px rgba(0,0,0,0.12);
+  }
+  .table-wrap table th:first-child{ z-index:3; background:var(--card); }
+  .table-wrap table tr:hover td:first-child{ background:#FAFBFA; }
+  .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
+  .subtab-btn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .checkbox-list{border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:150px;overflow-y:auto;background:#fdfdfc;}
+  .checkbox-list label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--ink);padding:4px 0;cursor:pointer;}
+  .checkbox-list input[type="checkbox"]{width:15px;height:15px;flex-shrink:0;}
+  .checkbox-list .empty-note{font-size:12.5px;color:var(--ink-soft);padding:4px 0;}
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
@@ -163,14 +176,14 @@
 <div class="app">
   <div class="sidebar">
     <div class="brand">Cartera<span>Gestión de Arriendos</span></div>
-    <div class="nav-item active" data-tab="propiedades"><span class="num">01</span> 🏠 Propiedades</div>
-    <div class="nav-item" data-tab="arrendatarios"><span class="num">02</span> 📄 Arrendatarios &amp; Contratos</div>
-    <div class="nav-item" data-tab="pagos"><span class="num">03</span> 💵 Pagos</div>
-    <div class="nav-item" data-tab="resumen"><span class="num">04</span> 📊 Resumen &amp; Deudas</div>
-    <div class="nav-item" data-tab="alertas"><span class="num">05</span> 🔔 Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
-    <div class="nav-item" data-tab="servicios"><span class="num">06</span> 🔧 Servicios</div>
-    <div class="nav-item" data-tab="historial"><span class="num">07</span> 📅 Historial Mensual</div>
-    <div class="nav-item" data-tab="historicos"><span class="num">08</span> 🗂️ Arrendatarios Históricos</div>
+    <div class="nav-item active" data-tab="resumen"><span class="num">01</span> 📊 Resumen &amp; Deudas</div>
+    <div class="nav-item" data-tab="pagos"><span class="num">02</span> 💵 Pagos</div>
+    <div class="nav-item" data-tab="servicios"><span class="num">03</span> 🔧 Servicios</div>
+    <div class="nav-item" data-tab="alertas"><span class="num">04</span> 🔔 Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
+    <div class="nav-item" data-tab="propiedades"><span class="num">05</span> 🏠 Propiedades</div>
+    <div class="nav-item" data-tab="arrendatarios"><span class="num">06</span> 📄 Arrendatarios &amp; Contratos</div>
+    <div class="nav-item" data-tab="historicos"><span class="num">07</span> 🗂️ Arrendatarios Históricos</div>
+    <div class="nav-item" data-tab="cobranza"><span class="num">08</span> 💰 Cobranza Finalizados</div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -189,7 +202,7 @@
     <div class="drive-note" id="drive-note"></div>
 
     <!-- PROPIEDADES -->
-    <div class="tab-section active" id="tab-propiedades">
+    <div class="tab-section" id="tab-propiedades">
       <h1>🏠 Propiedades</h1>
       <div class="subtitle">Registro de inmuebles de la cartera.</div>
       <div class="card">
@@ -216,7 +229,7 @@
               <div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
-              <div class="field"><label>Foja</label><input id="p-cbrFoja" type="number" step="1"></div>
+              <div class="field"><label>Foja (Paulina/Antonio)</label><input id="p-cbrFoja" type="number" step="1"></div>
               <div class="field"><label>Número</label><input id="p-cbrNumero" type="number" step="1"></div>
               <div class="field"><label>Año</label><input id="p-cbrAnio" type="number" step="1"></div>
               <div class="field"><label>Localidad</label><input id="p-cbrLocalidad"></div>
@@ -253,6 +266,11 @@
       </div>
       <div class="card">
         <h2>📋 Propiedades registradas</h2>
+        <div class="subtabs" id="prop-subtabs">
+          <button type="button" class="subtab-btn active" data-subtab="prop1">📜 Antecedentes e Inscripción CBR</button>
+          <button type="button" class="subtab-btn" data-subtab="prop2">🔧 Servicios</button>
+          <button type="button" class="subtab-btn" data-subtab="prop3">💰 Antecedentes Comerciales</button>
+        </div>
         <div id="prop-table" class="table-wrap"></div>
       </div>
     </div>
@@ -307,8 +325,8 @@
             <div class="line-row">
               <div class="field"><label>Arrendatario</label><select id="c-tenantId" required></select></div>
               <div class="field">
-                <label>Propiedad(es) — Ctrl/Cmd + clic para elegir varias</label>
-                <select id="c-propiedadId" multiple size="5" required></select>
+                <label>Propiedad(es) — solo se listan las disponibles</label>
+                <div id="c-propiedadId-checks" class="checkbox-list"></div>
               </div>
             </div>
             <div class="line-row" style="margin-top:14px">
@@ -369,14 +387,16 @@
         </form>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>💵 Historial de pagos</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
-        <select class="filter" id="pay-filter"></select>
-        <div id="pay-table" class="table-wrap"></div>
+        <div class="toggle-form"><h2>📅 Historial de pagos (mes a mes)</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
+        <div class="line-row" style="margin-bottom:16px">
+          <div class="field"><label>Contrato</label><select id="h-contratoId"></select></div>
+        </div>
+        <div id="historial-table" class="table-wrap"></div>
       </div>
     </div>
 
     <!-- RESUMEN -->
-    <div class="tab-section" id="tab-resumen">
+    <div class="tab-section active" id="tab-resumen">
       <h1>📊 Resumen &amp; Deudas</h1>
       <div class="subtitle">Estado de pago por contrato, a la fecha de hoy.</div>
       <div class="summary-cards" id="summary-cards"></div>
@@ -386,8 +406,8 @@
         <div id="resumen-table" class="table-wrap"></div>
       </div>
       <div class="card">
-        <h2>📈 Histograma — Valor arriendo, pagado y descuentos</h2>
-        <div class="line-row" style="margin-bottom:16px;max-width:420px">
+        <h2>📈 Histograma — Saldo, esperado, pagado y descuentos</h2>
+        <div class="line-row" id="chart-controls" style="margin-bottom:16px;max-width:420px">
           <div class="field"><label>Año</label><select id="chart-year-filter"></select></div>
           <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
         </div>
@@ -443,23 +463,21 @@
     </div>
 
     <!-- HISTORIAL MENSUAL -->
-    <div class="tab-section" id="tab-historial">
-      <h1>📅 Historial Mensual</h1>
-      <div class="subtitle">Revisa mes a mes si ya registraste el pago de un contrato y en cuáles meses falta.</div>
-      <div class="card">
-        <div class="line-row" style="margin-bottom:16px">
-          <div class="field"><label>Contrato</label><select id="h-contratoId"></select></div>
-        </div>
-        <div id="historial-table" class="table-wrap"></div>
-      </div>
-    </div>
-
     <!-- ARRENDATARIOS HISTÓRICOS -->
     <div class="tab-section" id="tab-historicos">
       <h1>🗂️ Arrendatarios Históricos</h1>
       <div class="subtitle">Arrendatarios que ya no están activos, pero cuyos pagos se conservan para no perder el registro. Es solo de consulta — no forman parte de la deuda ni de las alertas vigentes.</div>
       <div class="card">
         <div id="historicos-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- COBRANZA DE CONTRATOS FINALIZADOS -->
+    <div class="tab-section" id="tab-cobranza">
+      <h1>💰 Cobranza de Contratos Finalizados</h1>
+      <div class="subtitle">Contratos que ya terminaron pero quedaron con deuda pactada. Aquí se monitorea el cobro en el tiempo — no se generan nuevos cobros de arriendo, pero puedes seguir registrando pagos hacia esta deuda desde la pestaña "Pagos" (aparecen marcados como "Cobranza").</div>
+      <div class="card">
+        <div id="cobranza-table" class="table-wrap"></div>
       </div>
     </div>
 
@@ -1015,13 +1033,13 @@ function renderAll(){
   renderContractSelects();
   renderContracts();
   renderPaySelects();
-  renderPayments();
   renderResumen();
   renderAlertas();
   renderReadingSelects();
   renderReadings();
   renderHistorial();
   renderHistoricos();
+  renderCobranza();
 }
 
 // ---------- NAV ----------
@@ -1099,7 +1117,7 @@ function renderProperties(){
   });
   const seccion1 = `<h3>📜 Antecedentes de la Propiedad e Inscripción CBR</h3>
   <table><thead><tr>
-    ${th('prop1','direccion','Dirección')}${th('prop1','unidad','Depto/Piso/Local')}${th('prop1','m2Construidos','M² constr.')}${th('prop1','m2Terreno','M² terreno')}${th('prop1','propietario','Propietario')}${th('prop1','rolAvaluo','Rol avalúo')}${th('prop1','cbrFoja','Foja')}${th('prop1','cbrNumero','Número')}${th('prop1','cbrAnio','Año')}${th('prop1','cbrLocalidad','Localidad')}<th></th>
+    ${th('prop1','direccion','Dirección')}${th('prop1','unidad','Depto/Piso/Local')}${th('prop1','m2Construidos','M² constr.')}${th('prop1','m2Terreno','M² terreno')}${th('prop1','propietario','Propietario')}${th('prop1','rolAvaluo','Rol avalúo')}${th('prop1','cbrFoja','Foja (Paulina/Antonio)')}${th('prop1','cbrNumero','Número')}${th('prop1','cbrAnio','Año')}${th('prop1','cbrLocalidad','Localidad')}<th></th>
   </tr></thead><tbody>
   ${rows1.map(p=>`<tr>
     ${direccionCell(p)}
@@ -1154,8 +1172,16 @@ function renderProperties(){
   </tr>`).join('')}
   </tbody></table>`;
 
-  el.innerHTML = seccion1 + seccion2 + seccion3;
+  el.innerHTML = { prop1: seccion1, prop2: seccion2, prop3: seccion3 }[propActiveSubtab] || seccion1;
 }
+let propActiveSubtab = 'prop1';
+document.getElementById('prop-subtabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.subtab-btn');
+  if(!btn) return;
+  propActiveSubtab = btn.dataset.subtab;
+  document.querySelectorAll('#prop-subtabs .subtab-btn').forEach(b=> b.classList.toggle('active', b===btn));
+  renderProperties();
+});
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
@@ -1238,16 +1264,30 @@ function renderTenants(){
 const contractFields = ['tenantId','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
+function propiedadesDisponibles(excludeContratoId){
+  const usadas = new Set();
+  contracts.filter(isActiveContract).forEach(c=>{
+    if(c.id===excludeContratoId) return;
+    contractPropertyIds(c).forEach(id=>usadas.add(id));
+  });
+  return properties.filter(p=>!usadas.has(p.id));
+}
+
 function renderContractSelects(){
-  const sel = document.getElementById('c-propiedadId');
-  sel.innerHTML = properties.map(p=>`<option value="${p.id}">${esc(p.direccion)} ${esc(p.unidad||'')}</option>`).join('');
+  const disponibles = propiedadesDisponibles(editingContract);
+  const cont = document.getElementById('c-propiedadId-checks');
+  if(!disponibles.length){
+    cont.innerHTML = '<div class="empty-note">No hay propiedades disponibles (todas están arrendadas en un contrato activo).</div>';
+    return;
+  }
+  cont.innerHTML = disponibles.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.direccion)} ${esc(p.unidad||'')}</label>`).join('');
 }
 
 document.getElementById('form-contrato').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingContract || uid(), activo: true };
   contractFields.forEach(f=> obj[f] = document.getElementById('c-'+f).value);
-  const propiedadIds = Array.from(document.getElementById('c-propiedadId').selectedOptions).map(o=>o.value);
+  const propiedadIds = Array.from(document.querySelectorAll('#c-propiedadId-checks input:checked')).map(cb=>cb.value);
   if(!propiedadIds.length){ alert('Selecciona al menos una propiedad para el contrato.'); return; }
   obj.propiedadIds = propiedadIds;
   if(editingContract){
@@ -1271,17 +1311,18 @@ document.getElementById('c-cancel').addEventListener('click', resetContractForm)
 function resetContractForm(){
   editingContract = null;
   document.getElementById('form-contrato').reset();
-  Array.from(document.getElementById('c-propiedadId').options).forEach(o=>o.selected=false);
   document.getElementById('c-form-title').textContent='📝 Nuevo contrato';
   document.getElementById('c-cancel').style.display='none';
+  renderContractSelects();
 }
 function editContract(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
   editingContract = id;
   contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
+  renderContractSelects();
   const seleccionadas = contractPropertyIds(c);
-  Array.from(document.getElementById('c-propiedadId').options).forEach(o=>{ o.selected = seleccionadas.includes(o.value); });
+  document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
   document.getElementById('c-form-title').textContent='📝 Editar contrato';
   document.getElementById('c-cancel').style.display='inline-block';
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1383,18 +1424,23 @@ function renderContracts(){
 // ---------- PAGOS ----------
 const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
 
+function contratosConCobranza(){
+  return contracts.filter(c => !isActiveContract(c) && c.fechaTermino && Number(c.deudaPactada||0) > 0);
+}
+
 function renderPaySelects(){
   const activos = contracts.filter(isActiveContract);
-  const opts = '<option value="">— Selecciona contrato —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const cobranza = contratosConCobranza();
+  const opts = '<option value="">— Selecciona contrato —</option>'
+    + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('')
+    + cobranza.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))} (Cobranza deuda finalizada)</option>`).join('');
   document.getElementById('pay-contratoId').innerHTML = opts;
-  document.getElementById('pay-filter').innerHTML = '<option value="">Todos los contratos</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
 }
-document.getElementById('pay-filter').addEventListener('change', renderPayments);
 
 document.getElementById('pay-contratoId').addEventListener('change', ()=>{
   if(editingPay) return; // al editar un pago existente no se sobreescribe lo que ya tenía guardado
   const c = contracts.find(x=>x.id===document.getElementById('pay-contratoId').value);
-  document.getElementById('pay-valorArriendo').value = c ? (c.montoArriendoPactado||'') : '';
+  document.getElementById('pay-valorArriendo').value = (c && isActiveContract(c)) ? (c.montoArriendoPactado||'') : '';
 });
 
 document.getElementById('form-pago').addEventListener('submit', async e=>{
@@ -1405,7 +1451,7 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   // Si el valor de arriendo ingresado difiere del valor vigente en el contrato, se avisa la
   // consecuencia (queda como el nuevo valor pactado hacia adelante) y se pide confirmar.
   const c = contracts.find(x=>x.id===obj.contratoId);
-  if(c && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
+  if(c && isActiveContract(c) && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
     const confirmado = confirm(
       `El valor de arriendo que ingresaste (${money(obj.valorArriendo)}) es distinto al valor actual del contrato (${money(c.montoArriendoPactado)}).\n\n`+
       `Si continúas, el contrato de "${contractLabel(c.id)}" quedará actualizado a ${money(obj.valorArriendo)} — este será el nuevo valor pactado para los próximos pagos y para el cálculo de deuda de aquí en adelante.\n\n`+
@@ -1454,29 +1500,6 @@ async function deletePayment(id){
   await saveKey('payments',payments);
   renderAll();
   pushToDriveIfConnected();
-}
-function renderPayments(){
-  const filter = document.getElementById('pay-filter').value;
-  const el = document.getElementById('pay-table');
-  let list = payments.filter(p=> !filter || p.contratoId===filter)
-                      .sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
-  list = sortRows('payments', list, {
-    contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
-    descuentos: p=>Number(p.descuentos||0), medioPago: p=>p.medioPago||''
-  });
-  if(!list.length){ el.innerHTML='<div class="empty">No hay pagos registrados.</div>'; return; }
-  el.innerHTML = `<table><thead><tr>
-    ${th('payments','contrato','Contrato')}${th('payments','fechaPago','Fecha pago')}${th('payments','montoPagado','Monto pagado')}${th('payments','descuentos','Descuentos')}${th('payments','medioPago','Medio')}<th></th>
-  </tr></thead><tbody>
-  ${list.map(p=>`<tr>
-    <td>${esc(contractLabel(p.contratoId))}</td>
-    <td class="mono">${formatDate(p.fechaPago)}</td>
-    <td class="mono">${money(p.montoPagado)}</td>
-    <td class="mono">${money(p.descuentos)}</td>
-    <td>${esc(p.medioPago)}</td>
-    <td class="row-actions"><button onclick="editPayment('${p.id}')">Editar</button><button onclick="deletePayment('${p.id}')">Eliminar</button></td>
-  </tr>`).join('')}
-  </tbody></table>`;
 }
 
 document.getElementById('export-payments-btn').addEventListener('click', ()=>{
@@ -1561,13 +1584,14 @@ document.getElementById('resumen-filter').addEventListener('change', renderResum
 
 function renderResumen(){
   renderResumenSelect();
-  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDescuentosGlobal=0, totalDeudaGlobal=0, enMora=0;
+  let totalEsperadoGlobal=0, totalPagadoGlobal=0, totalDescuentosGlobal=0, totalDeudaGlobal=0, totalAFavorGlobal=0, enMora=0;
   const allRows = computeResumenRows();
   allRows.forEach(r=>{
     totalEsperadoGlobal += r.totalEsperado;
     totalPagadoGlobal += r.totalPagado;
     totalDescuentosGlobal += r.totalDescuentos;
     if(r.saldo>0){ totalDeudaGlobal += r.saldo; enMora += 1; }
+    else if(r.saldo<0){ totalAFavorGlobal += -r.saldo; }
   });
 
   document.getElementById('summary-cards').innerHTML = `
@@ -1576,13 +1600,14 @@ function renderResumen(){
     <div class="stat"><div class="label">Total descuentos aplicados</div><div class="value">${money(totalDescuentosGlobal)}</div></div>
     <div class="stat"><div class="label">Total esperado a la fecha</div><div class="value">${money(totalEsperadoGlobal)}</div></div>
     <div class="stat warn"><div class="label">Deuda total (${enMora} en mora)</div><div class="value">${money(totalDeudaGlobal)}</div></div>
+    <div class="stat good"><div class="label">Total a favor de arrendatarios (pagos por adelantado)</div><div class="value">${money(totalAFavorGlobal)}</div></div>
   `;
 
   const filtro = document.getElementById('resumen-filter').value;
   let rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
   rows = sortRows('resumen', rows, {
     contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto,
-    meses: r=>r.meses, totalEsperado: r=>r.totalEsperado, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos, saldo: r=>Math.max(r.saldo,0)
+    meses: r=>r.meses, totalEsperado: r=>r.totalEsperado, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos, saldo: r=>r.saldo
   });
 
   const el = document.getElementById('resumen-table');
@@ -1591,16 +1616,23 @@ function renderResumen(){
     el.innerHTML = `<table><thead><tr>
       ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses transcurridos')}${th('resumen','totalEsperado','Total esperado')}${th('resumen','totalPagado','Total pagado')}${th('resumen','totalDescuentos','Descuentos aplicados')}${th('resumen','saldo','Saldo')}<th>Estado</th>
     </tr></thead><tbody>
-    ${rows.map(r=>`<tr>
+    ${rows.map(r=>{
+      const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
+      let tag;
+      if(r.saldo>0) tag = '<span class="tag tag-debt">Con deuda</span>';
+      else if(r.saldo<0) tag = '<span class="tag tag-ok">A favor</span>';
+      else tag = '<span class="tag tag-ok">Al día</span>';
+      return `<tr>
       <td><span class="truncate" title="${esc(contractLabel(r.c.id))}">${esc(contractLabel(r.c.id))}</span></td>
       <td class="mono">${money(r.monto)}</td>
       <td class="mono">${r.meses}</td>
       <td class="mono">${money(r.totalEsperado)}</td>
       <td class="mono">${money(r.totalPagado)}</td>
       <td class="mono">${money(r.totalDescuentos)}</td>
-      <td class="mono">${money(Math.max(r.saldo,0))}</td>
-      <td>${r.saldo>0 ? '<span class="tag tag-debt">Con deuda</span>' : '<span class="tag tag-ok">Al día</span>'}</td>
-    </tr>`).join('')}
+      <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
+      <td>${tag}</td>
+    </tr>`;
+    }).join('')}
     </tbody></table>`;
   }
 
@@ -1859,18 +1891,22 @@ function renderHistorial(){
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
     const saldo = d.monto - (d.pagado+d.descuento);
     let estado, tagClass;
-    if(pagosMes.length===0){ estado='Sin pago'; tagClass='tag-debt'; }
+    if(saldo<0){ estado='A favor'; tagClass='tag-ok'; }
+    else if(pagosMes.length===0){ estado='Sin pago'; tagClass='tag-debt'; }
     else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
     else { estado='Pagado'; tagClass='tag-ok'; }
     const detalle = pagosMes.length
-      ? pagosMes.map(p=>`${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}`).join('<br>')
+      ? pagosMes.map(p=>`<div style="margin-bottom:3px">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''} · ${esc(p.medioPago||'')}
+        <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
+        <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
+      </div>`).join('')
       : '—';
     return `<tr>
       <td>${MESES_ES[d.month]} ${d.year}</td>
       <td class="mono">${money(d.monto)}</td>
       <td class="mono">${money(d.pagado)}</td>
       <td class="mono">${money(d.descuento)}</td>
-      <td class="mono">${money(Math.max(saldo,0))}</td>
+      <td class="mono" style="color:${saldo>0?'var(--brick)':(saldo<0?'var(--teal-dark)':'inherit')};font-weight:600">${money(saldo)}</td>
       <td><span class="tag ${tagClass}">${estado}</span></td>
       <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
     </tr>`;
@@ -1914,6 +1950,51 @@ function renderHistoricos(){
     <td class="mono">${r.c.fechaTermino?formatDate(r.c.fechaTermino):'—'}</td>
     <td class="mono">${Number(r.c.deudaPactada)>0?('<span style="color:var(--brick);font-weight:600">'+money(r.c.deudaPactada)+'</span>'):'—'}</td>
   </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- COBRANZA DE CONTRATOS FINALIZADOS ----------
+function computeCobranzaRows(){
+  return contratosConCobranza().map(c=>{
+    // Solo cuenta como "cobrado hacia la deuda" lo pagado DESDE la fecha de término en adelante
+    // (lo pagado antes ya se contabilizó como arriendo normal mientras el contrato estaba activo).
+    const pagosCobranza = payments.filter(p=>p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+      .sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''));
+    const totalCobrado = pagosCobranza.reduce((s,p)=>s+Number(p.montoPagado||0)+Number(p.descuentos||0),0);
+    const deudaPactada = Number(c.deudaPactada||0);
+    const saldo = deudaPactada - totalCobrado;
+    const ultimoPago = pagosCobranza.length ? pagosCobranza[pagosCobranza.length-1].fechaPago : '';
+    return { c, deudaPactada, totalCobrado, saldo, cantidadPagos: pagosCobranza.length, ultimoPago };
+  }).sort((a,b)=> b.saldo - a.saldo);
+}
+
+function renderCobranza(){
+  const el = document.getElementById('cobranza-table');
+  let rows = computeCobranzaRows();
+  if(!rows.length){ el.innerHTML='<div class="empty">No hay contratos finalizados con deuda pactada pendiente de cobrar.</div>'; return; }
+
+  rows = sortRows('cobranza', rows, {
+    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>propAddresses(r.c)||'', fechaTermino: r=>r.c.fechaTermino||'',
+    deudaPactada: r=>r.deudaPactada, totalCobrado: r=>r.totalCobrado, saldo: r=>r.saldo, cantidadPagos: r=>r.cantidadPagos
+  });
+
+  el.innerHTML = `<table><thead><tr>
+    ${th('cobranza','tenant','Arrendatario')}${th('cobranza','propiedad','Propiedad')}${th('cobranza','fechaTermino','Fecha término')}${th('cobranza','deudaPactada','Deuda pactada')}${th('cobranza','totalCobrado','Cobrado desde término')}${th('cobranza','cantidadPagos','Cant. pagos')}${th('cobranza','saldo','Saldo pendiente')}<th>Estado</th>
+  </tr></thead><tbody>
+  ${rows.map(r=>{
+    const tagClass = r.saldo<=0 ? 'tag-ok' : 'tag-debt';
+    const estado = r.saldo<=0 ? 'Cobrado' : 'Pendiente';
+    return `<tr>
+    <td>${esc(tenantName(r.c.tenantId))}</td>
+    <td>${esc(propAddresses(r.c))}</td>
+    <td class="mono">${formatDate(r.c.fechaTermino)}</td>
+    <td class="mono">${money(r.deudaPactada)}</td>
+    <td class="mono">${money(r.totalCobrado)}</td>
+    <td class="mono">${r.cantidadPagos}</td>
+    <td class="mono" style="font-weight:600;color:${r.saldo>0?'var(--brick)':'var(--teal-dark)'}">${money(r.saldo)}</td>
+    <td><span class="tag ${tagClass}">${estado}</span></td>
+  </tr>`;
+  }).join('')}
   </tbody></table>`;
 }
 
@@ -1984,13 +2065,18 @@ function renderResumenChart(contratoId){
   const container = document.getElementById('resumen-chart');
   const yearSel = document.getElementById('chart-year-filter');
   const groupSel = document.getElementById('chart-group-filter');
+  const chartControls = document.getElementById('chart-controls');
 
   if(!contratoId){
-    yearSel.innerHTML = '<option value="">—</option>';
-    container.innerHTML = '<div class="empty">Selecciona un arrendatario específico en el filtro de arriba para ver su histograma.</div>';
+    if(chartControls) chartControls.style.display = 'none';
+    const rows = computeResumenRows().map(r=>({
+      label: contractLabel(r.c.id), saldo: r.saldo, totalEsperado: r.totalEsperado, totalPagado: r.totalPagado, totalDescuentos: r.totalDescuentos
+    })).sort((a,b)=> b.saldo - a.saldo);
+    container.innerHTML = rows.length ? buildAllContractsChartSVG(rows) : '<div class="empty">Registra contratos y pagos para ver el histograma.</div>';
     renderResumenImpagos(contratoId);
     return;
   }
+  if(chartControls) chartControls.style.display = 'flex';
   const series = computeContratoMonthlySeries(contratoId);
   if(!series.length){
     yearSel.innerHTML = '<option value="">—</option>';
@@ -2025,6 +2111,52 @@ function renderResumenChart(contratoId){
 
   container.innerHTML = buildHorizontalBarChartSVG(rows);
   renderResumenImpagos(contratoId);
+}
+
+// Histograma comparativo de TODOS los arrendatarios: Saldo (rojo=deuda, azul=a favor),
+// Total esperado (verde claro), Total pagado (verde oscuro), Descuentos (amarillo).
+function buildAllContractsChartSVG(rows){
+  const labelW = 150, barAreaW = 400;
+  const barH = 13, barGap = 3, groupGap = 18;
+  const groupH = barH*4 + barGap*3 + groupGap;
+  const padT = 10, padL = labelW+10, padR = 90;
+  const w = padL+barAreaW+padR;
+  const h = padT+rows.length*groupH+10;
+  const maxVal = Math.max(1, ...rows.map(r=>Math.max(Math.abs(r.saldo), r.totalEsperado, r.totalPagado, r.totalDescuentos)));
+
+  const groups = rows.map((r,i)=>{
+    const gy = padT+i*groupH;
+    const wSaldo = Math.max((Math.abs(r.saldo)/maxVal)*barAreaW, r.saldo!==0?2:0);
+    const wEsp = Math.max((r.totalEsperado/maxVal)*barAreaW, r.totalEsperado>0?2:0);
+    const wPag = Math.max((r.totalPagado/maxVal)*barAreaW, r.totalPagado>0?2:0);
+    const wDesc = Math.max((r.totalDescuentos/maxVal)*barAreaW, r.totalDescuentos>0?2:0);
+    const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? '#3B6EA5' : 'var(--border)');
+    return `
+      <text x="${padL-10}" y="${gy+barH*2+barGap*1.5}" font-size="10.5" text-anchor="end" fill="var(--ink)" font-weight="600">${esc(r.label)}</text>
+      <rect x="${padL}" y="${gy}" width="${wSaldo}" height="${barH}" rx="2" fill="${saldoColor}"/>
+      <text x="${padL+wSaldo+6}" y="${gy+barH-3}" font-size="9" fill="var(--ink-soft)">${money(r.saldo)}</text>
+      <rect x="${padL}" y="${gy+barH+barGap}" width="${wEsp}" height="${barH}" rx="2" fill="#8FD6BC"/>
+      <text x="${padL+wEsp+6}" y="${gy+barH*2+barGap-3}" font-size="9" fill="var(--ink-soft)">${money(r.totalEsperado)}</text>
+      <rect x="${padL}" y="${gy+2*(barH+barGap)}" width="${wPag}" height="${barH}" rx="2" fill="var(--teal-dark)"/>
+      <text x="${padL+wPag+6}" y="${gy+barH*3+barGap*2-3}" font-size="9" fill="var(--ink-soft)">${money(r.totalPagado)}</text>
+      <rect x="${padL}" y="${gy+3*(barH+barGap)}" width="${wDesc}" height="${barH}" rx="2" fill="var(--gold)"/>
+      <text x="${padL+wDesc+6}" y="${gy+barH*4+barGap*3-3}" font-size="9" fill="var(--ink-soft)">${money(r.totalDescuentos)}</text>
+    `;
+  }).join('');
+
+  return `<div style="overflow-x:auto">
+  <svg viewBox="0 0 ${w} ${h}" style="width:${w}px;max-width:100%;height:${h}px;">
+    <line x1="${padL}" y1="0" x2="${padL}" y2="${h}" stroke="var(--border)"/>
+    ${groups}
+  </svg>
+  </div>
+  <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap">
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--brick);margin-right:5px;border-radius:2px;"></span>Saldo — con deuda</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#3B6EA5;margin-right:5px;border-radius:2px;"></span>Saldo — a favor</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#8FD6BC;margin-right:5px;border-radius:2px;"></span>Total esperado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal-dark);margin-right:5px;border-radius:2px;"></span>Total pagado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);margin-right:5px;border-radius:2px;"></span>Descuentos</span>
+  </div>`;
 }
 
 function buildHorizontalBarChartSVG(rows){
