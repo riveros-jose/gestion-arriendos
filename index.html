@@ -352,7 +352,7 @@
             <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
             <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="number" required></div>
             <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="number" value="0"></div>
-            <div class="field"><label>Valor arriendo del periodo ($)</label><input id="pay-valorArriendo" type="number" placeholder="Vacío = usa el del contrato"></div>
+            <div class="field"><label>Valor arriendo del periodo ($) — opcional</label><input id="pay-valorArriendo" type="number" placeholder="Se autocompleta con el valor actual del contrato"></div>
             <div class="field"><label>Medio de pago</label>
               <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
             </div>
@@ -1263,10 +1263,36 @@ function renderPaySelects(){
 }
 document.getElementById('pay-filter').addEventListener('change', renderPayments);
 
+document.getElementById('pay-contratoId').addEventListener('change', ()=>{
+  if(editingPay) return; // al editar un pago existente no se sobreescribe lo que ya tenía guardado
+  const c = contracts.find(x=>x.id===document.getElementById('pay-contratoId').value);
+  document.getElementById('pay-valorArriendo').value = c ? (c.montoArriendoPactado||'') : '';
+});
+
 document.getElementById('form-pago').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingPay || uid() };
   payFields.forEach(f=> obj[f] = document.getElementById('pay-'+f).value);
+
+  // Si el valor de arriendo ingresado difiere del valor vigente en el contrato, se avisa la
+  // consecuencia (queda como el nuevo valor pactado hacia adelante) y se pide confirmar.
+  const c = contracts.find(x=>x.id===obj.contratoId);
+  if(c && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
+    const confirmado = confirm(
+      `El valor de arriendo que ingresaste (${money(obj.valorArriendo)}) es distinto al valor actual del contrato (${money(c.montoArriendoPactado)}).\n\n`+
+      `Si continúas, el contrato de "${contractLabel(c.id)}" quedará actualizado a ${money(obj.valorArriendo)} — este será el nuevo valor pactado para los próximos pagos y para el cálculo de deuda de aquí en adelante.\n\n`+
+      `¿Confirmas el cambio?`
+    );
+    if(!confirmado){
+      document.getElementById('pay-status').textContent = 'Guardado cancelado — ajusta el valor arriendo o el monto no se modifica.';
+      setTimeout(()=>document.getElementById('pay-status').textContent='',4000);
+      return;
+    }
+    c.montoArriendoPactado = obj.valorArriendo;
+    contracts = contracts.map(x=> x.id===c.id ? c : x);
+    await saveKey('contracts',contracts);
+  }
+
   if(editingPay){ payments = payments.map(p=> p.id===editingPay ? obj : p); }
   else { payments.push(obj); }
   const ok = await saveKey('payments',payments);
@@ -1361,16 +1387,19 @@ function mesesTranscurridos(fechaInicio){
 }
 
 // Para el CÁLCULO DE DEUDA (no para vencimiento de contrato ni ajuste de IPC, que siguen usando la
-// fecha real de inicio): si hay una brecha entre el inicio del contrato y el primer pago registrado,
-// asumimos que esos meses previos sí se pagaron (no quedan como "adeudados"). No crea registros nuevos,
-// solo cambia desde qué fecha se cuenta la deuda para este contrato en particular.
+// fecha real de inicio): se usa la fecha del PRIMER PAGO registrado como punto de partida, en vez de
+// la fecha de inicio del contrato. Esto cubre dos casos reales:
+// 1) El contrato partió mucho antes del primer pago cargado (brecha sin registros) → esos meses previos
+//    se asumen pagados, no quedan como deuda.
+// 2) Hay pagos registrados ANTES de la fecha de inicio que quedó cargada en el contrato (dato de origen
+//    incompleto/incorrecto) → de lo contrario esos pagos y sus descuentos quedaban invisibles en el cálculo.
+// No crea ni modifica ningún registro, solo cambia desde qué fecha se cuenta la deuda para este contrato.
 function effectiveDebtStartDate(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
-  if(!c || !c.fechaInicioContrato) return c ? c.fechaInicioContrato : '';
+  if(!c) return '';
   const fechasPago = payments.filter(p=>p.contratoId===contratoId && p.fechaPago).map(p=>p.fechaPago).sort();
-  if(!fechasPago.length) return c.fechaInicioContrato;
-  const primerPago = fechasPago[0];
-  return primerPago > c.fechaInicioContrato ? primerPago : c.fechaInicioContrato;
+  if(fechasPago.length) return fechasPago[0];
+  return c.fechaInicioContrato || '';
 }
 
 function computeResumenRows(){
@@ -1419,7 +1448,7 @@ function renderResumen(){
   const filtro = document.getElementById('resumen-filter').value;
   let rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
   rows = sortRows('resumen', rows, {
-    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>propAddress(r.c.propiedadId)||'', monto: r=>r.monto,
+    contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto,
     meses: r=>r.meses, totalEsperado: r=>r.totalEsperado, totalPagado: r=>r.totalPagado, totalDescuentos: r=>r.totalDescuentos, saldo: r=>Math.max(r.saldo,0)
   });
 
@@ -1427,11 +1456,10 @@ function renderResumen(){
   if(!rows.length){ el.innerHTML='<div class="empty">Registra contratos y pagos para ver el resumen.</div>'; }
   else {
     el.innerHTML = `<table><thead><tr>
-      ${th('resumen','tenant','Arrendatario')}${th('resumen','propiedad','Propiedad')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses transcurridos')}${th('resumen','totalEsperado','Total esperado')}${th('resumen','totalPagado','Total pagado')}${th('resumen','totalDescuentos','Descuentos aplicados')}${th('resumen','saldo','Saldo')}<th>Estado</th>
+      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses transcurridos')}${th('resumen','totalEsperado','Total esperado')}${th('resumen','totalPagado','Total pagado')}${th('resumen','totalDescuentos','Descuentos aplicados')}${th('resumen','saldo','Saldo')}<th>Estado</th>
     </tr></thead><tbody>
     ${rows.map(r=>`<tr>
-      <td>${esc(tenantName(r.c.tenantId))}</td>
-      <td>${esc(propAddress(r.c.propiedadId))}</td>
+      <td><span class="truncate" title="${esc(contractLabel(r.c.id))}">${esc(contractLabel(r.c.id))}</span></td>
       <td class="mono">${money(r.monto)}</td>
       <td class="mono">${r.meses}</td>
       <td class="mono">${money(r.totalEsperado)}</td>
@@ -1687,7 +1715,7 @@ function renderHistorial(){
   const contratoId = document.getElementById('h-contratoId').value;
   if(!contratoId){ el.innerHTML = '<div class="empty">Selecciona un contrato para ver su historial mes a mes.</div>'; return; }
   const c = contracts.find(x=>x.id===contratoId);
-  if(!c || !c.fechaInicioContrato){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>'; return; }
+  if(!c || !effectiveDebtStartDate(contratoId)){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio ni pagos registrados.</div>'; return; }
 
   const series = computeContratoMonthlySeries(contratoId).slice().reverse(); // más reciente arriba
 
@@ -1792,8 +1820,10 @@ function th(tableId, key, label){
 // Serie completa mes a mes desde el inicio del contrato hasta hoy, en orden cronológico (el más antiguo primero).
 function computeContratoMonthlySeries(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
-  if(!c || !c.fechaInicioContrato) return [];
-  const months = monthsBetween(effectiveDebtStartDate(contratoId)).slice().reverse();
+  if(!c) return [];
+  const desde = effectiveDebtStartDate(contratoId);
+  if(!desde) return [];
+  const months = monthsBetween(desde).slice().reverse();
   const montoContrato = Number(c.montoArriendoPactado||0);
   return months.map(({year,month})=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
