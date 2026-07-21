@@ -142,6 +142,8 @@
   .collapsible-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
   .collapsible-header:hover h2{color:var(--teal-dark);}
   .collapse-arrow{font-size:14px;color:var(--ink-soft);transition:transform .15s;}
+  .mini-reload{cursor:pointer;font-size:14px;margin-left:8px;color:var(--ink-soft);display:inline-block;transition:transform .2s;}
+  .mini-reload:hover{color:var(--teal-dark);transform:rotate(75deg);}
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
@@ -219,9 +221,9 @@
     <div class="drive-bar">
       <span class="dot" id="drive-dot"></span>
       <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
-      <button class="btn btn-secondary" id="drive-pick-btn" title="Elige a mano el archivo Excel en tu Drive (útil si lo subiste tú directamente)">📂 Seleccionar archivo en Drive</button>
       <button class="btn btn-secondary" id="drive-reload-btn" title="Vuelve a leer el Excel de Drive (por si lo editaste a mano)">Recargar desde Excel</button>
-      <button class="btn btn-secondary" id="drive-disconnect-btn" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
+      <button class="btn btn-secondary" id="drive-pick-btn" style="display:none" title="Elige a mano el archivo Excel en tu Drive">📂 Seleccionar archivo en Drive</button>
+      <button class="btn btn-secondary" id="drive-disconnect-btn" style="display:none" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
       <button class="btn btn-secondary" id="drive-connect-btn">Conectar con Google Drive</button>
     </div>
     <div class="drive-note" id="drive-note"></div>
@@ -290,7 +292,7 @@
         </form>
       </div>
       <div class="card">
-        <h2>📋 Propiedades registradas</h2>
+        <h2>📋 Propiedades registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <input type="text" id="prop-search" class="filter" placeholder="🔎 Buscar propiedad (dirección, unidad, propietario…)" style="width:100%;max-width:420px;margin-bottom:14px;">
         <div class="subtabs" id="prop-subtabs">
           <button type="button" class="subtab-btn active" data-subtab="prop1">📜 Antecedentes e Inscripción CBR</button>
@@ -364,7 +366,7 @@
 
       <div class="card">
         <div class="collapsible-header" onclick="toggleCollapse('tenants')">
-          <h2>📋 Arrendatarios y contratos registrados</h2>
+          <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" title="Recargar desde Excel" onclick="event.stopPropagation();reloadFromDrive()">⟳</span></h2>
           <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
         </div>
         <div id="tenants-list-wrap" style="display:block">
@@ -400,7 +402,7 @@
         </form>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>📅 Historial de pagos</h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos (Excel)</button></div>
+        <div class="toggle-form"><h2>📅 Historial de pagos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos a Google Drive</button></div>
         <div class="line-row" style="margin-bottom:16px">
           <div class="field"><label>Contrato vigente</label><select id="h-contratoId-activo"></select></div>
           <div class="field"><label>Contrato histórico</label><select id="h-contratoId-historico"></select></div>
@@ -413,18 +415,17 @@
     <div class="tab-section active" id="tab-resumen">
       <h1>📊 Resumen &amp; Deudas</h1>
       <div class="subtitle">Estado de pago por contrato, a la fecha de hoy.</div>
-      <div class="summary-cards" id="summary-cards"></div>
       <div class="card">
-        <h2>📊 Estado por contrato</h2>
+        <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="resumen-filter"></select>
         <div id="resumen-table" class="table-wrap"></div>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor</h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar (Excel)</button></div>
+        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
         <div id="resumen-impagos" class="table-wrap"></div>
       </div>
       <div class="card">
-        <h2>📈 Histograma — Saldo, esperado, pagado y descuentos</h2>
+        <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <div class="line-row" style="margin-bottom:12px;max-width:420px">
           <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
         </div>
@@ -473,7 +474,7 @@
         </form>
       </div>
       <div class="card">
-        <h2>🔧 Lecturas registradas</h2>
+        <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="r-filter"></select>
         <div id="reading-table" class="table-wrap"></div>
       </div>
@@ -495,21 +496,8 @@
 <script>
 // ================== CONFIGURACIÓN DE GOOGLE DRIVE ==================
 const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.googleusercontent.com';
-// Necesaria para el selector de archivos de Google (Picker) — ver instrucciones para obtenerla.
-// Sin esto, la app sigue funcionando para archivos que ella misma crea, pero no puede ofrecerte
-// elegir a mano un archivo que subiste tú directamente en drive.google.com.
-const GOOGLE_API_KEY = 'AIzaSyBMZwZZm0VgH22qSOIs13JzP6W2_Zid8f0';
-
-// Si dejas esto VACÍO: cada usuario tendrá su PROPIA carpeta "RentaPro" en su propio Drive (modo individual).
-// Si le pones el ID de una carpeta de Drive ya existente: TODOS los usuarios que la tengan compartida
-// leerán y escribirán el mismo archivo (modo compartido/equipo). El ID se ve en la URL cuando abres
-// la carpeta en Drive: https://drive.google.com/drive/folders/ESTE_ES_EL_ID
+const GOOGLE_API_KEY = 'PEGA_AQUI_TU_API_KEY';
 const SHARED_FOLDER_ID = '';
-
-// Permiso MÍNIMO: la app solo puede ver/editar archivos que ella misma creó, o que el usuario
-// eligió explícitamente con el selector de Google (Picker). Si el usuario sube o reemplaza el
-// archivo a mano en drive.google.com, no será visible automáticamente — para eso está el botón
-// "Seleccionar archivo en Drive", que usa el Picker para darle acceso puntual a ese archivo.
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 const DRIVE_FOLDER_NAME = 'RentaPro';
@@ -616,14 +604,16 @@ function requestDriveConnection(){
 document.getElementById('drive-connect-btn').addEventListener('click', requestDriveConnection);
 document.getElementById('drive-gate-connect-btn').addEventListener('click', requestDriveConnection);
 
-document.getElementById('drive-reload-btn').addEventListener('click', ()=>{
+// ---- Recarga desde Excel (botón de la barra + íconos ⟳ de cada sección) ----
+function reloadFromDrive(){
   if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
   if(!confirm('Esto va a reemplazar lo que ves en pantalla por lo que esté guardado ahora mismo en el Excel de Drive (incluyendo ediciones manuales). ¿Continuar?')) return;
-  driveFileId = null;   // fuerza a volver a buscar el archivo por si cambió
-  driveFolderId = null; // fuerza a volver a ubicar la carpeta RentaPro por si había quedado una referencia vieja
+  driveFileId = null;
+  driveFolderId = null;
   setDriveStatus('recargando desde Excel…', true);
   driveSync(true);
-});
+}
+document.getElementById('drive-reload-btn').addEventListener('click', reloadFromDrive);
 
 document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
   if(!confirm('Esto cerrará tu sesión de Google Drive en este navegador y pedirá reconectar. ¿Continuar?')) return;
@@ -642,10 +632,7 @@ function scheduleTokenRefresh(expiresInSec){
   tokenRefreshTimer = setTimeout(()=>{ if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); }, ms);
 }
 
-// ---- Selector de archivos (Google Picker) ----
-// Permite elegir a mano un archivo del Drive del usuario, incluso si no fue creado por esta app
-// (por ejemplo, uno subido directamente en drive.google.com). Al elegirlo con este selector,
-// Google le da a la app acceso puntual a ESE archivo, sin necesitar el permiso amplio sobre todo el Drive.
+// ---- Selector de archivos (Google Picker) — oculto en la UI, se mantiene disponible por si se necesita ----
 let pickerLibLoaded = false;
 
 function ensurePickerLib(){
@@ -717,14 +704,11 @@ async function driveFindOrCreateFolder(){
 }
 
 async function driveFindFile(folderId){
-  // 1) Búsqueda exacta dentro de la carpeta esperada
   const qExact = encodeURIComponent(`name='${DRIVE_FILENAME}' and '${folderId}' in parents and trashed=false`);
   let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qExact}&spaces=drive&fields=files(id,name,parents,size)`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
   let data = await res.json();
   if(data.files && data.files.length){
-    // Drive permite nombres duplicados en una misma carpeta. No adivinamos cuál es el correcto:
-    // solo avisamos para que el usuario borre el que sobra manualmente en Drive.
     if(data.files.length > 1){
       document.getElementById('drive-note').textContent = `⚠ Hay ${data.files.length} archivos llamados "${DRIVE_FILENAME}" en tu carpeta RentaPro. Borra los que sobren en Drive para evitar resultados inconsistentes.`;
       console.warn('Archivos duplicados encontrados:', data.files);
@@ -732,8 +716,6 @@ async function driveFindFile(folderId){
     return data.files[0].id;
   }
 
-  // 2) Respaldo: busca el archivo en cualquier carpeta a la que esta app tenga acceso
-  //    (con el scope amplio de Drive, esto puede encontrar el archivo sin importar cómo se creó).
   const qBroad = encodeURIComponent(`name contains 'registros-arriendos' and trashed=false`);
   res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qBroad}&spaces=drive&fields=files(id,name,parents,size)`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
@@ -745,7 +727,7 @@ async function driveFindFile(folderId){
       console.warn('Archivos duplicados encontrados:', matches);
     }
     const match = matches[0];
-    if(match.parents && match.parents[0]) driveFolderId = match.parents[0]; // adopta la carpeta real donde vive el archivo
+    if(match.parents && match.parents[0]) driveFolderId = match.parents[0];
     return match.id;
   }
   return null;
@@ -782,8 +764,6 @@ async function driveReadXlsxFile(fileId){
   return await res.arrayBuffer();
 }
 
-// Aplica ancho de columnas y un encabezado con color/negrita a una hoja, para que sea legible
-// al abrirla directo en Excel o Google Sheets.
 function styleWorksheet(ws, widths){
   if(!ws['!ref']) return;
   ws['!cols'] = widths.map(w => ({ wch: w }));
@@ -800,8 +780,6 @@ function styleWorksheet(ws, widths){
   }
 }
 
-// Da formato real a las columnas de fecha (como fecha, no texto) y de plata (entero con formato $ CLP),
-// según el nombre de cada columna en "headers" (mismo orden con el que se armaron las filas).
 const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
 const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo'];
 function applyColumnFormats(ws, headers){
@@ -890,9 +868,6 @@ function buildWorkbook(){
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
-// Convierte una celda de fecha real de Excel (objeto Date, leída con cellDates:true) de vuelta a
-// texto ISO "AAAA-MM-DD" — el formato que usa el resto de la app (inputs, comparaciones de mes, etc.).
-// Si la celda ya viene como texto (archivos antiguos), se deja tal cual.
 function excelCellToISODate(v){
   if(v instanceof Date && !isNaN(v)){
     const y = v.getUTCFullYear();
@@ -924,7 +899,6 @@ function loadFromWorkbook(arrayBuffer){
       }))
     : [];
   payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id).map(normalizeDates) : [];
-  // De la hoja Servicios solo recuperamos los campos originales (consumo/monto se recalculan solos).
   readings = readingSheet
     ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=> normalizeDates({
         id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
@@ -950,8 +924,6 @@ async function driveSync(isInitialLoad){
       await saveKey('readings',readings);
       renderAll();
     } else if(isInitialLoad && !driveFileId){
-      // No se encontró ningún archivo automáticamente: nunca crear uno nuevo en silencio.
-      // Se ofrece primero buscarlo a mano con el selector de Google (cubre archivos subidos por el usuario).
       const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = crear un archivo NUEVO (vacío).');
       if(usarPicker){
         driveSyncBusy = false;
@@ -982,6 +954,37 @@ async function driveSync(isInitialLoad){
 }
 
 function pushToDriveIfConnected(){ if(driveToken) driveSync(false); }
+
+// ---- Exportar un workbook auxiliar (pagos / meses con deuda) directo a Google Drive ----
+async function exportWorkbookToDrive(wb, filenamePrefix){
+  if(!driveToken){ alert('Primero conéctate a Google Drive para poder exportar.'); return; }
+  try{
+    if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
+    const buf = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
+    const fecha = new Date().toISOString().slice(0,10);
+    const filename = `${filenamePrefix}-${fecha}.xlsx`;
+    const metadata = { name: filename, mimeType: XLSX_MIME, parents: [driveFolderId] };
+    const boundary = 'rentapro_export_' + Date.now();
+    const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${XLSX_MIME}\r\n\r\n`;
+    const tail = `\r\n--${boundary}--`;
+    const body = new Blob([head, buf, tail]);
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method:'POST',
+      headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body
+    });
+    const data = await res.json();
+    if(data.id){
+      const link = data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`;
+      window.open(link, '_blank');
+    } else {
+      alert('Hubo un problema exportando a Drive.');
+    }
+  }catch(e){
+    console.error(e);
+    alert('Error exportando a Google Drive: '+e.message);
+  }
+}
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
 let properties = [], tenants = [], contracts = [], payments = [], readings = [];
@@ -998,14 +1001,12 @@ let storageOK = true;
 const memoryStore = {};
 
 const money = n => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(n||0));
-// Convierte una fecha ISO (YYYY-MM-DD, la que usan los <input type="date">) al formato chileno DD-MM-AAAA.
 const formatDate = iso => {
   if(!iso) return '';
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(!m) return esc(iso);
   return `${m[3]}-${m[2]}-${m[1]}`;
 };
-// Números (no monetarios) con separador de miles chileno, ej: 1.234.
 const formatNumber = n => (n===''||n===null||n===undefined||isNaN(Number(n))) ? '' : new Intl.NumberFormat('es-CL').format(Number(n));
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
@@ -1320,7 +1321,7 @@ async function terminateContract(id){
 
   const hoy = new Date().toISOString().slice(0,10);
   let fechaTermino = prompt('Fecha de término del contrato (formato AAAA-MM-DD):', hoy);
-  if(fechaTermino===null) return; // canceló
+  if(fechaTermino===null) return;
   fechaTermino = fechaTermino.trim();
   if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaTermino) || isNaN(new Date(fechaTermino+'T00:00:00'))){
     alert('Fecha inválida. Usa el formato AAAA-MM-DD, por ejemplo: '+hoy);
@@ -1328,7 +1329,7 @@ async function terminateContract(id){
   }
 
   let deuda = prompt('Monto de deuda pactada al término (en $, deja 0 si no hay deuda):', '0');
-  if(deuda===null) return; // canceló
+  if(deuda===null) return;
   deuda = deuda.replace(/[.$\s]/g,'');
   if(deuda==='' || isNaN(Number(deuda)) || Number(deuda)<0){
     alert('Monto inválido. Ingresa solo números, por ejemplo: 500000');
@@ -1359,9 +1360,6 @@ async function reactivateContract(id){
   pushToDriveIfConnected();
 }
 
-// Cierra a mano el saldo pendiente de un histórico (por ejemplo, si se decide condonar o dar
-// por incobrable lo que falta) — deja la deuda pactada igual a lo ya cobrado, así el saldo
-// remanente queda en $0 y el contrato deja de aparecer en el selector de "Nuevo pago".
 async function closeDebtManually(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
@@ -1381,9 +1379,6 @@ function propAddress(id){
   const p = properties.find(x=>x.id===id);
   return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
 }
-// Devuelve SIEMPRE un arreglo de ids de propiedad para un contrato, sin importar si viene del
-// formato nuevo (propiedadIds: varias) o del formato antiguo (propiedadId: una sola) —
-// así los contratos ya guardados antes de este cambio siguen funcionando igual.
 function contractPropertyIds(c){
   if(!c) return [];
   if(Array.isArray(c.propiedadIds)) return c.propiedadIds.filter(Boolean);
@@ -1412,8 +1407,7 @@ function contractLabel(id){
   return propAddresses(c) + ' — ' + identificador;
 }
 
-// Tabla fusionada: un arrendatario y su contrato vigente en una sola fila (un arrendatario
-// activo siempre tiene un contrato asociado — se crean y editan juntos).
+// Tabla fusionada: un arrendatario y su contrato vigente en una sola fila
 function renderTenantsContracts(){
   const el = document.getElementById('tenant-table');
   const activos = contracts.filter(isActiveContract);
@@ -1428,17 +1422,22 @@ function renderTenantsContracts(){
     const t = tenants.find(x=>x.id===c.tenantId) || {};
     const finCalc = contractEndDate(c);
     const fechaFin = finCalc ? formatDate(toISO(finCalc)) : '—';
+
+    // Solo se muestran los campos de Nombre sociedad / Rut sociedad si tienen información.
+    const sociedadFields = [];
+    if(t.nombreSociedad) sociedadFields.push(propField('Nombre sociedad', esc(t.nombreSociedad)));
+    if(t.rutSociedad) sociedadFields.push(propField('Rut Sociedad', esc(t.rutSociedad)));
+    const sociedadSection = sociedadFields.length
+      ? `<div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div><div class="prop-fields-grid">${sociedadFields.join('')}</div>`
+      : '';
+
     return `<div class="prop-card">
       <div class="prop-card-header">
         <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
         <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
-      <div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div>
-      <div class="prop-fields-grid">
-        ${propField('Nombre sociedad', esc(t.nombreSociedad))}
-        ${propField('Rut Sociedad', esc(t.rutSociedad))}
-      </div>
-      <div class="prop-card-section">👤 Representante</div>
+      ${sociedadSection}
+      <div class="prop-card-section" ${sociedadSection?'':'style="margin-top:0;padding-top:0;border-top:none"'}>👤 Representante</div>
       <div class="prop-fields-grid">
         ${propField('Representante', esc(t.nombreRepresentante))}
         ${propField('Rut Representante', esc(t.rutRepresentante))}
@@ -1459,8 +1458,6 @@ function renderTenantsContracts(){
 // ---------- PAGOS ----------
 const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
 
-// Contratos ya finalizados que TODAVÍA tienen saldo de deuda pendiente por cobrar (se recalcula
-// siempre en vivo — apenas queda saldada, deja de aparecer en los menús de "Nuevo pago").
 function contratosConCobranza(){
   return contracts.filter(c => !isActiveContract(c) && computeCobranzaSaldo(c) > 0);
 }
@@ -1475,7 +1472,7 @@ function renderPaySelects(){
 }
 
 document.getElementById('pay-contratoId').addEventListener('change', ()=>{
-  if(editingPay) return; // al editar un pago existente no se sobreescribe lo que ya tenía guardado
+  if(editingPay) return;
   const c = contracts.find(x=>x.id===document.getElementById('pay-contratoId').value);
   document.getElementById('pay-valorArriendo').value = (c && isActiveContract(c)) ? (c.montoArriendoPactado||'') : '';
 });
@@ -1485,8 +1482,6 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   const obj = { id: editingPay || uid() };
   payFields.forEach(f=> obj[f] = document.getElementById('pay-'+f).value);
 
-  // Si el valor de arriendo ingresado difiere del valor vigente en el contrato, se avisa la
-  // consecuencia (queda como el nuevo valor pactado hacia adelante) y se pide confirmar.
   const c = contracts.find(x=>x.id===obj.contratoId);
   if(c && isActiveContract(c) && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
     const confirmado = confirm(
@@ -1564,8 +1559,7 @@ document.getElementById('export-payments-btn').addEventListener('click', ()=>{
   styleWorksheet(ws, [30,22,12,14,12,14,14,28]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
-  const fecha = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `pagos-y-descuentos-${fecha}.xlsx`, { cellStyles: true });
+  exportWorkbookToDrive(wb, 'pagos-y-descuentos');
 });
 
 // ---------- RESUMEN (por contrato) ----------
@@ -1579,14 +1573,6 @@ function mesesTranscurridos(fechaInicio){
   return Math.max(months,0);
 }
 
-// Para el CÁLCULO DE DEUDA (no para vencimiento de contrato ni ajuste de IPC, que siguen usando la
-// fecha real de inicio): se usa la fecha del PRIMER PAGO registrado como punto de partida, en vez de
-// la fecha de inicio del contrato. Esto cubre dos casos reales:
-// 1) El contrato partió mucho antes del primer pago cargado (brecha sin registros) → esos meses previos
-//    se asumen pagados, no quedan como deuda.
-// 2) Hay pagos registrados ANTES de la fecha de inicio que quedó cargada en el contrato (dato de origen
-//    incompleto/incorrecto) → de lo contrario esos pagos y sus descuentos quedaban invisibles en el cálculo.
-// No crea ni modifica ningún registro, solo cambia desde qué fecha se cuenta la deuda para este contrato.
 function effectiveDebtStartDate(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return '';
@@ -1597,8 +1583,6 @@ function effectiveDebtStartDate(contratoId){
 
 function computeResumenRows(){
   return contracts.filter(isActiveContract).map(c=>{
-    // Se calcula desde la serie mensual, que usa el valor de arriendo vigente EN CADA PERIODO
-    // (columna valorArriendo de los pagos), no el valor actual del contrato.
     const series = computeContratoMonthlySeries(c.id);
     const totalPagado = series.reduce((s,d)=>s+d.pagado,0);
     const totalDescuentos = series.reduce((s,d)=>s+d.descuento,0);
@@ -1633,19 +1617,18 @@ function renderResumen(){
   renderResumenSelect();
   const allRows = computeResumenRows();
 
-  document.getElementById('summary-cards').innerHTML = `
-    <div class="stat"><div class="label">Contratos activos</div><div class="value">${contracts.filter(isActiveContract).length}</div></div>
-  `;
+  // Solo se muestran clientes con deuda o saldo a favor (se excluyen los que están exactamente en $0).
+  const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
 
   const filtro = document.getElementById('resumen-filter').value;
-  let rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
+  let rows = filtro ? conSaldoDistintoDeCero.filter(r=>r.c.id===filtro) : conSaldoDistintoDeCero;
   rows = sortRows('resumen', rows, {
     contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto,
     meses: r=>r.meses, saldo: r=>r.saldo
   });
 
   const el = document.getElementById('resumen-table');
-  if(!rows.length){ el.innerHTML='<div class="empty">Registra contratos y pagos para ver el resumen.</div>'; }
+  if(!rows.length){ el.innerHTML='<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>'; }
   else {
     el.innerHTML = `<table><thead><tr>
       ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses transcurridos')}${th('resumen','saldo','Saldo')}<th>Estado</th>
@@ -1688,8 +1671,6 @@ function nextIpcDate(fechaInicio, intervalo){
   while(next <= now && guard < 200){ next = new Date(next); next.setMonth(next.getMonth()+intervalo); guard++; }
   return next;
 }
-// Fecha de fin real de un contrato: usa el valor guardado explícitamente si existe;
-// si no, la calcula como respaldo (inicio + duración) para contratos antiguos que aún no la tienen.
 function contractEndDate(c){
   if(c.fechaFinContrato) return new Date(c.fechaFinContrato+'T00:00:00Z');
   if(c.duracionMeses && c.fechaInicioContrato) return addMonths(c.fechaInicioContrato, Number(c.duracionMeses));
@@ -1737,8 +1718,6 @@ function renderAlertas(){
   }).join('');
 }
 
-// Al "actualizar" un contrato vencido: extiende la fecha de fin guardada en 1 año, y de paso
-// consulta si el valor de arriendo también cambia (quedando como el nuevo valor vigente).
 async function updateContractFromAlert(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
@@ -1754,7 +1733,7 @@ async function updateContractFromAlert(id){
 
   const montoActual = Number(c.montoArriendoPactado||0);
   const nuevoMontoStr = prompt(`Valor de arriendo actual: ${money(montoActual)}\n\n¿Quieres actualizarlo? Escribe el nuevo monto y presiona OK, o deja el mismo valor si no cambia.`, String(montoActual));
-  if(nuevoMontoStr===null) return; // canceló toda la operación
+  if(nuevoMontoStr===null) return;
 
   c.fechaFinContrato = nuevaFinISO;
   const nuevoMonto = Number(nuevoMontoStr.replace(/[.$\s]/g,''));
@@ -1829,8 +1808,6 @@ async function setReadingEstado(id, estado){
   pushToDriveIfConnected();
 }
 
-// Calcula consumo y monto de cada lectura comparándola con la lectura anterior
-// del mismo contrato + mismo servicio (por fecha).
 const DIAS_PARA_ATRASO = 15;
 
 function diasDesde(fechaStr){
@@ -1840,8 +1817,6 @@ function diasDesde(fechaStr){
   return Math.floor((hoy - fecha) / 86400000);
 }
 
-// El estado que el usuario guarda (Pendiente/Pagado) es la fuente de verdad para "Pagado".
-// "Atrasado" nunca se guarda: se calcula solo, en el momento, según los días transcurridos.
 function estadoEfectivo(r){
   if(r.estado === 'Pagado') return 'Pagado';
   return diasDesde(r.fechaLectura) > DIAS_PARA_ATRASO ? 'Atrasado' : 'Pendiente';
@@ -1964,11 +1939,9 @@ function monthsBetween(startDateStr){
     m++; if(m>11){ m=0; y++; }
     guard++;
   }
-  return months.reverse(); // más reciente primero
+  return months.reverse();
 }
 
-// Vista plana: todos los pagos de todos los contratos, con el contrato truncado a 50 caracteres
-// y un filtro por mes/año, para cuando no se elige un contrato específico.
 let historialTodosVerTodo = false;
 function renderHistorialTodos(){
   const el = document.getElementById('historial-table');
@@ -2017,7 +1990,7 @@ function renderHistorial(){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !effectiveDebtStartDate(contratoId)){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio ni pagos registrados.</div>'; return; }
 
-  const seriesTotal = computeContratoMonthlySeries(contratoId).slice().reverse(); // más reciente arriba
+  const seriesTotal = computeContratoMonthlySeries(contratoId).slice().reverse();
   const series = historialMensualVerTodo ? seriesTotal : seriesTotal.slice(0,12);
 
   el.innerHTML = `<table><thead><tr>
@@ -2056,8 +2029,6 @@ function renderHistorial(){
 }
 
 // ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
-// Saldo de deuda pactada que aún falta cobrar en un contrato finalizado (se recalcula siempre en
-// vivo restando lo abonado DESDE la fecha de término). Si nunca se fijó deuda pactada, es 0.
 function computeCobranzaSaldo(c){
   if(!c.fechaTermino || !Number(c.deudaPactada||0)) return 0;
   const cobrado = payments
@@ -2077,7 +2048,7 @@ function renderHistoricos(){
     const ultimoPago = pagosC.length ? pagosC[pagosC.length-1].fechaPago : '—';
     const saldoRemanente = computeCobranzaSaldo(c);
     return { c, primerPago, ultimoPago, saldoRemanente };
-  }).sort((a,b)=> b.saldoRemanente - a.saldoRemanente); // deuda pendiente primero
+  }).sort((a,b)=> b.saldoRemanente - a.saldoRemanente);
 
   rows = sortRows('historicos', rows, {
     tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>contractPropertyIds(r.c).length?propAddresses(r.c):'',
@@ -2112,7 +2083,7 @@ function renderHistoricos(){
 }
 
 // ---------- ORDEN DE TABLAS (clic en encabezado) ----------
-const sortState = {}; // { tableId: {key, dir} }  dir: 1 = asc, -1 = desc
+const sortState = {};
 
 function toggleSort(tableId, key){
   const cur = sortState[tableId];
@@ -2144,7 +2115,6 @@ function th(tableId, key, label){
 }
 
 // ---------- HISTOGRAMA MENSUAL (Resumen & Deudas) ----------
-// Serie completa mes a mes desde el inicio del contrato hasta hoy, en orden cronológico (el más antiguo primero).
 function computeContratoMonthlySeries(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return [];
@@ -2156,9 +2126,6 @@ function computeContratoMonthlySeries(contratoId){
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
     const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
-    // El valor esperado del mes es el "valor arriendo" registrado en los pagos de ese periodo
-    // (el arriendo puede haber cambiado en el tiempo). Si el mes no tiene pagos con ese dato,
-    // se usa el valor vigente del contrato como aproximación.
     const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
     const monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : montoContrato;
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
@@ -2172,7 +2139,6 @@ document.getElementById('chart-group-filter').addEventListener('change', ()=>{
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
 
-// Aplica el filtro de año y la agrupación (mes/año) a una serie, devolviendo filas listas para el gráfico.
 function applyYearGroupFilter(series, yearSel, groupSel){
   const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>a-b);
   const currentYear = yearSel.value;
@@ -2193,24 +2159,22 @@ function applyYearGroupFilter(series, yearSel, groupSel){
     });
     return Object.keys(byYear).sort((a,b)=>a-b).map(y=>({ label: y, ...byYear[y] }));
   }
-  return filtered.map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento })); // más antiguo arriba
+  return filtered.map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento }));
 }
 
-// Serie mensual AGREGADA de todos los contratos activos: para cada mes, suma lo esperado, pagado y
-// descontado de todos los contratos que ya estaban vigentes ese mes (respeta la fecha efectiva de cada uno).
 function computeGlobalMonthlySeries(){
   const activos = contracts.filter(isActiveContract);
   const starts = activos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
   if(!starts.length) return [];
   const minStart = starts.slice().sort()[0];
-  const months = monthsBetween(minStart).slice().reverse(); // ascendente
+  const months = monthsBetween(minStart).slice().reverse();
   return months.map(({year,month})=>{
     let monto=0, pagado=0, descuento=0;
     activos.forEach(c=>{
       const start = effectiveDebtStartDate(c.id);
       if(!start) return;
       const sy = Number(start.slice(0,4)), sm = Number(start.slice(5,7))-1;
-      if(year<sy || (year===sy && month<sm)) return; // este contrato todavía no había empezado ese mes
+      if(year<sy || (year===sy && month<sm)) return;
       const pagosMes = payments.filter(p=>p.contratoId===c.id && sameYearMonth(p.fechaPago,year,month));
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
       const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
@@ -2249,7 +2213,7 @@ function renderResumenChart(contratoId){
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
-      container.innerHTML = buildHorizontalBarChartSVG(rows, availableWidth) + histogramToggleHtml(total);
+      container.innerHTML = buildStackedColumnChartSVG(rows, availableWidth) + histogramToggleHtml(total);
     }
     renderResumenImpagos(contratoId);
     return;
@@ -2267,65 +2231,105 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
-  container.innerHTML = buildHorizontalBarChartSVG(rows, availableWidth) + histogramToggleHtml(total);
+  container.innerHTML = buildStackedColumnChartSVG(rows, availableWidth) + histogramToggleHtml(total);
   renderResumenImpagos(contratoId);
 }
 
-function buildHorizontalBarChartSVG(rows, availableWidth){
+// Gráfico de columnas verticales (fechas en el eje X): pagado + descuento apilados,
+// deuda/saldo a favor del periodo como segmento apilado adicional, y arriendo pactado
+// como línea punteada con puntos.
+function buildStackedColumnChartSVG(rows, availableWidth){
   if(!rows.length) return '<div class="empty">No hay datos para este filtro.</div>';
-  const labelW = 90, padT = 10, padL = labelW + 10, padR = 90;
-  const minBarArea = 220;
-  const barAreaW = Math.max(minBarArea, (availableWidth || 600) - padL - padR - 12);
-  const barH = 14, barGap = 3, groupGap = 16;
-  const groupH = barH*3 + barGap*2 + groupGap;
-  const w = padL + barAreaW + padR;
-  const h = padT + rows.length*groupH + 10;
-  const maxVal = Math.max(1, ...rows.map(d=>Math.max(d.monto,d.pagado,d.descuento)));
+  const padT = 24, padB = 58, padL = 74, padR = 20;
+  const colGap = 14;
+  const minColW = 34;
+  const w = Math.max(availableWidth || 600, padL+padR+rows.length*(minColW+colGap));
+  const colAreaW = w - padL - padR;
+  const colW = Math.min(46, Math.max(minColW, (colAreaW/rows.length) - colGap));
+  const chartH = 260;
+  const h = padT + chartH + padB;
 
-  const groups = rows.map((d,i)=>{
-    const gy = padT + i*groupH;
-    const wMonto = Math.max((d.monto/maxVal)*barAreaW, d.monto>0?2:0);
-    const wPagado = Math.max((d.pagado/maxVal)*barAreaW, d.pagado>0?2:0);
-    const wDesc = Math.max((d.descuento/maxVal)*barAreaW, d.descuento>0?2:0);
-    return `
-      <text x="${padL-10}" y="${gy+barH*1.5+barGap}" font-size="11" text-anchor="end" fill="var(--ink)" font-weight="600">${esc(d.label)}</text>
-      <rect x="${padL}" y="${gy}" width="${wMonto}" height="${barH}" rx="2" fill="var(--border)"/>
-      <text x="${padL+wMonto+6}" y="${gy+barH-3}" font-size="9" fill="var(--ink-soft)">${money(d.monto)}</text>
-      <rect x="${padL}" y="${gy+barH+barGap}" width="${wPagado}" height="${barH}" rx="2" fill="var(--teal)"/>
-      <text x="${padL+wPagado+6}" y="${gy+barH*2+barGap-3}" font-size="9" fill="var(--ink-soft)">${money(d.pagado)}</text>
-      <rect x="${padL}" y="${gy+2*(barH+barGap)}" width="${wDesc}" height="${barH}" rx="2" fill="var(--gold)"/>
-      <text x="${padL+wDesc+6}" y="${gy+barH*3+barGap*2-3}" font-size="9" fill="var(--ink-soft)">${money(d.descuento)}</text>
-    `;
+  const maxVal = Math.max(1, ...rows.map(d=> Math.max(d.monto, d.pagado + d.descuento)));
+  const scaleY = v => (v/maxVal)*chartH;
+
+  let bars = '';
+  const linePoints = [];
+
+  rows.forEach((d,i)=>{
+    const x = padL + i*(colW+colGap);
+    const cx = x + colW/2;
+    const yBase = padT + chartH;
+
+    const hPagado = scaleY(d.pagado);
+    const hDesc = scaleY(d.descuento);
+    const saldo = d.monto - (d.pagado + d.descuento); // >0 = deuda, <0 = a favor
+    const yTop = yBase - hPagado - hDesc;
+
+    bars += `<rect x="${x}" y="${yBase-hPagado}" width="${colW}" height="${hPagado}" fill="var(--teal)" rx="1.5"/>`;
+    bars += `<rect x="${x}" y="${yBase-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--gold)" rx="1.5"/>`;
+
+    if(saldo > 0){
+      const hDeuda = scaleY(saldo);
+      bars += `<rect x="${x}" y="${yTop-hDeuda}" width="${colW}" height="${hDeuda}" fill="var(--brick)" rx="1.5" opacity="0.85"/>`;
+    } else if(saldo < 0){
+      const hFavor = scaleY(-saldo);
+      bars += `<rect x="${x}" y="${yTop-hFavor}" width="${colW}" height="${hFavor}" fill="var(--teal-dark)" rx="1.5" opacity="0.55"/>`;
+    }
+
+    bars += `<text x="${cx}" y="${h-padB+18}" font-size="10.5" text-anchor="middle" fill="var(--ink-soft)" transform="rotate(-40 ${cx} ${h-padB+18})">${esc(d.label)}</text>`;
+
+    const yPactado = yBase - scaleY(d.monto);
+    linePoints.push({x:cx, y:yPactado});
+  });
+
+  const linePath = linePoints.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
+  const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="var(--brick-soft)" stroke="var(--brick)" stroke-width="1.5"/>`).join('');
+
+  const gridLines = [0,0.25,0.5,0.75,1].map(f=>{
+    const y = padT + chartH - f*chartH;
+    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
+      <text x="${padL-8}" y="${y+3}" font-size="9.5" text-anchor="end" fill="var(--ink-soft)">${money(Math.round(maxVal*f))}</text>`;
   }).join('');
 
-  return `<div>
-  <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;display:block;">
-    <line x1="${padL}" y1="0" x2="${padL}" y2="${h}" stroke="var(--border)"/>
-    ${groups}
+  return `<div style="overflow-x:auto">
+  <svg viewBox="0 0 ${w} ${h}" style="width:100%;min-width:${w}px;height:${h}px;display:block;">
+    ${gridLines}
+    ${bars}
+    <path d="${linePath}" fill="none" stroke="var(--brick)" stroke-width="1.8" stroke-dasharray="4,3"/>
+    ${dots}
   </svg>
   </div>
   <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap">
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--border);margin-right:5px;border-radius:2px;"></span>Valor arriendo pactado</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:5px;border-radius:2px;"></span>Pagado</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);margin-right:5px;border-radius:2px;"></span>Descuento aplicado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--brick);margin-right:5px;border-radius:2px;opacity:0.85"></span>Deuda del periodo</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal-dark);margin-right:5px;border-radius:2px;opacity:0.55"></span>Saldo a favor del periodo</span>
+    <span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--brick);margin-right:5px;"></span>Arriendo pactado</span>
   </div>`;
 }
 
-// Detalle de meses (dentro de toda la vida del contrato) que quedaron sin pagar o solo parcialmente cubiertos.
+// Detalle de meses con saldo, limitado a los últimos 12 (con botón para ver todo). Incluye comentarios.
+let impagosVerTodo = false;
 function renderResumenImpagos(contratoId){
   const el = document.getElementById('resumen-impagos');
   if(!contratoId){ el.innerHTML = '<div class="empty">Selecciona un arrendatario específico arriba para ver el detalle mes a mes.</div>'; return; }
   const series = computeContratoMonthlySeries(contratoId);
   const conSaldo = series
     .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => ({...d, saldo: d.monto - d.pagado - d.descuento}))
-    .reverse(); // más reciente arriba
+    .map(d => {
+      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
+      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
+    })
+    .reverse();
   if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — este arrendatario está exactamente al día en toda su historia.</div>'; return; }
   const totalFaltante = conSaldo.filter(d=>d.saldo>0).reduce((s,d)=>s+d.saldo,0);
   const totalAFavor = conSaldo.filter(d=>d.saldo<0).reduce((s,d)=>s-d.saldo,0);
+  const total = conSaldo.length;
+  const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
   el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong></div>
-  <table><thead><tr><th>Mes</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Saldo</th><th>Estado</th></tr></thead><tbody>
-  ${conSaldo.map(d=>{
+  <table><thead><tr><th>Mes</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Saldo</th><th>Estado</th><th>Comentarios</th></tr></thead><tbody>
+  ${mostrar.map(d=>{
     const esDeuda = d.saldo>0;
     return `<tr>
     <td>${MESES_ES[d.month]} ${d.year}</td>
@@ -2334,9 +2338,15 @@ function renderResumenImpagos(contratoId){
     <td class="mono">${money(d.descuento)}</td>
     <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
     <td><span class="tag ${esDeuda?'tag-debt':'tag-ok'}">${esDeuda?'Debe':'A favor'}</span></td>
+    <td>${esc(d.comentarios)}</td>
   </tr>`;
   }).join('')}
-  </tbody></table>`;
+  </tbody></table>
+  ${total>12 ? `<div style="text-align:center;margin-top:12px">
+    <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos(document.getElementById('resumen-filter').value);">
+      ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
+    </button>
+  </div>` : ''}`;
 }
 
 document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
@@ -2345,7 +2355,11 @@ document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
   const series = computeContratoMonthlySeries(contratoId);
   const conSaldo = series
     .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => ({...d, saldo: d.monto - d.pagado - d.descuento}))
+    .map(d => {
+      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
+      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
+    })
     .reverse();
   if(!conSaldo.length){ alert('Este arrendatario no tiene meses con deuda ni con saldo a favor para exportar.'); return; }
   const rows = conSaldo.map(d=>({
@@ -2354,23 +2368,19 @@ document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
     pagado: Number(d.pagado),
     descuento: Number(d.descuento),
     saldo: Number(d.saldo),
-    Estado: d.saldo>0 ? 'Debe' : 'A favor'
+    Estado: d.saldo>0 ? 'Debe' : 'A favor',
+    Comentarios: d.comentarios
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  applyColumnFormats(ws, ['Mes','monto','pagado','descuento','saldo','Estado']);
-  styleWorksheet(ws, [16,14,14,14,14,12]);
+  applyColumnFormats(ws, ['Mes','monto','pagado','descuento','saldo','Estado','Comentarios']);
+  styleWorksheet(ws, [16,14,14,14,14,12,28]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Meses con deuda');
   const nombre = truncateText(contractLabel(contratoId), 40).replace(/[\\/:*?"<>|]/g,'');
-  const fecha = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `meses-con-deuda-${nombre}-${fecha}.xlsx`, { cellStyles: true });
+  exportWorkbookToDrive(wb, `meses-con-deuda-${nombre}`);
 });
 
 // ---------- COMBOBOX BUSCABLE ----------
-// Envuelve un <select> ya existente con un campo de texto + datalist para poder escribir y
-// filtrar las opciones, sin tocar el <select> original (que sigue funcionando igual para
-// todo el resto del código: value, change, etc.). Se resincroniza solo cuando el <select>
-// cambia sus opciones (con un MutationObserver), así que no hay que tocar los render*Selects().
 function makeSearchable(selectId){
   const select = document.getElementById(selectId);
   if(!select || select.dataset.searchable) return;
@@ -2418,7 +2428,6 @@ function makeSearchable(selectId){
     }
   });
   input.addEventListener('blur', ()=>{
-    // si lo que quedó escrito no calza con ninguna opción real, se limpia para no confundir
     const typed = input.value.trim().toLowerCase();
     const match = Array.from(select.options).find(o=> optionLabel(o).toLowerCase()===typed);
     if(!match) syncFromSelect();
