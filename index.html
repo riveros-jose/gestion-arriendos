@@ -92,6 +92,7 @@
   .alert-card .sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
   .alert-card .when{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;white-space:nowrap;margin-left:16px;}
   .storage-banner{background:var(--brick-soft);color:var(--brick);border:1px solid var(--brick);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;}
+  .date-warning-banner{background:#FBF1DC;color:#8A6410;border:1px solid var(--gold);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;line-height:1.5;}
   .drive-bar{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:6px;font-size:13px;}
   .drive-bar .dot{width:9px;height:9px;border-radius:50%;background:#B7BFB9;flex-shrink:0;}
   .drive-bar .dot.on{background:var(--teal);}
@@ -138,6 +139,7 @@
   .searchable-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;z-index:80;box-shadow:0 8px 20px rgba(0,0,0,0.14);margin-top:4px;}
   .dropdown-item{padding:8px 10px;font-size:13px;cursor:pointer;white-space:normal;}
   .dropdown-item:hover{background:var(--teal-soft);}
+  .dropdown-item-reset{font-weight:700;color:var(--teal-dark);border-bottom:1px solid var(--border);}
   .dropdown-empty{padding:8px 10px;font-size:12.5px;color:var(--ink-soft);}
   .prop-card-unidad{font-size:13px;color:var(--ink-soft);}
   .prop-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 16px;}
@@ -228,6 +230,7 @@
     <div id="storage-banner" class="storage-banner" style="display:none">
       ⚠ No se detectó almacenamiento persistente en esta ventana. Lo que registres ahora <strong>se perderá al cerrar o recargar</strong>. Para que tus datos se guarden automáticamente, abre y usa esta app dentro del chat de Claude (como artifact), no como archivo descargado y abierto directo en el navegador.
     </div>
+    <div id="date-corruption-banner" class="date-warning-banner" style="display:none"></div>
     <div class="drive-bar">
       <span class="dot" id="drive-dot"></span>
       <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
@@ -644,6 +647,7 @@ document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
   if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
   forgetConnectedHint();
   setDriveStatus('no conectado', false);
+  document.getElementById('date-corruption-banner').style.display = 'none';
   showDriveGate();
   setGateChecking(false);
 });
@@ -816,8 +820,14 @@ function applyColumnFormats(ws, headers){
       const cell = ws[addr];
       if(!cell || cell.v==='' || cell.v==null) continue;
       if(esFecha){
-        const d = new Date(String(cell.v)+'T00:00:00Z');
-        if(!isNaN(d)){ cell.t = 'd'; cell.v = d; cell.z = 'dd-mm-yyyy'; }
+        // Se guarda como TEXTO plano "AAAA-MM-DD" (celda tipo string), NO como fecha nativa
+        // de Excel. Una celda de fecha nativa es un número serial que, al pasar por otra
+        // herramienta (Google Sheets, Excel de escritorio), puede reinterpretarse aplicando
+        // una zona horaria y correr la fecha un día. El texto plano no tiene ese problema:
+        // mientras nadie reescriba la celda a mano, queda inmune a esa conversión.
+        cell.t = 's';
+        cell.v = String(cell.v);
+        delete cell.z;
       } else if(esMoneda){
         const n = Number(cell.v);
         if(!isNaN(n)){ cell.t = 'n'; cell.v = Math.round(n); cell.z = '"$"#,##0'; }
@@ -905,6 +915,33 @@ function normalizeDates(obj){
   return obj;
 }
 
+// ---- Detección de corrupción de fechas por zona horaria ----
+// Cuando el Excel se guarda como medianoche UTC (como lo hace esta app) y luego alguien
+// lo abre/guarda con otra herramienta (Google Sheets, Excel de escritorio, etc.) que aplica
+// la zona horaria local, la fecha "se corre" y queda con una hora distinta de 00:00:00.
+// Esa hora rara es la huella del problema, y por eso podemos detectarla apenas se carga el archivo.
+let lastDateCorruptionCount = 0;
+function cellHasTimeCorruption(v){
+  return v instanceof Date && !isNaN(v) && (v.getUTCHours()!==0 || v.getUTCMinutes()!==0 || v.getUTCSeconds()!==0);
+}
+function countDateTimeCorruption(rows){
+  let n = 0;
+  rows.forEach(r=>{
+    DATE_FIELD_NAMES.forEach(f=>{ if(cellHasTimeCorruption(r[f])) n++; });
+  });
+  return n;
+}
+function checkDateCorruptionBanner(){
+  const banner = document.getElementById('date-corruption-banner');
+  if(!banner) return;
+  if(lastDateCorruptionCount > 0){
+    banner.innerHTML = `⚠ Se detectaron <strong>${lastDateCorruptionCount} fecha(s)</strong> con una hora distinta de medianoche en el Excel recién cargado desde Drive. Esa es la huella de que el archivo fue abierto o guardado fuera de esta app (por ejemplo en Google Sheets o Excel de escritorio) y sus fechas podrían haberse corrido uno o más días. Revisa tus pagos, contratos y lecturas antes de seguir registrando datos, y evita editar este archivo fuera de la app — solo ábrelo desde aquí (botón "Conectar con Google Drive" / "Recargar desde Excel").`;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
 function loadFromWorkbook(arrayBuffer){
   const wb = XLSX.read(new Uint8Array(arrayBuffer), { type:'array', cellDates: true });
   const propSheet = wb.Sheets['Propiedades'];
@@ -914,19 +951,21 @@ function loadFromWorkbook(arrayBuffer){
   const readingSheet = wb.Sheets['Servicios'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
-  contracts = contractSheet
-    ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id).map(c=> normalizeDates({
-        ...c,
-        activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
-      }))
-    : [];
-  payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id).map(normalizeDates) : [];
-  readings = readingSheet
-    ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=> normalizeDates({
-        id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
-        lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
-      }))
-    : [];
+
+  const rawContracts = contractSheet ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id) : [];
+  const rawPayments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
+  const rawReadings = readingSheet ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id) : [];
+  lastDateCorruptionCount = countDateTimeCorruption(rawContracts) + countDateTimeCorruption(rawPayments) + countDateTimeCorruption(rawReadings);
+
+  contracts = rawContracts.map(c=> normalizeDates({
+    ...c,
+    activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
+  }));
+  payments = rawPayments.map(normalizeDates);
+  readings = rawReadings.map(r=> normalizeDates({
+    id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
+    lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
+  }));
 }
 
 async function driveSync(isInitialLoad){
@@ -945,6 +984,7 @@ async function driveSync(isInitialLoad){
       await saveKey('payments',payments);
       await saveKey('readings',readings);
       renderAll();
+      checkDateCorruptionBanner();
     } else if(isInitialLoad && !driveFileId){
       const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = crear un archivo NUEVO (vacío).');
       if(usarPicker){
@@ -1919,8 +1959,8 @@ function renderHistorialSelects(){
   const activos = contracts.filter(isActiveContract);
   const historicos = contracts.filter(c=>!isActiveContract(c));
 
-  selActivo.innerHTML = '<option value="">— Ninguno —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  selHist.innerHTML = '<option value="">— Ninguno —</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  selActivo.innerHTML = '<option value="">Todos</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  selHist.innerHTML = '<option value="">Todos</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
 
   if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
   if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
@@ -2235,7 +2275,9 @@ function renderResumenChart(contratoId){
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
-      container.innerHTML = buildStackedColumnChartSVG(rows, availableWidth) + histogramToggleHtml(total);
+      const chart = buildStackedColumnChartSVG(rows, availableWidth);
+      container.innerHTML = chart.html + histogramToggleHtml(total);
+      chart.attach(container);
     }
     renderResumenImpagos(contratoId);
     return;
@@ -2253,16 +2295,15 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
-  container.innerHTML = buildStackedColumnChartSVG(rows, availableWidth) + histogramToggleHtml(total);
+  const chart = buildStackedColumnChartSVG(rows, availableWidth);
+  container.innerHTML = chart.html + histogramToggleHtml(total);
+  chart.attach(container);
   renderResumenImpagos(contratoId);
 }
 
-// Gráfico de columnas verticales (fechas en el eje X): pagado + descuento apilados,
-// deuda del periodo apilada arriba en rojo, saldo a favor del periodo bajo el cero en rojo,
-// y arriendo pactado como línea gris punteada con etiquetas en MM.
-// El eje Y va en una columna aparte, sticky, para que quede siempre visible al hacer scroll horizontal.
-function buildStackedColumnChartSVG(rows, availableWidth){
-  if(!rows.length) return '<div class="empty">No hay datos para este filtro.</div>';
+// Calcula las medidas fijas del gráfico (posiciones X, ancho de columnas, etc.) — estas NO
+// cambian aunque cambie la escala vertical, para que el scroll horizontal no salte.
+function computeChartLayout(rows, availableWidth){
   const padT = 24, padB = 58, padAxis = 74, padR = 20;
   const colGap = 14;
   const minColW = 34;
@@ -2272,15 +2313,24 @@ function buildStackedColumnChartSVG(rows, availableWidth){
   const chartH = 260;
   const h = padT + chartH + padB;
   const barsSvgW = rows.length*(colW+colGap) + padR;
+  return { padT, padB, padAxis, padR, colGap, colW, chartH, h, barsSvgW };
+}
 
-  const maxPos = Math.max(1, ...rows.map(d=> Math.max(d.monto, d.pagado + d.descuento)));
-  const maxNeg = Math.max(0, ...rows.map(d=> Math.max(0, (d.pagado+d.descuento) - d.monto)));
+// Dibuja el gráfico completo (todas las columnas de "rows", en sus posiciones X fijas según
+// "layout") pero calculando la escala vertical (máximos) usando SOLO "scaleRows" — que puede
+// ser un subconjunto (por ejemplo, las columnas que están visibles en pantalla en este momento).
+// Así el eje Y siempre refleja los datos que se están viendo, no el máximo de todo el histórico.
+function renderChartAtScale(rows, layout, scaleRows){
+  const { padT, padB, padAxis, colGap, colW, chartH, h, barsSvgW } = layout;
+
+  const maxPos = Math.max(1, ...scaleRows.map(d=> Math.max(d.monto, d.pagado + d.descuento)));
+  const maxNeg = Math.max(0, ...scaleRows.map(d=> Math.max(0, (d.pagado+d.descuento) - d.monto)));
   const totalRange = maxPos + maxNeg;
   const chartHPos = totalRange>0 ? chartH * (maxPos/totalRange) : chartH;
   const chartHNeg = chartH - chartHPos;
   const zeroY = padT + chartHPos;
-  const scaleYPos = v => (v/maxPos)*chartHPos;
-  const scaleYNeg = v => maxNeg>0 ? (v/maxNeg)*chartHNeg : 0;
+  const scaleYPos = v => Math.min(v,maxPos)/maxPos*chartHPos;
+  const scaleYNeg = v => maxNeg>0 ? Math.min(v,maxNeg)/maxNeg*chartHNeg : 0;
 
   let bars = '';
   const linePoints = [];
@@ -2302,7 +2352,7 @@ function buildStackedColumnChartSVG(rows, availableWidth){
       bars += `<rect x="${x}" y="${yTop-hDeuda}" width="${colW}" height="${hDeuda}" fill="var(--brick)" rx="1.5" opacity="0.9"><title>Deuda del periodo: ${formatMM(saldo)}</title></rect>`;
     } else if(saldo < 0){
       const hFavor = scaleYNeg(-saldo);
-      bars += `<rect x="${x}" y="${zeroY}" width="${colW}" height="${hFavor}" fill="var(--brick)" rx="1.5" opacity="0.6"><title>Saldo a favor del periodo: ${formatMM(-saldo)}</title></rect>`;
+      bars += `<rect x="${x}" y="${zeroY}" width="${colW}" height="${hFavor}" fill="var(--teal-dark)" rx="1.5" opacity="0.85"><title>Saldo a favor del periodo: ${formatMM(-saldo)}</title></rect>`;
     }
 
     bars += `<text x="${cx}" y="${h-padB+18}" font-size="10.5" text-anchor="middle" fill="var(--ink-soft)" transform="rotate(-40 ${cx} ${h-padB+18})">${esc(d.label)}</text>`;
@@ -2315,7 +2365,6 @@ function buildStackedColumnChartSVG(rows, availableWidth){
   const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="#fff" stroke="var(--gris-linea)" stroke-width="1.8"><title>Arriendo pactado: ${formatMM(p.monto)}</title></circle>`).join('');
   const lineLabels = linePoints.map(p=>`<text x="${p.x}" y="${p.y-8}" font-size="10" text-anchor="middle" fill="var(--gris-linea)" font-weight="600">${formatMM(p.monto)}</text>`).join('');
 
-  // Eje Y (columna aparte, sticky)
   const gridSteps = [0,0.25,0.5,0.75,1];
   let axisSvg = '';
   gridSteps.forEach(f=>{
@@ -2325,9 +2374,8 @@ function buildStackedColumnChartSVG(rows, availableWidth){
   if(maxNeg>0){
     axisSvg += `<text x="${padAxis-8}" y="${zeroY+chartHNeg+3}" font-size="9.5" text-anchor="end" fill="var(--ink-soft)">-${money(Math.round(maxNeg))}</text>`;
   }
-  const axisSvgFull = `<svg viewBox="0 0 ${padAxis} ${h}" width="${padAxis}" height="${h}" style="display:block;">${axisSvg}</svg>`;
+  const axisHtml = `<svg viewBox="0 0 ${padAxis} ${h}" width="${padAxis}" height="${h}" style="display:block;">${axisSvg}</svg>`;
 
-  // Líneas de grilla + línea de cero, dibujadas dentro del área scrolleable (para que crucen todas las barras)
   let gridLines = '';
   gridSteps.forEach(f=>{
     const y = zeroY - f*chartHPos;
@@ -2335,7 +2383,7 @@ function buildStackedColumnChartSVG(rows, availableWidth){
   });
   gridLines += `<line x1="0" y1="${zeroY}" x2="${barsSvgW}" y2="${zeroY}" stroke="var(--ink-soft)" stroke-width="1.4"/>`;
 
-  const barsSvgFull = `<svg viewBox="0 0 ${barsSvgW} ${h}" width="${barsSvgW}" height="${h}" style="display:block;">
+  const barsHtml = `<svg viewBox="0 0 ${barsSvgW} ${h}" width="${barsSvgW}" height="${h}" style="display:block;">
     ${gridLines}
     ${bars}
     <path d="${linePath}" fill="none" stroke="var(--gris-linea)" stroke-width="1.8" stroke-dasharray="4,3"/>
@@ -2343,17 +2391,62 @@ function buildStackedColumnChartSVG(rows, availableWidth){
     ${lineLabels}
   </svg>`;
 
-  return `<div class="chart-scroll-area">
-    <div class="chart-axis-col">${axisSvgFull}</div>
-    <div class="chart-bars-col">${barsSvgFull}</div>
+  return { axisHtml, barsHtml };
+}
+
+// Gráfico de columnas verticales (fechas en el eje X): pagado + descuento apilados,
+// deuda del periodo apilada arriba en rojo, saldo a favor del periodo bajo el cero en VERDE,
+// y arriendo pactado como línea gris punteada con etiquetas en MM.
+// El eje Y va en una columna aparte, sticky, para que quede siempre visible al hacer scroll horizontal,
+// y su escala se recalcula sobre la marcha según las columnas que estén visibles en ese momento
+// (no según todo el histórico), para aprovechar mejor el alto disponible.
+function buildStackedColumnChartSVG(rows, availableWidth){
+  if(!rows.length) return { html: '<div class="empty">No hay datos para este filtro.</div>', attach: ()=>{} };
+
+  const layout = computeChartLayout(rows, availableWidth);
+  const initial = renderChartAtScale(rows, layout, rows);
+
+  const html = `<div class="chart-scroll-area">
+    <div class="chart-axis-col">${initial.axisHtml}</div>
+    <div class="chart-bars-col">${initial.barsHtml}</div>
   </div>
   <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap">
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--azul);margin-right:5px;border-radius:2px;"></span>Pagado</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--azul-claro);margin-right:5px;border-radius:2px;"></span>Descuento aplicado</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:var(--brick);margin-right:5px;border-radius:2px;opacity:0.9"></span>Deuda del periodo</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--brick);margin-right:5px;border-radius:2px;opacity:0.6"></span>Saldo a favor del periodo</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal-dark);margin-right:5px;border-radius:2px;opacity:0.85"></span>Saldo a favor del periodo</span>
     <span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--gris-linea);margin-right:5px;"></span>Arriendo pactado (en MM)</span>
   </div>`;
+
+  function attach(container){
+    const axisEl = container.querySelector('.chart-axis-col');
+    const barsEl = container.querySelector('.chart-bars-col');
+    if(!axisEl || !barsEl) return;
+    let scaleTimer = null;
+    function recompute(){
+      const scrollLeft = barsEl.scrollLeft;
+      const viewW = barsEl.clientWidth || layout.barsSvgW;
+      const step = layout.colW + layout.colGap;
+      let startIdx = Math.max(0, Math.floor(scrollLeft/step));
+      let endIdx = Math.min(rows.length, Math.ceil((scrollLeft+viewW)/step));
+      if(endIdx<=startIdx) endIdx = Math.min(rows.length, startIdx+1);
+      const visible = rows.slice(startIdx, endIdx);
+      if(!visible.length) return;
+      const scaled = renderChartAtScale(rows, layout, visible);
+      const sl = barsEl.scrollLeft;
+      axisEl.innerHTML = scaled.axisHtml;
+      barsEl.innerHTML = scaled.barsHtml;
+      barsEl.scrollLeft = sl;
+    }
+    barsEl.addEventListener('scroll', ()=>{
+      if(scaleTimer) clearTimeout(scaleTimer);
+      scaleTimer = setTimeout(recompute, 120);
+    });
+    // Ajuste inicial a la ventana realmente visible (recién ahora se conoce el ancho real en pantalla)
+    recompute();
+  }
+
+  return { html, attach };
 }
 
 // Detalle de meses con saldo, limitado a los últimos 12 (con botón para ver todo). Incluye comentarios.
@@ -2454,17 +2547,26 @@ function makeSearchable(selectId){
 
   function buildList(filterText){
     const term = (filterText||'').toLowerCase();
-    const opts = Array.from(select.options).filter(o=> o.value!=='').filter(o=> !term || optionLabel(o).toLowerCase().includes(term));
-    if(!opts.length){
-      dropdown.innerHTML = '<div class="dropdown-empty">Sin resultados</div>';
-      return;
+    const allOpts = Array.from(select.options);
+    // La primera opción (valor vacío, típicamente "Todos") queda siempre fija arriba,
+    // sin filtrar, para poder volver a la vista sin selección en cualquier momento.
+    const resetOpt = allOpts.find(o=> o.value==='');
+    const rest = allOpts.filter(o=> o.value!=='').filter(o=> !term || optionLabel(o).toLowerCase().includes(term));
+    let html = '';
+    if(resetOpt){
+      html += `<div class="dropdown-item dropdown-item-reset" data-value="">${esc(optionLabel(resetOpt))}</div>`;
     }
-    dropdown.innerHTML = opts.map(o=>`<div class="dropdown-item" data-value="${esc(o.value)}">${esc(optionLabel(o))}</div>`).join('');
+    if(!rest.length){
+      if(!resetOpt) { dropdown.innerHTML = '<div class="dropdown-empty">Sin resultados</div>'; return; }
+    } else {
+      html += rest.map(o=>`<div class="dropdown-item" data-value="${esc(o.value)}">${esc(optionLabel(o))}</div>`).join('');
+    }
+    dropdown.innerHTML = html;
   }
 
   function syncFromSelect(){
     const opt = select.options[select.selectedIndex];
-    input.value = (opt && opt.value) ? optionLabel(opt) : '';
+    input.value = opt ? optionLabel(opt) : '';
   }
   syncFromSelect();
 
