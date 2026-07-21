@@ -343,8 +343,6 @@
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo de contrato</label><select id="c-tipoContrato"><option>Renovable</option><option>No Renovable</option></select></div>
-              <div class="field"><label>Periodo (ej: 12 meses)</label><input id="c-periodoContrato" placeholder="Ej: 12 meses"></div>
-              <div class="field"><label>Duración contrato (# meses)</label><input id="c-duracionMeses" type="number" min="1" placeholder="Ej: 12"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo ajuste IPC</label><select id="c-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select></div>
@@ -404,7 +402,6 @@
         <div class="line-row" style="margin-bottom:16px">
           <div class="field"><label>Contrato vigente</label><select id="h-contratoId-activo"></select></div>
           <div class="field"><label>Contrato histórico</label><select id="h-contratoId-historico"></select></div>
-          <div class="field" id="h-mesano-wrap" style="display:none"><label>Mes / Año</label><select id="h-mesano-filter"></select></div>
         </div>
         <div id="historial-table" class="table-wrap"></div>
       </div>
@@ -1218,7 +1215,7 @@ document.getElementById('prop-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
-const contractFields = ['fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -1237,21 +1234,6 @@ function renderContractSelects(){
     ? disponibles.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.direccion)} ${esc(p.unidad||'')}</label>`).join('')
     : '<div class="empty-note">No hay propiedades disponibles (todas están arrendadas en un contrato activo).</div>';
 }
-
-// Sugerencia de conveniencia: si el usuario no ha escrito una fecha de fin a mano, se calcula
-// sola a partir de inicio + duración — pero queda guardada como dato real y editable, no fórmula.
-function sugerirFechaFinContrato(){
-  const finInput = document.getElementById('c-fechaFinContrato');
-  if(finInput.dataset.tocado==='1') return; // el usuario ya la editó a mano, no la pisamos
-  const inicio = document.getElementById('c-fechaInicioContrato').value;
-  const duracion = document.getElementById('c-duracionMeses').value;
-  if(inicio && duracion){
-    finInput.value = toISO(addMonths(inicio, Number(duracion)));
-  }
-}
-document.getElementById('c-fechaInicioContrato').addEventListener('input', sugerirFechaFinContrato);
-document.getElementById('c-duracionMeses').addEventListener('input', sugerirFechaFinContrato);
-document.getElementById('c-fechaFinContrato').addEventListener('input', ()=>{ document.getElementById('c-fechaFinContrato').dataset.tocado='1'; });
 
 document.getElementById('form-arrendatario-contrato').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -1293,7 +1275,6 @@ function resetTenantContractForm(){
   editingTenant = null;
   editingContract = null;
   document.getElementById('form-arrendatario-contrato').reset();
-  delete document.getElementById('c-fechaFinContrato').dataset.tocado;
   document.getElementById('tc-form-title').textContent='🏢 Nuevo arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='none';
   renderContractSelects();
@@ -1307,8 +1288,6 @@ function editTenantContract(tenantId, contractId){
   editingContract = contractId;
   tenantFields.forEach(f=> document.getElementById('t-'+f).value = t[f] || '');
   contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
-  // si ya tenía una fecha de fin guardada, no la sobrescribas sola al tocar inicio/duración
-  document.getElementById('c-fechaFinContrato').dataset.tocado = c.fechaFinContrato ? '1' : '';
   renderContractSelects();
   const seleccionadas = contractPropertyIds(c);
   document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
@@ -1950,9 +1929,6 @@ function renderHistorialSelects(){
 
   if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
   if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
-
-  const contratoId = selActivo.value || selHist.value;
-  document.getElementById('h-mesano-wrap').style.display = contratoId ? 'none' : 'block';
 }
 document.getElementById('h-contratoId-activo').addEventListener('change', ()=>{
   if(document.getElementById('h-contratoId-activo').value) document.getElementById('h-contratoId-historico').value = '';
@@ -1962,7 +1938,6 @@ document.getElementById('h-contratoId-historico').addEventListener('change', ()=
   if(document.getElementById('h-contratoId-historico').value) document.getElementById('h-contratoId-activo').value = '';
   renderHistorial();
 });
-document.getElementById('h-mesano-filter').addEventListener('change', renderHistorial);
 
 function truncateText(str, n){
   str = str || '';
@@ -1995,19 +1970,8 @@ function monthsBetween(startDateStr){
 let historialTodosVerTodo = false;
 function renderHistorialTodos(){
   const el = document.getElementById('historial-table');
-  const mesanoSel = document.getElementById('h-mesano-filter');
 
-  const clavesMes = [...new Set(payments.filter(p=>p.fechaPago).map(p=>p.fechaPago.slice(0,7)))].sort().reverse();
-  const currentMesano = mesanoSel.value;
-  mesanoSel.innerHTML = '<option value="">Todos los meses</option>' + clavesMes.map(k=>{
-    const [y,m] = k.split('-');
-    return `<option value="${k}">${MESES_ES[Number(m)-1]} ${y}</option>`;
-  }).join('');
-  if(clavesMes.includes(currentMesano)) mesanoSel.value = currentMesano;
-
-  const filtroMes = mesanoSel.value;
-  let list = payments.filter(p=> !filtroMes || (p.fechaPago||'').slice(0,7)===filtroMes)
-                      .sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
+  let list = payments.slice().sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
   list = sortRows('payments-todos', list, {
     contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
     descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>Number(p.valorArriendo||0), comentarios: p=>p.comentarios||''
