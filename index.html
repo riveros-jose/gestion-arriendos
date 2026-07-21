@@ -339,6 +339,7 @@
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required></div>
               <div class="field"><label>Fecha firma contrato</label><input id="c-fechaFirmaContrato" type="date"></div>
+              <div class="field"><label>Fecha fin contrato</label><input id="c-fechaFinContrato" type="date"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo de contrato</label><select id="c-tipoContrato"><option>Renovable</option><option>No Renovable</option></select></div>
@@ -802,7 +803,7 @@ function styleWorksheet(ws, widths){
 
 // Da formato real a las columnas de fecha (como fecha, no texto) y de plata (entero con formato $ CLP),
 // según el nombre de cada columna en "headers" (mismo orden con el que se armaron las filas).
-const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaLectura','fechaTermino'];
+const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
 const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto'];
 function applyColumnFormats(ws, headers){
   if(!ws['!ref']) return;
@@ -816,7 +817,7 @@ function applyColumnFormats(ws, headers){
       const cell = ws[addr];
       if(!cell || cell.v==='' || cell.v==null) continue;
       if(esFecha){
-        const d = new Date(String(cell.v)+'T00:00:00');
+        const d = new Date(String(cell.v)+'T00:00:00Z');
         if(!isNaN(d)){ cell.t = 'd'; cell.v = d; cell.z = 'dd-mm-yyyy'; }
       } else if(esMoneda){
         const n = Number(cell.v);
@@ -854,14 +855,14 @@ function buildWorkbook(){
     direccion: propAddresses(c),
     nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
-    fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato,
+    fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato, fechaFinContrato: c.fechaFinContrato||'',
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
     tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral','activo','fechaTermino','deudaPactada']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,32,8,14,14]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral','activo','fechaTermino','deudaPactada']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,14,10,12,16,32,8,14,14]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -902,7 +903,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaLectura','fechaTermino'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -1217,7 +1218,7 @@ document.getElementById('prop-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
-const contractFields = ['fechaInicioContrato','fechaFirmaContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -1236,6 +1237,21 @@ function renderContractSelects(){
     ? disponibles.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.direccion)} ${esc(p.unidad||'')}</label>`).join('')
     : '<div class="empty-note">No hay propiedades disponibles (todas están arrendadas en un contrato activo).</div>';
 }
+
+// Sugerencia de conveniencia: si el usuario no ha escrito una fecha de fin a mano, se calcula
+// sola a partir de inicio + duración — pero queda guardada como dato real y editable, no fórmula.
+function sugerirFechaFinContrato(){
+  const finInput = document.getElementById('c-fechaFinContrato');
+  if(finInput.dataset.tocado==='1') return; // el usuario ya la editó a mano, no la pisamos
+  const inicio = document.getElementById('c-fechaInicioContrato').value;
+  const duracion = document.getElementById('c-duracionMeses').value;
+  if(inicio && duracion){
+    finInput.value = toISO(addMonths(inicio, Number(duracion)));
+  }
+}
+document.getElementById('c-fechaInicioContrato').addEventListener('input', sugerirFechaFinContrato);
+document.getElementById('c-duracionMeses').addEventListener('input', sugerirFechaFinContrato);
+document.getElementById('c-fechaFinContrato').addEventListener('input', ()=>{ document.getElementById('c-fechaFinContrato').dataset.tocado='1'; });
 
 document.getElementById('form-arrendatario-contrato').addEventListener('submit', async e=>{
   e.preventDefault();
@@ -1277,6 +1293,7 @@ function resetTenantContractForm(){
   editingTenant = null;
   editingContract = null;
   document.getElementById('form-arrendatario-contrato').reset();
+  delete document.getElementById('c-fechaFinContrato').dataset.tocado;
   document.getElementById('tc-form-title').textContent='🏢 Nuevo arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='none';
   renderContractSelects();
@@ -1290,6 +1307,8 @@ function editTenantContract(tenantId, contractId){
   editingContract = contractId;
   tenantFields.forEach(f=> document.getElementById('t-'+f).value = t[f] || '');
   contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
+  // si ya tenía una fecha de fin guardada, no la sobrescribas sola al tocar inicio/duración
+  document.getElementById('c-fechaFinContrato').dataset.tocado = c.fechaFinContrato ? '1' : '';
   renderContractSelects();
   const seleccionadas = contractPropertyIds(c);
   document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
@@ -1426,7 +1445,8 @@ function renderTenantsContracts(){
   el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('tenants','nemo','Nemo')}${sortChip('tenants','nombreSociedad','Sociedad')}${sortChip('tenants','fechaInicioContrato','Inicio contrato')}${sortChip('tenants','montoArriendoPactado','Monto pactado')}</div>` +
   rows.map((c,idx)=>{
     const t = tenants.find(x=>x.id===c.tenantId) || {};
-    const fechaFin = (c.fechaInicioContrato && c.duracionMeses) ? formatDate(toISO(addMonths(c.fechaInicioContrato, Number(c.duracionMeses)))) : '—';
+    const finCalc = contractEndDate(c);
+    const fechaFin = finCalc ? formatDate(toISO(finCalc)) : '—';
     return `<div class="prop-card">
       <div class="prop-card-header">
         <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
@@ -1670,7 +1690,7 @@ function renderResumen(){
 }
 
 // ---------- ALERTAS (por contrato) ----------
-function addMonths(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setMonth(d.getMonth()+n); return d; }
+function addMonths(dateStr, n){ const d = new Date(dateStr+'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth()+n); return d; }
 function toISO(d){ return (d instanceof Date && !isNaN(d)) ? d.toISOString().slice(0,10) : ''; }
 function monthsUntil(targetDate){
   const now = new Date(); now.setHours(0,0,0,0);
@@ -1687,11 +1707,19 @@ function nextIpcDate(fechaInicio, intervalo){
   while(next <= now && guard < 200){ next = new Date(next); next.setMonth(next.getMonth()+intervalo); guard++; }
   return next;
 }
+// Fecha de fin real de un contrato: usa el valor guardado explícitamente si existe;
+// si no, la calcula como respaldo (inicio + duración) para contratos antiguos que aún no la tienen.
+function contractEndDate(c){
+  if(c.fechaFinContrato) return new Date(c.fechaFinContrato+'T00:00:00Z');
+  if(c.duracionMeses && c.fechaInicioContrato) return addMonths(c.fechaInicioContrato, Number(c.duracionMeses));
+  return null;
+}
+
 function buildAlerts(){
   const alerts = [];
   contracts.filter(isActiveContract).forEach(c=>{
-    if(c.duracionMeses && c.fechaInicioContrato){
-      const venc = addMonths(c.fechaInicioContrato, Number(c.duracionMeses));
+    const venc = contractEndDate(c);
+    if(venc){
       const m = monthsUntil(toISO(venc));
       if(m===1||m===2||m===3){ alerts.push({c, tipo:'Vencimiento de contrato', meses:m, fecha:toISO(venc)}); }
       else if(m<0){ alerts.push({c, tipo:'Contrato vencido', meses:m, fecha:toISO(venc), vencido:true}); }
@@ -1722,18 +1750,37 @@ function renderAlertas(){
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="when">${when}</div>
-        ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="renewContract('${a.c.id}')">Renovar 1 año</button>` : ''}
+        ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="updateContractFromAlert('${a.c.id}')">Actualizar contrato</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-async function renewContract(id){
+// Al "actualizar" un contrato vencido: extiende la fecha de fin guardada en 1 año, y de paso
+// consulta si el valor de arriendo también cambia (quedando como el nuevo valor vigente).
+async function updateContractFromAlert(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
   const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
-  if(!confirm(`Vas a renovar el contrato de:\n${label}\n\nSe extiende la fecha de fin del contrato en 1 año más (12 meses) desde el vencimiento actual. ¿Continuar?`)) return;
-  c.duracionMeses = Number(c.duracionMeses||0) + 12;
+  const vencActual = contractEndDate(c);
+  if(!vencActual){ alert('Este contrato no tiene una fecha de fin calculable (falta fecha de inicio o duración).'); return; }
+
+  const nuevaFin = new Date(vencActual);
+  nuevaFin.setUTCFullYear(nuevaFin.getUTCFullYear()+1);
+  const nuevaFinISO = toISO(nuevaFin);
+
+  if(!confirm(`Vas a actualizar el contrato de:\n${label}\n\nLa fecha de fin de contrato pasará de ${formatDate(toISO(vencActual))} a ${formatDate(nuevaFinISO)} (1 año más). ¿Continuar?`)) return;
+
+  const montoActual = Number(c.montoArriendoPactado||0);
+  const nuevoMontoStr = prompt(`Valor de arriendo actual: ${money(montoActual)}\n\n¿Quieres actualizarlo? Escribe el nuevo monto y presiona OK, o deja el mismo valor si no cambia.`, String(montoActual));
+  if(nuevoMontoStr===null) return; // canceló toda la operación
+
+  c.fechaFinContrato = nuevaFinISO;
+  const nuevoMonto = Number(nuevoMontoStr.replace(/[.$\s]/g,''));
+  if(!isNaN(nuevoMonto) && nuevoMonto>0){
+    c.montoArriendoPactado = nuevoMonto;
+  }
+
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
   renderAll();
