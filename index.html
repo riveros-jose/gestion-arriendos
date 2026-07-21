@@ -11,17 +11,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#EEF1EF;
-    --card:#FFFFFF;
-    --ink:#16261F;
-    --ink-soft:#4B5951;
-    --border:#D7DBD6;
-    --teal:#2B6F5C;
-    --teal-dark:#1E5445;
-    --brick:#B4432E;
-    --brick-soft:#F4E3DF;
-    --teal-soft:#E1EEE9;
-    --gold:#B98B2A;
+    --paper:#EEF1EF; --card:#FFFFFF; --ink:#16261F; --ink-soft:#4B5951; --border:#D7DBD6;
+    --teal:#2B6F5C; --teal-dark:#1E5445; --brick:#B4432E; --brick-soft:#F4E3DF; --teal-soft:#E1EEE9;
+    --gold:#B98B2A; --blue:#2C5FA8; --blue-light:#9DC0EA; --gray-line:#7C8A82;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
@@ -69,12 +61,6 @@
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
   .empty{color:var(--ink-soft);font-size:13.5px;padding:20px 0;text-align:center;}
-  .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
-  .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
-  .stat .label{font-size:11.5px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);margin-bottom:6px;}
-  .stat .value{font-family:'Inter',sans-serif;font-size:22px;font-weight:600;}
-  .stat.warn .value{color:var(--brick);}
-  .stat.good .value{color:var(--teal-dark);}
   .tab-section{display:none;}
   .tab-section.active{display:block;}
   select.filter{max-width:320px;margin-bottom:16px;}
@@ -107,12 +93,10 @@
   .line-group{border-top:1px solid var(--border);padding-top:16px;margin-top:16px;}
   .line-group:first-child{border-top:none;margin-top:0;padding-top:0;}
   .line-group h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);margin:0 0 10px;font-weight:700;}
-  .table-wrap h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);margin:0 0 10px;font-weight:700;}
   .line-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .table-wrap table th:first-child, .table-wrap table td:first-child{
-    position:sticky; left:0; z-index:2; background:var(--card);
-    box-shadow:2px 0 4px -2px rgba(0,0,0,0.12);
+    position:sticky; left:0; z-index:2; background:var(--card); box-shadow:2px 0 4px -2px rgba(0,0,0,0.12);
   }
   .table-wrap table th:first-child{ z-index:3; background:var(--card); }
   .table-wrap table tr:hover td:first-child{ background:#FAFBFA; }
@@ -123,15 +107,10 @@
   .checkbox-list label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--ink);padding:4px 0;cursor:pointer;}
   .checkbox-list input[type="checkbox"]{width:15px;height:15px;flex-shrink:0;}
   .checkbox-list .empty-note{font-size:12.5px;color:var(--ink-soft);padding:4px 0;}
-  .sort-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;font-size:12.5px;color:var(--ink-soft);}
-  .sort-chip{padding:6px 12px;font-size:11.5px;}
-  .sort-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);}
   .prop-card{border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#fdfdfc;}
   .prop-card-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
   .prop-card-dir{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink);}
   .card-index{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink-soft);}
-  .searchable-select{position:relative;}
-  .searchable-select input{width:100%;}
   .prop-card-unidad{font-size:13px;color:var(--ink-soft);}
   .prop-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 16px;}
   .prop-field{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -145,14 +124,19 @@
   .mini-reload{cursor:pointer;font-size:14px;margin-left:8px;color:var(--ink-soft);display:inline-block;transition:transform .2s;}
   .mini-reload:hover{color:var(--teal-dark);transform:rotate(75deg);}
 
-  /* ===== RESPONSIVE (tablet / mobile) ===== */
+  /* ===== combobox ===== */
+  .combo-wrap{position:relative;}
+  .combo-input{width:100%;cursor:pointer;}
+  .combo-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:230px;overflow-y:auto;z-index:80;box-shadow:0 10px 24px rgba(0,0,0,0.14);display:none;}
+  .combo-panel.open{display:block;}
+  .combo-opt{padding:9px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);}
+  .combo-opt:hover,.combo-opt.hl{background:var(--teal-soft);}
+  .combo-opt.sel{font-weight:600;color:var(--teal-dark);}
+  .combo-empty{padding:9px 12px;font-size:12.5px;color:var(--ink-soft);}
+
   @media (max-width: 860px){
     .app{flex-direction:column;}
-    .sidebar{
-      width:100%;flex-direction:row;align-items:center;
-      padding:10px 12px;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;
-      position:sticky;top:0;z-index:500;
-    }
+    .sidebar{width:100%;flex-direction:row;align-items:center;padding:10px 12px;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:0;z-index:500;}
     .brand{padding:0 14px 0 0;margin:0;border-bottom:none;border-right:1px solid rgba(238,241,239,0.15);flex-shrink:0;font-size:16px;white-space:nowrap;}
     .brand span{display:none;}
     .sidebar-foot{display:none;}
@@ -163,7 +147,6 @@
     .card{padding:18px;}
     .grid{grid-template-columns:1fr;}
     .line-row{grid-template-columns:1fr;}
-    .summary-cards{grid-template-columns:repeat(2,1fr);}
     .drive-bar{flex-wrap:wrap;row-gap:10px;}
     .drive-bar .drive-status{order:1;flex:1 1 100%;}
     .drive-bar button{margin-left:0;}
@@ -174,14 +157,9 @@
     .alert-card .when{margin-left:0;}
     .prop-fields-grid{grid-template-columns:1fr !important;}
     .prop-card{padding:14px;}
-    .table-wrap table th:first-child, .table-wrap table td:first-child{
-      position:static; box-shadow:none;
-    }
-    .sort-bar{gap:6px;}
-    .sort-chip{padding:5px 10px;font-size:11px;}
+    .table-wrap table th:first-child, .table-wrap table td:first-child{position:static; box-shadow:none;}
   }
   @media (max-width: 480px){
-    .summary-cards{grid-template-columns:1fr;}
     .btn-row{flex-direction:column;}
     .btn-row .btn{width:100%;}
   }
@@ -221,9 +199,9 @@
     <div class="drive-bar">
       <span class="dot" id="drive-dot"></span>
       <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
-      <button class="btn btn-secondary" id="drive-reload-btn" title="Vuelve a leer el Excel de Drive (por si lo editaste a mano)">Recargar desde Excel</button>
-      <button class="btn btn-secondary" id="drive-pick-btn" style="display:none" title="Elige a mano el archivo Excel en tu Drive">📂 Seleccionar archivo en Drive</button>
-      <button class="btn btn-secondary" id="drive-disconnect-btn" style="display:none" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
+      <button class="btn btn-secondary" id="drive-reload-btn" title="Vuelve a leer el Excel de Drive">Recargar desde Excel</button>
+      <button class="btn btn-secondary" id="drive-pick-btn" style="display:none">📂 Seleccionar archivo en Drive</button>
+      <button class="btn btn-secondary" id="drive-disconnect-btn" style="display:none">Cambiar cuenta</button>
       <button class="btn btn-secondary" id="drive-connect-btn">Conectar con Google Drive</button>
     </div>
     <div class="drive-note" id="drive-note"></div>
@@ -233,10 +211,13 @@
       <h1>🏠 Propiedades</h1>
       <div class="subtitle">Registro de inmuebles de la cartera.</div>
       <div class="card">
-        <div class="toggle-form"><h2 id="prop-form-title">🏠 Nueva propiedad</h2></div>
+        <div class="collapsible-header" onclick="toggleCollapse('propForm')">
+          <h2 id="prop-form-title">🏠 Nueva propiedad</h2>
+          <span class="collapse-arrow" id="propForm-arrow">▸</span>
+        </div>
+        <div id="propForm-list-wrap" style="display:none">
         <form id="form-propiedad">
           <input type="hidden" id="p-id">
-
           <div class="line-group">
             <div class="line-row">
               <div class="field"><label>Dirección</label><input id="p-direccion" required></div>
@@ -283,16 +264,16 @@
               <div class="field"><label>Contribuciones ($)</label><input id="p-contribuciones" type="number"></div>
             </div>
           </div>
-
           <div class="btn-row">
             <button type="submit" class="btn btn-primary">Guardar propiedad</button>
             <button type="button" class="btn btn-secondary" id="p-cancel" style="display:none">Cancelar edición</button>
           </div>
           <div class="status-msg" id="p-status"></div>
         </form>
+        </div>
       </div>
       <div class="card">
-        <h2>📋 Propiedades registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <h2>📋 Propiedades registradas <span class="mini-reload" onclick="reloadFromDrive()">⟳</span></h2>
         <input type="text" id="prop-search" class="filter" placeholder="🔎 Buscar propiedad (dirección, unidad, propietario…)" style="width:100%;max-width:420px;margin-bottom:14px;">
         <div class="subtabs" id="prop-subtabs">
           <button type="button" class="subtab-btn active" data-subtab="prop1">📜 Antecedentes e Inscripción CBR</button>
@@ -307,9 +288,12 @@
     <div class="tab-section" id="tab-arrendatarios">
       <h1>📄 Arrendatarios &amp; Contratos</h1>
       <div class="subtitle">Registra el arrendatario junto con su contrato — van siempre de la mano.</div>
-
       <div class="card">
-        <h2 id="tc-form-title">🏢 Nuevo arrendatario y contrato</h2>
+        <div class="collapsible-header" onclick="toggleCollapse('tcForm')">
+          <h2 id="tc-form-title">🏢 Nuevo arrendatario y contrato</h2>
+          <span class="collapse-arrow" id="tcForm-arrow">▸</span>
+        </div>
+        <div id="tcForm-list-wrap" style="display:none">
         <form id="form-arrendatario-contrato">
           <input type="hidden" id="t-id">
           <input type="hidden" id="c-id">
@@ -362,14 +346,15 @@
           </div>
           <div class="status-msg" id="tc-status"></div>
         </form>
+        </div>
       </div>
-
       <div class="card">
         <div class="collapsible-header" onclick="toggleCollapse('tenants')">
-          <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" title="Recargar desde Excel" onclick="event.stopPropagation();reloadFromDrive()">⟳</span></h2>
+          <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" onclick="event.stopPropagation();reloadFromDrive()">⟳</span></h2>
           <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
         </div>
         <div id="tenants-list-wrap" style="display:block">
+          <input type="text" id="tenant-search" class="filter" placeholder="🔎 Buscar arrendatario, sociedad, dirección…" style="width:100%;max-width:420px;margin-bottom:14px;">
           <div id="tenant-table" class="table-wrap"></div>
         </div>
       </div>
@@ -388,9 +373,7 @@
             <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
             <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="number" required></div>
             <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="number" value="0"></div>
-            <div class="field"><label>Medio de pago</label>
-              <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
-            </div>
+            <div class="field"><label>Medio de pago</label><select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select></div>
             <div class="field full"><label>Comentarios</label><textarea id="pay-comentarios"></textarea></div>
             <div class="field"><label>Valor arriendo del periodo ($) — opcional</label><input id="pay-valorArriendo" type="number" placeholder="Se autocompleta con el valor actual del contrato"></div>
           </div>
@@ -402,7 +385,7 @@
         </form>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>📅 Historial de pagos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos a Google Drive</button></div>
+        <div class="toggle-form"><h2>📅 Historial de pagos <span class="mini-reload" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-payments-btn">Exportar pagos a Google Drive</button></div>
         <div class="line-row" style="margin-bottom:16px">
           <div class="field"><label>Contrato vigente</label><select id="h-contratoId-activo"></select></div>
           <div class="field"><label>Contrato histórico</label><select id="h-contratoId-historico"></select></div>
@@ -416,16 +399,16 @@
       <h1>📊 Resumen &amp; Deudas</h1>
       <div class="subtitle">Estado de pago por contrato, a la fecha de hoy.</div>
       <div class="card">
-        <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="resumen-filter"></select>
         <div id="resumen-table" class="table-wrap"></div>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
+        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
         <div id="resumen-impagos" class="table-wrap"></div>
       </div>
       <div class="card">
-        <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" onclick="reloadFromDrive()">⟳</span></h2>
         <div class="line-row" style="margin-bottom:12px;max-width:420px">
           <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
         </div>
@@ -441,10 +424,7 @@
     <div class="tab-section" id="tab-alertas">
       <h1>🔔 Alertas</h1>
       <div class="subtitle">Avisos de vencimiento de contrato y de ajuste de IPC, con 3, 2 y 1 mes de anticipación.</div>
-      <div class="card">
-        <h2>🔔 Próximos vencimientos y ajustes</h2>
-        <div id="alertas-list"></div>
-      </div>
+      <div class="card"><h2>🔔 Próximos vencimientos y ajustes</h2><div id="alertas-list"></div></div>
     </div>
 
     <!-- SERVICIOS -->
@@ -461,9 +441,7 @@
             <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required></div>
-            <div class="field"><label>Estado de pago</label>
-              <select id="r-estado"><option selected>Pendiente</option><option>Pagado</option></select>
-            </div>
+            <div class="field"><label>Estado de pago</label><select id="r-estado"><option selected>Pendiente</option><option>Pagado</option></select></div>
             <div class="field full"><label>Comentarios</label><textarea id="r-comentarios"></textarea></div>
           </div>
           <div class="btn-row">
@@ -474,18 +452,18 @@
         </form>
       </div>
       <div class="card">
-        <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <h2>🔧 Lecturas registradas <span class="mini-reload" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="r-filter"></select>
         <div id="reading-table" class="table-wrap"></div>
       </div>
     </div>
 
-    <!-- HISTORIAL MENSUAL -->
     <!-- ARRENDATARIOS HISTÓRICOS -->
     <div class="tab-section" id="tab-historicos">
       <h1>🗂️ Arrendatarios Históricos</h1>
       <div class="subtitle">Arrendatarios cuyo contrato ya terminó. No cuentan en la deuda vigente ni en las alertas. Si quedaron con deuda pactada, puedes seguir abonando desde la pestaña "Pagos" — aparecen ahí marcados como "Cobranza" mientras tengan saldo pendiente.</div>
       <div class="card">
+        <input type="text" id="historicos-search" class="filter" placeholder="🔎 Buscar arrendatario o dirección…" style="width:100%;max-width:420px;margin-bottom:14px;">
         <div id="historicos-table" class="table-wrap"></div>
       </div>
     </div>
@@ -499,100 +477,65 @@ const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.goo
 const GOOGLE_API_KEY = 'PEGA_AQUI_TU_API_KEY';
 const SHARED_FOLDER_ID = '';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-
 const DRIVE_FOLDER_NAME = 'RentaPro';
 const DRIVE_FILENAME = 'registros-arriendos.xlsx';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DRIVE_HINT_KEY = 'arriendos_drive_connected_hint';
 
-let tokenClient = null;
-let driveToken = null;
-let driveFolderId = null;
-let driveFileId = null;
-let hasLoadedFromDrive = false;
-let tokenRefreshTimer = null;
-let driveSyncBusy = false;
-let driveSyncQueued = false;
+let tokenClient = null, driveToken = null, driveFolderId = null, driveFileId = null;
+let hasLoadedFromDrive = false, tokenRefreshTimer = null, driveSyncBusy = false, driveSyncQueued = false;
 
-function driveConfigured(){
-  return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('PEGA_AQUI');
-}
-
+function driveConfigured(){ return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('PEGA_AQUI'); }
 function setDriveStatus(text, connected){
   document.getElementById('drive-status').textContent = 'Google Drive: '+text;
   document.getElementById('drive-dot').classList.toggle('on', !!connected);
 }
-
 function showDriveGate(){ document.getElementById('drive-gate-overlay').style.display = 'flex'; }
 function hideDriveGate(){ document.getElementById('drive-gate-overlay').style.display = 'none'; }
 function setGateChecking(isChecking){
   document.getElementById('drive-gate-checking').style.display = isChecking ? 'block' : 'none';
   document.getElementById('drive-gate-action').style.display = isChecking ? 'none' : 'block';
 }
-
 function rememberConnectedHint(){ try{ localStorage.setItem(DRIVE_HINT_KEY, DRIVE_SCOPE); }catch(e){} }
 function hadConnectedBefore(){ try{ return localStorage.getItem(DRIVE_HINT_KEY) === DRIVE_SCOPE; }catch(e){ return false; } }
 function forgetConnectedHint(){ try{ localStorage.removeItem(DRIVE_HINT_KEY); }catch(e){} }
 
 function initGoogleDrive(){
   if(SHARED_FOLDER_ID){
-    document.getElementById('drive-note').textContent = 'Modo compartido: todos los usuarios conectados ven y editan el mismo archivo en la carpeta RentaPro. Los cambios de dos personas al mismo tiempo pueden pisarse entre sí (gana el último guardado).';
+    document.getElementById('drive-note').textContent = 'Modo compartido: todos los usuarios conectados ven y editan el mismo archivo en la carpeta RentaPro.';
   }
   if(!driveConfigured()){
     setDriveStatus('falta configurar tu Client ID (ver instrucciones)', false);
     document.getElementById('drive-connect-btn').disabled = true;
-    showDriveGate();
-    setGateChecking(false);
+    showDriveGate(); setGateChecking(false);
     document.getElementById('drive-gate-msg').textContent = 'Este sitio todavía no tiene configurada la conexión con Google Drive.';
     document.getElementById('drive-gate-connect-btn').style.display = 'none';
     return;
   }
   if(typeof google === 'undefined' || !google.accounts){ setTimeout(initGoogleDrive,300); return; }
-
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: DRIVE_SCOPE,
-    callback: handleTokenResponse
-  });
-
+  tokenClient = google.accounts.oauth2.initTokenClient({ client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, callback: handleTokenResponse });
   attemptSilentConnect();
 }
 window.addEventListener('load', initGoogleDrive);
 
 async function handleTokenResponse(resp){
-  if(resp.error){
-    driveToken = null;
-    setDriveStatus('no conectado', false);
-    setGateChecking(false);
-    showDriveGate();
-    return;
-  }
+  if(resp.error){ driveToken = null; setDriveStatus('no conectado', false); setGateChecking(false); showDriveGate(); return; }
   driveToken = resp.access_token;
   rememberConnectedHint();
   scheduleTokenRefresh(resp.expires_in);
   setDriveStatus('conectado ✓ sincronizando…', true);
   document.getElementById('drive-connect-btn').textContent = 'Sincronizar ahora';
   hideDriveGate();
-  if(!hasLoadedFromDrive){
-    hasLoadedFromDrive = true;
-    await driveSync(true);
-  } else {
-    await driveSync(false);
-  }
+  if(!hasLoadedFromDrive){ hasLoadedFromDrive = true; await driveSync(true); } else { await driveSync(false); }
 }
 
 function attemptSilentConnect(){
-  showDriveGate();
-  setGateChecking(true);
+  showDriveGate(); setGateChecking(true);
   if(!hadConnectedBefore()){ setGateChecking(false); return; }
   let resolved = false;
   const timeout = setTimeout(()=>{ if(!resolved){ resolved = true; setGateChecking(false); } }, 4000);
   const originalCallback = tokenClient.callback;
-  tokenClient.callback = (resp)=>{
-    if(!resolved){ resolved = true; clearTimeout(timeout); }
-    tokenClient.callback = originalCallback;
-    originalCallback(resp);
-  };
+  tokenClient.callback = (resp)=>{ if(!resolved){ resolved = true; clearTimeout(timeout); } tokenClient.callback = originalCallback; originalCallback(resp); };
   tokenClient.requestAccessToken({ prompt: '' });
 }
 
@@ -604,26 +547,23 @@ function requestDriveConnection(){
 document.getElementById('drive-connect-btn').addEventListener('click', requestDriveConnection);
 document.getElementById('drive-gate-connect-btn').addEventListener('click', requestDriveConnection);
 
-// ---- Recarga desde Excel (botón de la barra + íconos ⟳ de cada sección) ----
 function reloadFromDrive(){
   if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
-  if(!confirm('Esto va a reemplazar lo que ves en pantalla por lo que esté guardado ahora mismo en el Excel de Drive (incluyendo ediciones manuales). ¿Continuar?')) return;
-  driveFileId = null;
-  driveFolderId = null;
+  if(!confirm('Esto va a reemplazar lo que ves en pantalla por lo que esté guardado ahora mismo en el Excel de Drive. ¿Continuar?')) return;
+  driveFileId = null; driveFolderId = null;
   setDriveStatus('recargando desde Excel…', true);
   driveSync(true);
 }
 document.getElementById('drive-reload-btn').addEventListener('click', reloadFromDrive);
 
 document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
-  if(!confirm('Esto cerrará tu sesión de Google Drive en este navegador y pedirá reconectar. ¿Continuar?')) return;
+  if(!confirm('Esto cerrará tu sesión de Google Drive en este navegador. ¿Continuar?')) return;
   if(driveToken && google.accounts && google.accounts.oauth2){ google.accounts.oauth2.revoke(driveToken, ()=>{}); }
   driveToken = null; driveFolderId = null; driveFileId = null; hasLoadedFromDrive = false;
   if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
   forgetConnectedHint();
   setDriveStatus('no conectado', false);
-  showDriveGate();
-  setGateChecking(false);
+  showDriveGate(); setGateChecking(false);
 });
 
 function scheduleTokenRefresh(expiresInSec){
@@ -632,40 +572,21 @@ function scheduleTokenRefresh(expiresInSec){
   tokenRefreshTimer = setTimeout(()=>{ if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); }, ms);
 }
 
-// ---- Selector de archivos (Google Picker) — oculto en la UI, se mantiene disponible por si se necesita ----
 let pickerLibLoaded = false;
-
 function ensurePickerLib(){
   return new Promise((resolve, reject)=>{
     if(pickerLibLoaded){ resolve(); return; }
-    if(typeof gapi === 'undefined'){ reject(new Error('Librería de Google (gapi) no cargó todavía. Intenta de nuevo en un segundo.')); return; }
+    if(typeof gapi === 'undefined'){ reject(new Error('Librería de Google (gapi) no cargó todavía.')); return; }
     gapi.load('picker', { callback: ()=>{ pickerLibLoaded = true; resolve(); }, onerror: ()=>reject(new Error('No se pudo cargar el selector de Drive.')) });
   });
 }
-
 async function openFilePicker(){
-  if(!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('PEGA_AQUI')){
-    alert('Falta configurar GOOGLE_API_KEY en el código para poder usar el selector de archivos. Revisa las instrucciones.');
-    return;
-  }
+  if(!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('PEGA_AQUI')){ alert('Falta configurar GOOGLE_API_KEY en el código.'); return; }
   if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
-  try{
-    await ensurePickerLib();
-  }catch(e){
-    alert(e.message);
-    return;
-  }
-  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-    .setMimeTypes(XLSX_MIME)
-    .setIncludeFolders(true)
-    .setSelectFolderEnabled(false);
-  const picker = new google.picker.PickerBuilder()
-    .setOAuthToken(driveToken)
-    .setDeveloperKey(GOOGLE_API_KEY)
-    .addView(view)
-    .setTitle('Elige tu archivo registros-arriendos.xlsx')
-    .setCallback(onPickerResult)
-    .build();
+  try{ await ensurePickerLib(); }catch(e){ alert(e.message); return; }
+  const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setMimeTypes(XLSX_MIME).setIncludeFolders(true).setSelectFolderEnabled(false);
+  const picker = new google.picker.PickerBuilder().setOAuthToken(driveToken).setDeveloperKey(GOOGLE_API_KEY).addView(view)
+    .setTitle('Elige tu archivo registros-arriendos.xlsx').setCallback(onPickerResult).build();
   picker.setVisible(true);
 }
 document.getElementById('drive-pick-btn').addEventListener('click', openFilePicker);
@@ -677,11 +598,8 @@ async function onPickerResult(data){
   setDriveStatus('archivo elegido, cargando…', true);
   try{
     const res = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?fields=parents`, { headers:{ Authorization:'Bearer '+driveToken } });
-    if(res.ok){
-      const meta = await res.json();
-      if(meta.parents && meta.parents[0]) driveFolderId = meta.parents[0];
-    }
-  }catch(e){ console.warn('No se pudo confirmar la carpeta del archivo elegido', e); }
+    if(res.ok){ const meta = await res.json(); if(meta.parents && meta.parents[0]) driveFolderId = meta.parents[0]; }
+  }catch(e){}
   hideDriveGate();
   await driveSync(true);
 }
@@ -694,8 +612,7 @@ async function driveFindOrCreateFolder(){
   const data = await res.json();
   if(data.files && data.files.length) return data.files[0].id;
   const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-    method:'POST',
-    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
+    method:'POST', headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
     body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType:'application/vnd.google-apps.folder' })
   });
   if(createRes.status===401) throw new Error('token expirado');
@@ -708,28 +625,13 @@ async function driveFindFile(folderId){
   let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qExact}&spaces=drive&fields=files(id,name,parents,size)`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
   let data = await res.json();
-  if(data.files && data.files.length){
-    if(data.files.length > 1){
-      document.getElementById('drive-note').textContent = `⚠ Hay ${data.files.length} archivos llamados "${DRIVE_FILENAME}" en tu carpeta RentaPro. Borra los que sobren en Drive para evitar resultados inconsistentes.`;
-      console.warn('Archivos duplicados encontrados:', data.files);
-    }
-    return data.files[0].id;
-  }
-
+  if(data.files && data.files.length) return data.files[0].id;
   const qBroad = encodeURIComponent(`name contains 'registros-arriendos' and trashed=false`);
   res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${qBroad}&spaces=drive&fields=files(id,name,parents,size)`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
   data = await res.json();
   const matches = (data.files||[]).filter(f => f.name.trim().toLowerCase() === DRIVE_FILENAME.toLowerCase());
-  if(matches.length){
-    if(matches.length > 1){
-      document.getElementById('drive-note').textContent = `⚠ Hay ${matches.length} archivos llamados "${DRIVE_FILENAME}" en tu Drive. Borra los que sobren para evitar resultados inconsistentes.`;
-      console.warn('Archivos duplicados encontrados:', matches);
-    }
-    const match = matches[0];
-    if(match.parents && match.parents[0]) driveFolderId = match.parents[0];
-    return match.id;
-  }
+  if(matches.length){ const match = matches[0]; if(match.parents && match.parents[0]) driveFolderId = match.parents[0]; return match.id; }
   return null;
 }
 
@@ -740,24 +642,18 @@ async function driveCreateXlsxFile(arrayBuffer, folderId){
   const tail = `\r\n--${boundary}--`;
   const body = new Blob([head, arrayBuffer, tail]);
   const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-    method:'POST',
-    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': `multipart/related; boundary=${boundary}` },
-    body
+    method:'POST', headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': `multipart/related; boundary=${boundary}` }, body
   });
   if(res.status===401) throw new Error('token expirado');
   const data = await res.json();
   return data.id;
 }
-
 async function driveUpdateXlsxFile(fileId, arrayBuffer){
   const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-    method:'PATCH',
-    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': XLSX_MIME },
-    body: new Blob([arrayBuffer], { type: XLSX_MIME })
+    method:'PATCH', headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': XLSX_MIME }, body: new Blob([arrayBuffer], { type: XLSX_MIME })
   });
   if(res.status===401) throw new Error('token expirado');
 }
-
 async function driveReadXlsxFile(fileId){
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
@@ -772,11 +668,7 @@ function styleWorksheet(ws, widths){
   for(let C = range.s.c; C <= range.e.c; C++){
     const addr = XLSX.utils.encode_cell({ r:0, c:C });
     if(!ws[addr]) continue;
-    ws[addr].s = {
-      font: { bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { patternType: 'solid', fgColor: { rgb: '2B6F5C' } },
-      alignment: { vertical: 'center', horizontal: 'left' }
-    };
+    ws[addr].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: '2B6F5C' } }, alignment: { vertical: 'center', horizontal: 'left' } };
   }
 }
 
@@ -806,7 +698,6 @@ function applyColumnFormats(ws, headers){
 
 function buildWorkbook(){
   const wb = XLSX.utils.book_new();
-
   const propRows = properties.length ? properties.map(p=>({
     id: p.id, direccion: p.direccion, unidad: p.unidad, m2Construidos: p.m2Construidos, m2Terreno: p.m2Terreno,
     propietario: p.propietario, rolAvaluo: p.rolAvaluo, cbrFoja: p.cbrFoja, cbrNumero: p.cbrNumero, cbrAnio: p.cbrAnio,
@@ -828,9 +719,7 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsTen, 'Arrendatarios');
 
   const contractRows = contracts.length ? contracts.map(c=>({
-    id: c.id,
-    direccion: propAddresses(c),
-    nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
+    id: c.id, direccion: propAddresses(c), nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
     fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato, fechaFinContrato: c.fechaFinContrato||'',
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
@@ -843,10 +732,8 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
-    id: p.id,
-    contrato: contractLabel(p.contratoId),
-    fechaPago: p.fechaPago, montoPagado: p.montoPagado, descuentos: p.descuentos, valorArriendo: p.valorArriendo,
-    medioPago: p.medioPago, comentarios: p.comentarios, contratoId: p.contratoId
+    id: p.id, contrato: contractLabel(p.contratoId), fechaPago: p.fechaPago, montoPagado: p.montoPagado,
+    descuentos: p.descuentos, valorArriendo: p.valorArriendo, medioPago: p.medioPago, comentarios: p.comentarios, contratoId: p.contratoId
   })) : [{}];
   const wsPay = XLSX.utils.json_to_sheet(payRows);
   applyColumnFormats(wsPay, ['id','contrato','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios','contratoId']);
@@ -854,11 +741,9 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsPay, 'Pagos');
 
   const readingRows = readings.length ? computeReadingsWithConsumption().map(r=>({
-    id: r.id,
-    arrendatario: contractLabel(r.contratoId),
-    servicio: r.servicio, fechaLectura: r.fechaLectura, lecturaAnterior: r.lecturaAnterior, lecturaActual: r.lecturaActual,
-    consumo: r.consumo, valorUnitario: r.valorUnitario, monto: r.monto, estado: r.estado, estadoEfectivo: r.estadoEfectivo,
-    comentarios: r.comentarios, contratoId: r.contratoId
+    id: r.id, arrendatario: contractLabel(r.contratoId), servicio: r.servicio, fechaLectura: r.fechaLectura,
+    lecturaAnterior: r.lecturaAnterior, lecturaActual: r.lecturaActual, consumo: r.consumo, valorUnitario: r.valorUnitario,
+    monto: r.monto, estado: r.estado, estadoEfectivo: r.estadoEfectivo, comentarios: r.comentarios, contratoId: r.contratoId
   })) : [{}];
   const wsRead = XLSX.utils.json_to_sheet(readingRows);
   applyColumnFormats(wsRead, ['id','arrendatario','servicio','fechaLectura','lecturaAnterior','lecturaActual','consumo','valorUnitario','monto','estado','estadoEfectivo','comentarios','contratoId']);
@@ -870,41 +755,28 @@ function buildWorkbook(){
 
 function excelCellToISODate(v){
   if(v instanceof Date && !isNaN(v)){
-    const y = v.getUTCFullYear();
-    const m = String(v.getUTCMonth()+1).padStart(2,'0');
-    const d = String(v.getUTCDate()).padStart(2,'0');
+    const y = v.getUTCFullYear(), m = String(v.getUTCMonth()+1).padStart(2,'0'), d = String(v.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${d}`;
   }
   return v;
 }
 const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
-function normalizeDates(obj){
-  DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
-  return obj;
-}
+function normalizeDates(obj){ DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); }); return obj; }
 
 function loadFromWorkbook(arrayBuffer){
   const wb = XLSX.read(new Uint8Array(arrayBuffer), { type:'array', cellDates: true });
-  const propSheet = wb.Sheets['Propiedades'];
-  const tenantSheet = wb.Sheets['Arrendatarios'];
-  const contractSheet = wb.Sheets['Contratos'];
-  const paySheet = wb.Sheets['Pagos'];
-  const readingSheet = wb.Sheets['Servicios'];
+  const propSheet = wb.Sheets['Propiedades'], tenantSheet = wb.Sheets['Arrendatarios'], contractSheet = wb.Sheets['Contratos'];
+  const paySheet = wb.Sheets['Pagos'], readingSheet = wb.Sheets['Servicios'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
-  contracts = contractSheet
-    ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id).map(c=> normalizeDates({
-        ...c,
-        activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
-      }))
-    : [];
+  contracts = contractSheet ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id).map(c=> normalizeDates({
+      ...c, activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
+    })) : [];
   payments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id).map(normalizeDates) : [];
-  readings = readingSheet
-    ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=> normalizeDates({
-        id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
-        lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
-      }))
-    : [];
+  readings = readingSheet ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id).map(r=> normalizeDates({
+      id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
+      lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
+    })) : [];
 }
 
 async function driveSync(isInitialLoad){
@@ -917,28 +789,17 @@ async function driveSync(isInitialLoad){
     if(isInitialLoad && driveFileId){
       const buf = await driveReadXlsxFile(driveFileId);
       loadFromWorkbook(buf);
-      await saveKey('properties',properties);
-      await saveKey('tenants',tenants);
-      await saveKey('contracts',contracts);
-      await saveKey('payments',payments);
-      await saveKey('readings',readings);
+      await saveKey('properties',properties); await saveKey('tenants',tenants); await saveKey('contracts',contracts);
+      await saveKey('payments',payments); await saveKey('readings',readings);
       renderAll();
     } else if(isInitialLoad && !driveFileId){
-      const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = crear un archivo NUEVO (vacío).');
-      if(usarPicker){
-        driveSyncBusy = false;
-        openFilePicker();
-        return;
-      }
+      const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente.\n\nAceptar = buscarlo con el selector.\nCancelar = crear un archivo NUEVO (vacío).');
+      if(usarPicker){ driveSyncBusy = false; openFilePicker(); return; }
       const buf = buildWorkbook();
       driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
     } else {
       const buf = buildWorkbook();
-      if(!driveFileId){
-        driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
-      } else {
-        await driveUpdateXlsxFile(driveFileId, buf);
-      }
+      if(!driveFileId){ driveFileId = await driveCreateXlsxFile(buf, driveFolderId); } else { await driveUpdateXlsxFile(driveFileId, buf); }
     }
     const now = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
     setDriveStatus('conectado ✓ · última sync '+now, true);
@@ -952,10 +813,8 @@ async function driveSync(isInitialLoad){
     if(driveSyncQueued){ driveSyncQueued = false; driveSync(false); }
   }
 }
-
 function pushToDriveIfConnected(){ if(driveToken) driveSync(false); }
 
-// ---- Exportar un workbook auxiliar (pagos / meses con deuda) directo a Google Drive ----
 async function exportWorkbookToDrive(wb, filenamePrefix){
   if(!driveToken){ alert('Primero conéctate a Google Drive para poder exportar.'); return; }
   try{
@@ -969,26 +828,17 @@ async function exportWorkbookToDrive(wb, filenamePrefix){
     const tail = `\r\n--${boundary}--`;
     const body = new Blob([head, buf, tail]);
     const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
-      method:'POST',
-      headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body
+      method:'POST', headers:{ Authorization:'Bearer '+driveToken, 'Content-Type': `multipart/related; boundary=${boundary}` }, body
     });
     const data = await res.json();
-    if(data.id){
-      const link = data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`;
-      window.open(link, '_blank');
-    } else {
-      alert('Hubo un problema exportando a Drive.');
-    }
-  }catch(e){
-    console.error(e);
-    alert('Error exportando a Google Drive: '+e.message);
-  }
+    if(data.id){ window.open(data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`, '_blank'); }
+    else { alert('Hubo un problema exportando a Drive.'); }
+  }catch(e){ alert('Error exportando a Google Drive: '+e.message); }
 }
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
 let properties = [], tenants = [], contracts = [], payments = [], readings = [];
-const collapseState = { tenants:true, contracts:false };
+const collapseState = { tenants:true, propForm:false, tcForm:false };
 function toggleCollapse(key){
   collapseState[key] = !collapseState[key];
   const wrap = document.getElementById(key+'-list-wrap');
@@ -996,11 +846,23 @@ function toggleCollapse(key){
   if(wrap) wrap.style.display = collapseState[key] ? 'block' : 'none';
   if(arrow) arrow.style.transform = collapseState[key] ? 'rotate(90deg)' : 'rotate(0deg)';
 }
+function expandCollapse(key){
+  collapseState[key] = true;
+  const wrap = document.getElementById(key+'-list-wrap');
+  const arrow = document.getElementById(key+'-arrow');
+  if(wrap) wrap.style.display = 'block';
+  if(arrow) arrow.style.transform = 'rotate(90deg)';
+}
+
 let editingProp = null, editingTenant = null, editingContract = null, editingPay = null, editingReading = null;
 let storageOK = true;
 const memoryStore = {};
 
 const money = n => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(n||0));
+function moneyMM(n){
+  const mm = Number(n||0)/1000000;
+  return mm.toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1})+' MM';
+}
 const formatDate = iso => {
   if(!iso) return '';
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1015,10 +877,7 @@ async function loadKey(key){
     if(typeof window.storage === 'undefined') throw new Error('no storage');
     const res = await window.storage.get(key,false);
     return res ? JSON.parse(res.value) : [];
-  }catch(e){
-    storageOK = false;
-    return memoryStore[key] ? JSON.parse(memoryStore[key]) : [];
-  }
+  }catch(e){ storageOK = false; return memoryStore[key] ? JSON.parse(memoryStore[key]) : []; }
 }
 async function saveKey(key,data){
   memoryStore[key] = JSON.stringify(data);
@@ -1026,11 +885,7 @@ async function saveKey(key,data){
     if(typeof window.storage === 'undefined') throw new Error('no storage');
     await window.storage.set(key, JSON.stringify(data), false);
     return true;
-  }catch(e){
-    storageOK = false;
-    console.error('Almacenamiento persistente no disponible, usando memoria temporal',key,e);
-    return false;
-  }
+  }catch(e){ storageOK = false; return false; }
 }
 
 async function init(){
@@ -1044,16 +899,8 @@ async function init(){
 }
 
 function renderAll(){
-  renderProperties();
-  renderContractSelects();
-  renderTenantsContracts();
-  renderPaySelects();
-  renderResumen();
-  renderAlertas();
-  renderReadingSelects();
-  renderReadings();
-  renderHistorial();
-  renderHistoricos();
+  renderProperties(); renderContractSelects(); renderTenantsContracts(); renderPaySelects();
+  renderResumen(); renderAlertas(); renderReadingSelects(); renderReadings(); renderHistorial(); renderHistoricos();
 }
 
 // ---------- NAV ----------
@@ -1073,17 +920,12 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingProp || uid() };
   propFields.forEach(f=> obj[f] = document.getElementById('p-'+f).value);
-  ['cbrFoja','cbrNumero','cbrAnio'].forEach(f=>{
-    if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.round(Number(obj[f])));
-  });
-  ['m2Construidos','m2Terreno'].forEach(f=>{
-    if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.ceil(Number(obj[f])));
-  });
-  if(editingProp){ properties = properties.map(p=> p.id===editingProp ? obj : p); }
-  else { properties.push(obj); }
+  ['cbrFoja','cbrNumero','cbrAnio'].forEach(f=>{ if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.round(Number(obj[f]))); });
+  ['m2Construidos','m2Terreno'].forEach(f=>{ if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.ceil(Number(obj[f]))); });
+  if(editingProp){ properties = properties.map(p=> p.id===editingProp ? obj : p); } else { properties.push(obj); }
   const ok = await saveKey('properties',properties);
   document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
-  document.getElementById('p-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  document.getElementById('p-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal';
   setTimeout(()=>document.getElementById('p-status').textContent='',ok?1500:4000);
   resetPropForm();
   renderAll();
@@ -1104,6 +946,7 @@ function editProperty(id){
   propFields.forEach(f=> document.getElementById('p-'+f).value = p[f] || '');
   document.getElementById('prop-form-title').textContent='🏠 Editar propiedad';
   document.getElementById('p-cancel').style.display='inline-block';
+  expandCollapse('propForm');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 async function deleteProperty(id){
@@ -1113,12 +956,6 @@ async function deleteProperty(id){
   await saveKey('properties',properties);
   renderAll();
   pushToDriveIfConnected();
-}
-function sortChip(tableId, key, label){
-  const s = sortState[tableId];
-  const arrow = (s && s.key===key) ? (s.dir===1 ? ' ▲' : ' ▼') : '';
-  const activeClass = (s && s.key===key) ? 'active' : '';
-  return `<button type="button" class="subtab-btn sort-chip ${activeClass}" onclick="toggleSort('${tableId}','${key}')">${label}${arrow}</button>`;
 }
 
 function propCardHeader(p, idx){
@@ -1130,7 +967,6 @@ function propCardHeader(p, idx){
 function propField(label, value){
   return `<div class="prop-field"><span class="lbl">${esc(label)}</span><span class="val">${value===''||value==null?'—':value}</span></div>`;
 }
-
 function propertyMatchesSearch(p, term){
   if(!term) return true;
   const haystack = [p.direccion,p.unidad,p.propietario,p.rolAvaluo,p.cbrLocalidad,p.clienteLuz,p.clienteAgua,p.clienteGas]
@@ -1142,68 +978,44 @@ function renderProperties(){
   const el = document.getElementById('prop-table');
   if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
   const term = (document.getElementById('prop-search').value||'').trim().toLowerCase();
-  const list = properties.filter(p=>propertyMatchesSearch(p,term));
+  let list = properties.filter(p=>propertyMatchesSearch(p,term));
   if(!list.length){ el.innerHTML=`<div class="empty">No se encontraron propiedades para "${esc(term)}".</div>`; return; }
+  list = list.slice().sort((a,b)=> (a.direccion||'').localeCompare(b.direccion||''));
 
   const intFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? String(Math.round(Number(v))) : esc(v);
   const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
-  const num = v => (v==='' || v==null || isNaN(Number(v))) ? -Infinity : Number(v);
 
   if(propActiveSubtab==='prop1'){
-    const rows = sortRows('prop1', list, {
-      direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', m2Construidos: p=>num(p.m2Construidos), m2Terreno: p=>num(p.m2Terreno),
-      propietario: p=>p.propietario||'', rolAvaluo: p=>p.rolAvaluo||'', cbrFoja: p=>num(p.cbrFoja), cbrNumero: p=>num(p.cbrNumero),
-      cbrAnio: p=>num(p.cbrAnio), cbrLocalidad: p=>p.cbrLocalidad||''
-    });
-    el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop1','direccion','Dirección')}${sortChip('prop1','m2Construidos','M² constr.')}${sortChip('prop1','propietario','Propietario')}${sortChip('prop1','rolAvaluo','Rol avalúo')}${sortChip('prop1','cbrAnio','Año')}</div>` +
-      rows.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
-        <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
-          ${propField('M² construidos', ceilFmt(p.m2Construidos))}
-          ${propField('M² terreno', ceilFmt(p.m2Terreno))}
-        </div>
-        <div class="prop-fields-grid">
-          ${propField('Propietario', esc(p.propietario))}
-          ${propField('Rol avalúo', esc(p.rolAvaluo))}
-          ${propField('Foja (Paulina/Antonio)', intFmt(p.cbrFoja))}
-          ${propField('Número', intFmt(p.cbrNumero))}
-          ${propField('Año', intFmt(p.cbrAnio))}
-          ${propField('Localidad', esc(p.cbrLocalidad))}
-        </div>
-      </div>`).join('');
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
+      <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
+        ${propField('M² construidos', ceilFmt(p.m2Construidos))}
+        ${propField('M² terreno', ceilFmt(p.m2Terreno))}
+      </div>
+      <div class="prop-fields-grid">
+        ${propField('Propietario', esc(p.propietario))}
+        ${propField('Rol avalúo', esc(p.rolAvaluo))}
+        ${propField('Foja (Paulina/Antonio)', intFmt(p.cbrFoja))}
+        ${propField('Número', intFmt(p.cbrNumero))}
+        ${propField('Año', intFmt(p.cbrAnio))}
+        ${propField('Localidad', esc(p.cbrLocalidad))}
+      </div>
+    </div>`).join('');
   } else if(propActiveSubtab==='prop2'){
-    const rows = sortRows('prop2', list, {
-      direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', clienteLuz: p=>p.clienteLuz||'', clienteAgua: p=>p.clienteAgua||'',
-      clienteGas: p=>p.clienteGas||'', medidorLuz: p=>p.medidorLuz||'', medidorAgua: p=>p.medidorAgua||'', medidorGas: p=>p.medidorGas||''
-    });
-    el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop2','direccion','Dirección')}${sortChip('prop2','clienteLuz','⚡ Cliente Luz')}${sortChip('prop2','clienteAgua','💧 Cliente Agua')}${sortChip('prop2','clienteGas','🔥 Cliente Gas')}</div>` +
-      rows.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
-        <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
-          <div class="prop-service-group">
-            ${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}
-            ${propField('Medidor Luz', esc(p.medidorLuz))}
-          </div>
-          <div class="prop-service-group">
-            ${propField('💧 # Cliente Agua', esc(p.clienteAgua))}
-            ${propField('Medidor Agua', esc(p.medidorAgua))}
-          </div>
-          <div class="prop-service-group">
-            ${propField('🔥 # Cliente Gas', esc(p.clienteGas))}
-            ${propField('Medidor Gas', esc(p.medidorGas))}
-          </div>
-        </div>
-      </div>`).join('');
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
+      <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="prop-service-group">${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}${propField('Medidor Luz', esc(p.medidorLuz))}</div>
+        <div class="prop-service-group">${propField('💧 # Cliente Agua', esc(p.clienteAgua))}${propField('Medidor Agua', esc(p.medidorAgua))}</div>
+        <div class="prop-service-group">${propField('🔥 # Cliente Gas', esc(p.clienteGas))}${propField('Medidor Gas', esc(p.medidorGas))}</div>
+      </div>
+    </div>`).join('');
   } else {
-    const rows = sortRows('prop3', list, {
-      direccion: p=>p.direccion||'', unidad: p=>p.unidad||'', avaluoFiscal: p=>num(p.avaluoFiscal), valorComercial: p=>num(p.valorComercial), contribuciones: p=>num(p.contribuciones)
-    });
-    el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('prop3','direccion','Dirección')}${sortChip('prop3','avaluoFiscal','Avalúo fiscal')}${sortChip('prop3','valorComercial','Valor comercial')}${sortChip('prop3','contribuciones','Contribuciones')}</div>` +
-      rows.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
-        <div class="prop-fields-grid">
-          ${propField('Avalúo fiscal', p.avaluoFiscal?money(p.avaluoFiscal):'—')}
-          ${propField('Valor comercial probable', p.valorComercial?money(p.valorComercial):'—')}
-          ${propField('Contribuciones', p.contribuciones?money(p.contribuciones):'—')}
-        </div>
-      </div>`).join('');
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
+      <div class="prop-fields-grid">
+        ${propField('Avalúo fiscal', p.avaluoFiscal?money(p.avaluoFiscal):'—')}
+        ${propField('Valor comercial probable', p.valorComercial?money(p.valorComercial):'—')}
+        ${propField('Contribuciones', p.contribuciones?money(p.contribuciones):'—')}
+      </div>
+    </div>`).join('');
   }
 }
 let propActiveSubtab = 'prop1';
@@ -1229,26 +1041,21 @@ function propiedadesDisponibles(excludeContratoId){
   });
   return properties.filter(p=>!usadas.has(p.id));
 }
-
 function renderContractSelects(){
   const disponibles = propiedadesDisponibles(editingContract);
   const cont = document.getElementById('c-propiedadId-checks');
   cont.innerHTML = disponibles.length
     ? disponibles.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.direccion)} ${esc(p.unidad||'')}</label>`).join('')
-    : '<div class="empty-note">No hay propiedades disponibles (todas están arrendadas en un contrato activo).</div>';
+    : '<div class="empty-note">No hay propiedades disponibles.</div>';
 }
 
 document.getElementById('form-arrendatario-contrato').addEventListener('submit', async e=>{
   e.preventDefault();
-
   const propiedadIds = Array.from(document.querySelectorAll('#c-propiedadId-checks input:checked')).map(cb=>cb.value);
   if(!propiedadIds.length){ alert('Selecciona al menos una propiedad para el contrato.'); return; }
-
   const tObj = { id: editingTenant || uid() };
   tenantFields.forEach(f=> tObj[f] = document.getElementById('t-'+f).value);
-  if(editingTenant){ tenants = tenants.map(t=> t.id===editingTenant ? tObj : t); }
-  else { tenants.push(tObj); }
-
+  if(editingTenant){ tenants = tenants.map(t=> t.id===editingTenant ? tObj : t); } else { tenants.push(tObj); }
   const cObj = { id: editingContract || uid(), tenantId: tObj.id, activo: true };
   contractFields.forEach(f=> cObj[f] = document.getElementById('c-'+f).value);
   cObj.propiedadIds = propiedadIds;
@@ -1258,15 +1065,12 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
     if(anterior.fechaTermino) cObj.fechaTermino = anterior.fechaTermino;
     if(anterior.deudaPactada!==undefined) cObj.deudaPactada = anterior.deudaPactada;
     contracts = contracts.map(c=> c.id===editingContract ? cObj : c);
-  } else {
-    contracts.push(cObj);
-  }
-
+  } else { contracts.push(cObj); }
   const ok1 = await saveKey('tenants',tenants);
   const ok2 = await saveKey('contracts',contracts);
   const ok = ok1 && ok2;
   document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
-  document.getElementById('tc-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  document.getElementById('tc-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal';
   setTimeout(()=>document.getElementById('tc-status').textContent='',ok?1500:4000);
   resetTenantContractForm();
   renderAll();
@@ -1275,20 +1079,17 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
 document.getElementById('tc-cancel').addEventListener('click', resetTenantContractForm);
 
 function resetTenantContractForm(){
-  editingTenant = null;
-  editingContract = null;
+  editingTenant = null; editingContract = null;
   document.getElementById('form-arrendatario-contrato').reset();
   document.getElementById('tc-form-title').textContent='🏢 Nuevo arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='none';
   renderContractSelects();
 }
-
 function editTenantContract(tenantId, contractId){
   const t = tenants.find(x=>x.id===tenantId);
   const c = contracts.find(x=>x.id===contractId);
   if(!t || !c) return;
-  editingTenant = tenantId;
-  editingContract = contractId;
+  editingTenant = tenantId; editingContract = contractId;
   tenantFields.forEach(f=> document.getElementById('t-'+f).value = t[f] || '');
   contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
   renderContractSelects();
@@ -1296,19 +1097,16 @@ function editTenantContract(tenantId, contractId){
   document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
   document.getElementById('tc-form-title').textContent='🏢 Editar arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='inline-block';
+  expandCollapse('tcForm');
   window.scrollTo({top:0,behavior:'smooth'});
 }
-
 async function deleteTenantContract(tenantId, contractId){
   if(payments.some(p=>p.contratoId===contractId)){ alert('Este contrato tiene pagos asociados. Elimina primero esos pagos.'); return; }
   if(!confirm('¿Eliminar este arrendatario y su contrato?')) return;
   const otrosContratos = contracts.filter(c=>c.tenantId===tenantId && c.id!==contractId);
   contracts = contracts.filter(c=>c.id!==contractId);
   await saveKey('contracts',contracts);
-  if(!otrosContratos.length){
-    tenants = tenants.filter(t=>t.id!==tenantId);
-    await saveKey('tenants',tenants);
-  }
+  if(!otrosContratos.length){ tenants = tenants.filter(t=>t.id!==tenantId); await saveKey('tenants',tenants); }
   renderAll();
   pushToDriveIfConnected();
 }
@@ -1317,57 +1115,40 @@ async function terminateContract(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
   const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
-  if(!confirm(`Vas a finalizar el contrato de:\n${label}\n\nEl arrendatario pasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas, y ya no aparecerá en los menús para arriendo normal. Sus pagos se conservan y, si queda con deuda pactada, se le podrá seguir abonando desde ahí. ¿Continuar?`)) return;
-
+  if(!confirm(`Vas a finalizar el contrato de:\n${label}\n\nEl arrendatario pasará a "Arrendatarios Históricos". ¿Continuar?`)) return;
   const hoy = new Date().toISOString().slice(0,10);
-  let fechaTermino = prompt('Fecha de término del contrato (formato AAAA-MM-DD):', hoy);
+  let fechaTermino = prompt('Fecha de término del contrato (AAAA-MM-DD):', hoy);
   if(fechaTermino===null) return;
   fechaTermino = fechaTermino.trim();
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaTermino) || isNaN(new Date(fechaTermino+'T00:00:00'))){
-    alert('Fecha inválida. Usa el formato AAAA-MM-DD, por ejemplo: '+hoy);
-    return;
-  }
-
-  let deuda = prompt('Monto de deuda pactada al término (en $, deja 0 si no hay deuda):', '0');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaTermino) || isNaN(new Date(fechaTermino+'T00:00:00'))){ alert('Fecha inválida.'); return; }
+  let deuda = prompt('Monto de deuda pactada al término (deja 0 si no hay):', '0');
   if(deuda===null) return;
   deuda = deuda.replace(/[.$\s]/g,'');
-  if(deuda==='' || isNaN(Number(deuda)) || Number(deuda)<0){
-    alert('Monto inválido. Ingresa solo números, por ejemplo: 500000');
-    return;
-  }
-
-  c.activo = false;
-  c.fechaTermino = fechaTermino;
-  c.deudaPactada = Number(deuda);
+  if(deuda==='' || isNaN(Number(deuda)) || Number(deuda)<0){ alert('Monto inválido.'); return; }
+  c.activo = false; c.fechaTermino = fechaTermino; c.deudaPactada = Number(deuda);
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
   renderAll();
   pushToDriveIfConnected();
-  alert('Contrato finalizado. Lo encontrarás en la pestaña "Arrendatarios Históricos".');
+  alert('Contrato finalizado.');
 }
-
 async function reactivateContract(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
-  if(!confirm(`Vas a reactivar el contrato de:\n${label}\n\nVolverá a "Arrendatarios & Contratos" como Vigente, a la deuda vigente y a las alertas. Se borra la fecha de término y la deuda pactada quedará en $0 (puedes volver a fijarla si finalizas de nuevo). ¿Continuar?`)) return;
-  c.activo = true;
-  c.fechaTermino = '';
-  c.deudaPactada = 0;
+  if(!confirm(`Vas a reactivar el contrato de:\n${tenantName(c.tenantId)} — ${propAddresses(c)}\n\n¿Continuar?`)) return;
+  c.activo = true; c.fechaTermino = ''; c.deudaPactada = 0;
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
   renderAll();
   pushToDriveIfConnected();
 }
-
 async function closeDebtManually(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const cobrado = payments
-    .filter(p=>p.contratoId===id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+  const cobrado = payments.filter(p=>p.contratoId===id && p.fechaPago && p.fechaPago>=c.fechaTermino)
     .reduce((s,p)=>s+Number(p.montoPagado||0)+Number(p.descuentos||0),0);
   const saldoActual = computeCobranzaSaldo(c);
-  if(!confirm(`Vas a cerrar manualmente la deuda de este contrato (por ejemplo, para condonarla o darla por incobrable).\n\nSaldo pendiente actual: ${money(Math.max(saldoActual,0))}\n\nAl confirmar, la deuda pactada quedará fijada en ${money(cobrado)} (lo que realmente se alcanzó a cobrar) y el saldo pasará a $0. Esto no se puede deshacer automáticamente. ¿Continuar?`)) return;
+  if(!confirm(`Saldo pendiente actual: ${money(Math.max(saldoActual,0))}\n\nLa deuda pactada quedará fijada en ${money(cobrado)}. ¿Continuar?`)) return;
   c.deudaPactada = cobrado;
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
@@ -1375,10 +1156,7 @@ async function closeDebtManually(id){
   pushToDriveIfConnected();
 }
 
-function propAddress(id){
-  const p = properties.find(x=>x.id===id);
-  return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—';
-}
+function propAddress(id){ const p = properties.find(x=>x.id===id); return p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : '—'; }
 function contractPropertyIds(c){
   if(!c) return [];
   if(Array.isArray(c.propiedadIds)) return c.propiedadIds.filter(Boolean);
@@ -1386,51 +1164,42 @@ function contractPropertyIds(c){
   if(c.propiedadId) return [c.propiedadId];
   return [];
 }
-function propAddresses(c){
-  const ids = contractPropertyIds(c);
-  if(!ids.length) return '—';
-  return ids.map(id=>propAddress(id)).join(' + ');
-}
-function tenantNemo(id){
-  const t = tenants.find(x=>x.id===id);
-  return t ? (t.nemoArrendatario || '') : '';
-}
-function tenantName(id){
-  const t = tenants.find(x=>x.id===id);
-  return t ? t.nombreSociedad : '—';
-}
+function propAddresses(c){ const ids = contractPropertyIds(c); if(!ids.length) return '—'; return ids.map(id=>propAddress(id)).join(' + '); }
+function tenantNemo(id){ const t = tenants.find(x=>x.id===id); return t ? (t.nemoArrendatario || '') : ''; }
+function tenantName(id){ const t = tenants.find(x=>x.id===id); return t ? t.nombreSociedad : '—'; }
 function contractLabel(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return '—';
   const nemo = tenantNemo(c.tenantId);
-  const identificador = nemo || tenantName(c.tenantId);
-  return propAddresses(c) + ' — ' + identificador;
+  return propAddresses(c) + ' — ' + (nemo || tenantName(c.tenantId));
+}
+function tenantContractMatchesSearch(c, term){
+  if(!term) return true;
+  const t = tenants.find(x=>x.id===c.tenantId) || {};
+  const haystack = [t.nemoArrendatario, t.nombreSociedad, t.nombreRepresentante, propAddresses(c)]
+    .map(v=>String(v||'').toLowerCase()).join(' ');
+  return haystack.includes(term);
 }
 
-// Tabla fusionada: un arrendatario y su contrato vigente en una sola fila
 function renderTenantsContracts(){
   const el = document.getElementById('tenant-table');
   const activos = contracts.filter(isActiveContract);
-  if(!activos.length){ el.innerHTML='<div class="empty">Aún no hay arrendatarios ni contratos registrados. (Los finalizados se ven en "Arrendatarios Históricos")</div>'; return; }
-  const rows = sortRows('tenants', activos, {
-    nemo: c=>tenantNemo(c.tenantId)||'', nombreSociedad: c=>tenantName(c.tenantId)||'', propiedad: c=>propAddresses(c)||'',
-    representante: c=>{ const t=tenants.find(x=>x.id===c.tenantId); return t?(t.nombreRepresentante||''):''; },
-    fechaInicioContrato: c=>c.fechaInicioContrato||'', montoArriendoPactado: c=>Number(c.montoArriendoPactado||0)
-  });
-  el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('tenants','nemo','Nemo')}${sortChip('tenants','nombreSociedad','Sociedad')}${sortChip('tenants','fechaInicioContrato','Inicio contrato')}${sortChip('tenants','montoArriendoPactado','Monto pactado')}</div>` +
-  rows.map((c,idx)=>{
+  if(!activos.length){ el.innerHTML='<div class="empty">Aún no hay arrendatarios ni contratos registrados.</div>'; return; }
+  const term = (document.getElementById('tenant-search').value||'').trim().toLowerCase();
+  let rows = activos.filter(c=>tenantContractMatchesSearch(c,term));
+  if(!rows.length){ el.innerHTML=`<div class="empty">No se encontraron resultados para "${esc(term)}".</div>`; return; }
+  rows = rows.slice().sort((a,b)=> (tenantNemo(a.tenantId)||tenantName(a.tenantId)).localeCompare(tenantNemo(b.tenantId)||tenantName(b.tenantId)));
+
+  el.innerHTML = rows.map((c,idx)=>{
     const t = tenants.find(x=>x.id===c.tenantId) || {};
     const finCalc = contractEndDate(c);
     const fechaFin = finCalc ? formatDate(toISO(finCalc)) : '—';
-
-    // Solo se muestran los campos de Nombre sociedad / Rut sociedad si tienen información.
     const sociedadFields = [];
     if(t.nombreSociedad) sociedadFields.push(propField('Nombre sociedad', esc(t.nombreSociedad)));
     if(t.rutSociedad) sociedadFields.push(propField('Rut Sociedad', esc(t.rutSociedad)));
     const sociedadSection = sociedadFields.length
       ? `<div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div><div class="prop-fields-grid">${sociedadFields.join('')}</div>`
       : '';
-
     return `<div class="prop-card">
       <div class="prop-card-header">
         <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
@@ -1454,13 +1223,11 @@ function renderTenantsContracts(){
     </div>`;
   }).join('');
 }
+document.getElementById('tenant-search').addEventListener('input', renderTenantsContracts);
 
 // ---------- PAGOS ----------
 const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
-
-function contratosConCobranza(){
-  return contracts.filter(c => !isActiveContract(c) && computeCobranzaSaldo(c) > 0);
-}
+function contratosConCobranza(){ return contracts.filter(c => !isActiveContract(c) && computeCobranzaSaldo(c) > 0); }
 
 function renderPaySelects(){
   const activos = contracts.filter(isActiveContract);
@@ -1470,7 +1237,6 @@ function renderPaySelects(){
     + cobranza.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))} (Cobranza deuda finalizada)</option>`).join('');
   document.getElementById('pay-contratoId').innerHTML = opts;
 }
-
 document.getElementById('pay-contratoId').addEventListener('change', ()=>{
   if(editingPay) return;
   const c = contracts.find(x=>x.id===document.getElementById('pay-contratoId').value);
@@ -1481,16 +1247,11 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingPay || uid() };
   payFields.forEach(f=> obj[f] = document.getElementById('pay-'+f).value);
-
   const c = contracts.find(x=>x.id===obj.contratoId);
   if(c && isActiveContract(c) && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
-    const confirmado = confirm(
-      `El valor de arriendo que ingresaste (${money(obj.valorArriendo)}) es distinto al valor actual del contrato (${money(c.montoArriendoPactado)}).\n\n`+
-      `Si continúas, el contrato de "${contractLabel(c.id)}" quedará actualizado a ${money(obj.valorArriendo)} — este será el nuevo valor pactado para los próximos pagos y para el cálculo de deuda de aquí en adelante.\n\n`+
-      `¿Confirmas el cambio?`
-    );
+    const confirmado = confirm(`El valor de arriendo ingresado (${money(obj.valorArriendo)}) difiere del valor actual del contrato (${money(c.montoArriendoPactado)}). Quedará como nuevo valor pactado. ¿Confirmas?`);
     if(!confirmado){
-      document.getElementById('pay-status').textContent = 'Guardado cancelado — ajusta el valor arriendo o el monto no se modifica.';
+      document.getElementById('pay-status').textContent = 'Guardado cancelado.';
       setTimeout(()=>document.getElementById('pay-status').textContent='',4000);
       return;
     }
@@ -1498,19 +1259,16 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
     contracts = contracts.map(x=> x.id===c.id ? c : x);
     await saveKey('contracts',contracts);
   }
-
-  if(editingPay){ payments = payments.map(p=> p.id===editingPay ? obj : p); }
-  else { payments.push(obj); }
+  if(editingPay){ payments = payments.map(p=> p.id===editingPay ? obj : p); } else { payments.push(obj); }
   const ok = await saveKey('payments',payments);
   document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
-  document.getElementById('pay-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  document.getElementById('pay-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal';
   setTimeout(()=>document.getElementById('pay-status').textContent='',ok?1500:4000);
   resetPayForm();
   renderAll();
   pushToDriveIfConnected();
 });
 document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
-
 function resetPayForm(){
   editingPay = null;
   document.getElementById('form-pago').reset();
@@ -1533,27 +1291,16 @@ async function deletePayment(id){
   renderAll();
   pushToDriveIfConnected();
 }
-
 document.getElementById('export-payments-btn').addEventListener('click', ()=>{
   if(!payments.length){ alert('No hay pagos registrados para exportar.'); return; }
-  const rows = payments
-    .slice()
-    .sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''))
-    .map(p=>{
-      const c = contracts.find(x=>x.id===p.contratoId);
-      const direccion = c ? propAddresses(c) : '—';
-      const nemo = c ? (tenantNemo(c.tenantId) || tenantName(c.tenantId)) : '—';
-      return {
-        Direccion: direccion,
-        Nemo: nemo,
-        fechaPago: p.fechaPago,
-        montoPagado: Number(p.montoPagado||0),
-        descuentos: Number(p.descuentos||0),
-        valorArriendo: Number(p.valorArriendo||0),
-        MedioPago: p.medioPago,
-        Comentarios: p.comentarios
-      };
-    });
+  const rows = payments.slice().sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||'')).map(p=>{
+    const c = contracts.find(x=>x.id===p.contratoId);
+    return {
+      Direccion: c ? propAddresses(c) : '—', Nemo: c ? (tenantNemo(c.tenantId) || tenantName(c.tenantId)) : '—',
+      fechaPago: p.fechaPago, montoPagado: Number(p.montoPagado||0), descuentos: Number(p.descuentos||0),
+      valorArriendo: Number(p.valorArriendo||0), MedioPago: p.medioPago, Comentarios: p.comentarios
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(rows);
   applyColumnFormats(ws, ['Direccion','Nemo','fechaPago','montoPagado','descuentos','valorArriendo','MedioPago','Comentarios']);
   styleWorksheet(ws, [30,22,12,14,12,14,14,28]);
@@ -1563,16 +1310,6 @@ document.getElementById('export-payments-btn').addEventListener('click', ()=>{
 });
 
 // ---------- RESUMEN (por contrato) ----------
-function mesesTranscurridos(fechaInicio){
-  if(!fechaInicio) return 0;
-  const start = new Date(fechaInicio+'T00:00:00');
-  const now = new Date();
-  if(start > now) return 0;
-  let months = (now.getFullYear()-start.getFullYear())*12 + (now.getMonth()-start.getMonth());
-  if(now.getDate() >= start.getDate()) months += 1;
-  return Math.max(months,0);
-}
-
 function effectiveDebtStartDate(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return '';
@@ -1580,20 +1317,17 @@ function effectiveDebtStartDate(contratoId){
   if(fechasPago.length) return fechasPago[0];
   return c.fechaInicioContrato || '';
 }
-
 function computeResumenRows(){
   return contracts.filter(isActiveContract).map(c=>{
     const series = computeContratoMonthlySeries(c.id);
     const totalPagado = series.reduce((s,d)=>s+d.pagado,0);
     const totalDescuentos = series.reduce((s,d)=>s+d.descuento,0);
     const totalEsperado = series.reduce((s,d)=>s+d.monto,0);
-    const meses = series.length;
     const monto = Number(c.montoArriendoPactado||0);
     const saldo = totalEsperado - (totalPagado + totalDescuentos);
-    return {c, monto, meses, totalEsperado, totalPagado, totalDescuentos, saldo};
+    return {c, monto, saldo};
   }).sort((a,b)=> b.saldo - a.saldo);
 }
-
 function renderResumenSelect(){
   const activos = contracts.filter(isActiveContract);
   const optionsHtml = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
@@ -1615,45 +1349,30 @@ document.getElementById('chart-tenant-filter').addEventListener('change', ()=>{
 
 function renderResumen(){
   renderResumenSelect();
-  const allRows = computeResumenRows();
-
-  // Solo se muestran clientes con deuda o saldo a favor (se excluyen los que están exactamente en $0).
-  const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
-
+  const allRows = computeResumenRows().filter(r=>r.saldo !== 0);
   const filtro = document.getElementById('resumen-filter').value;
-  let rows = filtro ? conSaldoDistintoDeCero.filter(r=>r.c.id===filtro) : conSaldoDistintoDeCero;
-  rows = sortRows('resumen', rows, {
-    contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto,
-    meses: r=>r.meses, saldo: r=>r.saldo
-  });
+  let rows = filtro ? allRows.filter(r=>r.c.id===filtro) : allRows;
 
   const el = document.getElementById('resumen-table');
   if(!rows.length){ el.innerHTML='<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>'; }
   else {
-    el.innerHTML = `<table><thead><tr>
-      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto mensual')}${th('resumen','meses','Meses transcurridos')}${th('resumen','saldo','Saldo')}<th>Estado</th>
-    </tr></thead><tbody>
+    el.innerHTML = `<table><thead><tr><th>Arrendatario (Dirección — Nemo)</th><th>Monto mensual</th><th>Saldo</th><th>Estado</th></tr></thead><tbody>
     ${rows.map(r=>{
-      const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
-      let tag;
-      if(r.saldo>0) tag = '<span class="tag tag-debt">Con deuda</span>';
-      else if(r.saldo<0) tag = '<span class="tag tag-ok">A favor</span>';
-      else tag = '<span class="tag tag-ok">Al día</span>';
+      const saldoColor = r.saldo>0 ? 'var(--brick)' : 'var(--teal-dark)';
+      const tag = r.saldo>0 ? '<span class="tag tag-debt">Con deuda</span>' : '<span class="tag tag-ok">A favor</span>';
       return `<tr>
       <td><span class="truncate" title="${esc(contractLabel(r.c.id))}">${esc(contractLabel(r.c.id))}</span></td>
       <td class="mono">${money(r.monto)}</td>
-      <td class="mono">${r.meses}</td>
       <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
       <td>${tag}</td>
     </tr>`;
     }).join('')}
     </tbody></table>`;
   }
-
   renderResumenChart(filtro);
 }
 
-// ---------- ALERTAS (por contrato) ----------
+// ---------- ALERTAS ----------
 function addMonths(dateStr, n){ const d = new Date(dateStr+'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth()+n); return d; }
 function toISO(d){ return (d instanceof Date && !isNaN(d)) ? d.toISOString().slice(0,10) : ''; }
 function monthsUntil(targetDate){
@@ -1676,7 +1395,6 @@ function contractEndDate(c){
   if(c.duracionMeses && c.fechaInicioContrato) return addMonths(c.fechaInicioContrato, Number(c.duracionMeses));
   return null;
 }
-
 function buildAlerts(){
   const alerts = [];
   contracts.filter(isActiveContract).forEach(c=>{
@@ -1698,83 +1416,64 @@ function buildAlerts(){
 function renderAlertas(){
   const alerts = buildAlerts();
   const badge = document.getElementById('alert-badge');
-  if(alerts.length){ badge.style.display='inline-block'; badge.textContent = alerts.length; }
-  else { badge.style.display='none'; }
+  if(alerts.length){ badge.style.display='inline-block'; badge.textContent = alerts.length; } else { badge.style.display='none'; }
   const el = document.getElementById('alertas-list');
   if(!alerts.length){ el.innerHTML='<div class="empty">No hay vencimientos ni ajustes de IPC dentro de los próximos 3 meses.</div>'; return; }
   el.innerHTML = alerts.map(a=>{
     const urgencyClass = a.vencido ? 'u1' : ('u'+a.meses);
     const when = a.vencido ? `Venció el ${formatDate(a.fecha)}` : `${formatDate(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
     return `<div class="alert-card ${urgencyClass}">
-      <div>
-        <div class="title">${esc(a.tipo)} — ${esc(tenantName(a.c.tenantId))}</div>
-        <div class="sub">${esc(propAddresses(a.c))}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="when">${when}</div>
+      <div><div class="title">${esc(a.tipo)} — ${esc(tenantName(a.c.tenantId))}</div><div class="sub">${esc(propAddresses(a.c))}</div></div>
+      <div style="display:flex;align-items:center;gap:10px"><div class="when">${when}</div>
         ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="updateContractFromAlert('${a.c.id}')">Actualizar contrato</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
-
 async function updateContractFromAlert(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
   const vencActual = contractEndDate(c);
-  if(!vencActual){ alert('Este contrato no tiene una fecha de fin calculable (falta fecha de inicio o duración).'); return; }
-
+  if(!vencActual){ alert('No hay fecha de fin calculable.'); return; }
   const nuevaFin = new Date(vencActual);
   nuevaFin.setUTCFullYear(nuevaFin.getUTCFullYear()+1);
   const nuevaFinISO = toISO(nuevaFin);
-
-  if(!confirm(`Vas a actualizar el contrato de:\n${label}\n\nLa fecha de fin de contrato pasará de ${formatDate(toISO(vencActual))} a ${formatDate(nuevaFinISO)} (1 año más). ¿Continuar?`)) return;
-
+  if(!confirm(`La fecha de fin pasará de ${formatDate(toISO(vencActual))} a ${formatDate(nuevaFinISO)}. ¿Continuar?`)) return;
   const montoActual = Number(c.montoArriendoPactado||0);
-  const nuevoMontoStr = prompt(`Valor de arriendo actual: ${money(montoActual)}\n\n¿Quieres actualizarlo? Escribe el nuevo monto y presiona OK, o deja el mismo valor si no cambia.`, String(montoActual));
+  const nuevoMontoStr = prompt(`Valor de arriendo actual: ${money(montoActual)}\n¿Actualizarlo?`, String(montoActual));
   if(nuevoMontoStr===null) return;
-
   c.fechaFinContrato = nuevaFinISO;
   const nuevoMonto = Number(nuevoMontoStr.replace(/[.$\s]/g,''));
-  if(!isNaN(nuevoMonto) && nuevoMonto>0){
-    c.montoArriendoPactado = nuevoMonto;
-  }
-
+  if(!isNaN(nuevoMonto) && nuevoMonto>0){ c.montoArriendoPactado = nuevoMonto; }
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
   renderAll();
   pushToDriveIfConnected();
 }
 
-// ---------- SERVICIOS (lecturas de luz/agua/gas) ----------
+// ---------- SERVICIOS ----------
 const readingFields = ['contratoId','servicio','fechaLectura','lecturaActual','valorUnitario','estado','comentarios'];
-
 function renderReadingSelects(){
   const activos = contracts.filter(isActiveContract);
-  const opts = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  document.getElementById('r-contratoId').innerHTML = opts;
+  document.getElementById('r-contratoId').innerHTML = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
   document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
 }
 document.getElementById('r-filter').addEventListener('change', renderReadings);
-
 document.getElementById('form-lectura').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingReading || uid() };
   readingFields.forEach(f=> obj[f] = document.getElementById('r-'+f).value);
   if(!obj.estado) obj.estado = 'Pendiente';
-  if(editingReading){ readings = readings.map(r=> r.id===editingReading ? obj : r); }
-  else { readings.push(obj); }
+  if(editingReading){ readings = readings.map(r=> r.id===editingReading ? obj : r); } else { readings.push(obj); }
   const ok = await saveKey('readings',readings);
   document.getElementById('storage-banner').style.display = storageOK ? 'none' : 'block';
-  document.getElementById('r-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (ver aviso arriba)';
+  document.getElementById('r-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal';
   setTimeout(()=>document.getElementById('r-status').textContent='',ok?1500:4000);
   resetReadingForm();
   renderAll();
   pushToDriveIfConnected();
 });
 document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
-
 function resetReadingForm(){
   editingReading = null;
   document.getElementById('form-lectura').reset();
@@ -1807,30 +1506,18 @@ async function setReadingEstado(id, estado){
   renderAll();
   pushToDriveIfConnected();
 }
-
 const DIAS_PARA_ATRASO = 15;
-
 function diasDesde(fechaStr){
   if(!fechaStr) return 0;
   const fecha = new Date(fechaStr+'T00:00:00');
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   return Math.floor((hoy - fecha) / 86400000);
 }
-
-function estadoEfectivo(r){
-  if(r.estado === 'Pagado') return 'Pagado';
-  return diasDesde(r.fechaLectura) > DIAS_PARA_ATRASO ? 'Atrasado' : 'Pendiente';
-}
-
+function estadoEfectivo(r){ if(r.estado === 'Pagado') return 'Pagado'; return diasDesde(r.fechaLectura) > DIAS_PARA_ATRASO ? 'Atrasado' : 'Pendiente'; }
 function computeReadingsWithConsumption(){
   const groups = {};
-  readings.forEach(r=>{
-    const key = r.contratoId+'|'+r.servicio;
-    if(!groups[key]) groups[key] = [];
-    groups[key].push(r);
-  });
+  readings.forEach(r=>{ const key = r.contratoId+'|'+r.servicio; if(!groups[key]) groups[key] = []; groups[key].push(r); });
   Object.values(groups).forEach(list=> list.sort((a,b)=> (a.fechaLectura||'').localeCompare(b.fechaLectura||'')));
-
   return readings.map(r=>{
     const key = r.contratoId+'|'+r.servicio;
     const list = groups[key];
@@ -1842,20 +1529,12 @@ function computeReadingsWithConsumption(){
     return { ...r, lecturaAnterior, consumo, monto, estadoEfectivo: estadoEfectivo(r) };
   });
 }
-
-function servicioIcono(s){
-  if(s==='Luz') return '⚡ Luz';
-  if(s==='Agua') return '💧 Agua';
-  if(s==='Gas') return '🔥 Gas';
-  return esc(s);
-}
-
+function servicioIcono(s){ if(s==='Luz') return '⚡ Luz'; if(s==='Agua') return '💧 Agua'; if(s==='Gas') return '🔥 Gas'; return esc(s); }
 function renderReadings(){
   const filter = document.getElementById('r-filter').value;
   const el = document.getElementById('reading-table');
   const all = computeReadingsWithConsumption();
-  let list = all.filter(r=> !filter || r.contratoId===filter)
-                .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
+  let list = all.filter(r=> !filter || r.contratoId===filter).sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
   list = sortRows('readings', list, {
     contrato: r=>contractLabel(r.contratoId)||'', servicio: r=>r.servicio||'', fechaLectura: r=>r.fechaLectura||'',
     lecturaActual: r=>Number(r.lecturaActual||0), consumo: r=>(r.consumo===null?-Infinity:r.consumo),
@@ -1876,9 +1555,7 @@ function renderReadings(){
     <td class="mono">${r.consumo===null?'primera lectura':formatNumber(r.consumo)}</td>
     <td class="mono">${money(r.valorUnitario)}</td>
     <td class="mono">${money(r.monto)}</td>
-    <td>
-      <span class="tag ${tagClass}">${esc(r.estadoEfectivo)}</span>
-    </td>
+    <td><span class="tag ${tagClass}">${esc(r.estadoEfectivo)}</span></td>
     <td class="row-actions">
       <button onclick="editReading('${r.id}')">Editar</button>
       ${r.estadoEfectivo!=='Pagado' ? `<button onclick="setReadingEstado('${r.id}','Pagado')">Marcar pagado</button>` : ''}
@@ -1891,19 +1568,14 @@ function renderReadings(){
 
 // ---------- HISTORIAL MENSUAL ----------
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
 function renderHistorialSelects(){
   const selActivo = document.getElementById('h-contratoId-activo');
   const selHist = document.getElementById('h-contratoId-historico');
-  const currentActivo = selActivo.value;
-  const currentHist = selHist.value;
-
+  const currentActivo = selActivo.value, currentHist = selHist.value;
   const activos = contracts.filter(isActiveContract);
   const historicos = contracts.filter(c=>!isActiveContract(c));
-
   selActivo.innerHTML = '<option value="">— Ninguno —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
   selHist.innerHTML = '<option value="">— Ninguno —</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-
   if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
   if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
 }
@@ -1915,18 +1587,12 @@ document.getElementById('h-contratoId-historico').addEventListener('change', ()=
   if(document.getElementById('h-contratoId-historico').value) document.getElementById('h-contratoId-activo').value = '';
   renderHistorial();
 });
-
-function truncateText(str, n){
-  str = str || '';
-  return str.length > n ? str.slice(0, n) + '…' : str;
-}
-
+function truncateText(str, n){ str = str || ''; return str.length > n ? str.slice(0, n) + '…' : str; }
 function sameYearMonth(fechaStr, year, month){
   if(!fechaStr) return false;
   const parts = fechaStr.split('-');
   return Number(parts[0])===year && (Number(parts[1])-1)===month;
 }
-
 function monthsBetween(startDateStr){
   const start = new Date(startDateStr+'T00:00:00');
   const now = new Date();
@@ -1934,29 +1600,20 @@ function monthsBetween(startDateStr){
   let y = start.getFullYear(), m = start.getMonth();
   const endY = now.getFullYear(), endM = now.getMonth();
   let guard = 0;
-  while((y < endY || (y===endY && m<=endM)) && guard < 600){
-    months.push({year:y, month:m});
-    m++; if(m>11){ m=0; y++; }
-    guard++;
-  }
+  while((y < endY || (y===endY && m<=endM)) && guard < 600){ months.push({year:y, month:m}); m++; if(m>11){ m=0; y++; } guard++; }
   return months.reverse();
 }
-
 let historialTodosVerTodo = false;
 function renderHistorialTodos(){
   const el = document.getElementById('historial-table');
-
   let list = payments.slice().sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
   list = sortRows('payments-todos', list, {
     contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
     descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>Number(p.valorArriendo||0), comentarios: p=>p.comentarios||''
   });
-
-  if(!list.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para este filtro.</div>'; return; }
-
+  if(!list.length){ el.innerHTML = '<div class="empty">No hay pagos registrados.</div>'; return; }
   const total = list.length;
   const mostrar = historialTodosVerTodo ? list : list.slice(0,12);
-
   el.innerHTML = `<table><thead><tr>
     ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Monto pagado')}${th('payments-todos','descuentos','Descuentos')}${th('payments-todos','valorArriendo','Valor arriendo')}<th></th>${th('payments-todos','comentarios','Comentarios')}
   </tr></thead><tbody>
@@ -1973,29 +1630,19 @@ function renderHistorialTodos(){
   </tr>`;
   }).join('')}
   </tbody></table>
-  ${total>12 ? `<div style="text-align:center;margin-top:12px">
-    <button type="button" class="btn btn-secondary" onclick="historialTodosVerTodo=!historialTodosVerTodo;renderHistorialTodos();">
-      ${historialTodosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
-    </button>
-  </div>` : ''}`;
+  ${total>12 ? `<div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-secondary" onclick="historialTodosVerTodo=!historialTodosVerTodo;renderHistorialTodos();">${historialTodosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}</button></div>` : ''}`;
 }
-
 let historialMensualVerTodo = false;
 function renderHistorial(){
   renderHistorialSelects();
   const contratoId = document.getElementById('h-contratoId-activo').value || document.getElementById('h-contratoId-historico').value;
   if(!contratoId){ renderHistorialTodos(); return; }
-
   const el = document.getElementById('historial-table');
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !effectiveDebtStartDate(contratoId)){ el.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio ni pagos registrados.</div>'; return; }
-
   const seriesTotal = computeContratoMonthlySeries(contratoId).slice().reverse();
   const series = historialMensualVerTodo ? seriesTotal : seriesTotal.slice(0,12);
-
-  el.innerHTML = `<table><thead><tr>
-    <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
-  </tr></thead><tbody>
+  el.innerHTML = `<table><thead><tr><th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th></tr></thead><tbody>
   ${series.map(d=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
     const saldo = d.monto - (d.pagado+d.descuento);
@@ -2021,44 +1668,36 @@ function renderHistorial(){
     </tr>`;
   }).join('')}
   </tbody></table>
-  ${seriesTotal.length>12 ? `<div style="text-align:center;margin-top:12px">
-    <button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">
-      ${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}
-    </button>
-  </div>` : ''}`;
+  ${seriesTotal.length>12 ? `<div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}</button></div>` : ''}`;
 }
 
-// ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
+// ---------- ARRENDATARIOS HISTÓRICOS ----------
 function computeCobranzaSaldo(c){
   if(!c.fechaTermino || !Number(c.deudaPactada||0)) return 0;
-  const cobrado = payments
-    .filter(p=>p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+  const cobrado = payments.filter(p=>p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
     .reduce((s,p)=>s+Number(p.montoPagado||0)+Number(p.descuentos||0),0);
   return Number(c.deudaPactada||0) - cobrado;
 }
-
+function historicoMatchesSearch(c, term){
+  if(!term) return true;
+  const haystack = [tenantName(c.tenantId), propAddresses(c)].map(v=>String(v||'').toLowerCase()).join(' ');
+  return haystack.includes(term);
+}
 function renderHistoricos(){
   const el = document.getElementById('historicos-table');
   const historicos = contracts.filter(c=> !isActiveContract(c));
   if(!historicos.length){ el.innerHTML='<div class="empty">No hay arrendatarios históricos registrados.</div>'; return; }
-
-  let rows = historicos.map(c=>{
+  const term = (document.getElementById('historicos-search').value||'').trim().toLowerCase();
+  let rows = historicos.filter(c=>historicoMatchesSearch(c,term)).map(c=>{
     const pagosC = payments.filter(p=>p.contratoId===c.id).sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''));
     const primerPago = pagosC.length ? pagosC[0].fechaPago : '—';
     const ultimoPago = pagosC.length ? pagosC[pagosC.length-1].fechaPago : '—';
     const saldoRemanente = computeCobranzaSaldo(c);
     return { c, primerPago, ultimoPago, saldoRemanente };
   }).sort((a,b)=> b.saldoRemanente - a.saldoRemanente);
+  if(!rows.length){ el.innerHTML=`<div class="empty">No se encontraron resultados para "${esc(term)}".</div>`; return; }
 
-  rows = sortRows('historicos', rows, {
-    tenant: r=>tenantName(r.c.tenantId)||'', propiedad: r=>contractPropertyIds(r.c).length?propAddresses(r.c):'',
-    saldoRemanente: r=>r.saldoRemanente,
-    primerPago: r=>r.primerPago==='—'?'':r.primerPago, ultimoPago: r=>r.ultimoPago==='—'?'':r.ultimoPago,
-    fechaTermino: r=>r.c.fechaTermino||'', deudaPactada: r=>Number(r.c.deudaPactada||0)
-  });
-
-  el.innerHTML = `<div class="sort-bar">Ordenar: ${sortChip('historicos','saldoRemanente','Deuda Final')}${sortChip('historicos','tenant','Arrendatario')}${sortChip('historicos','fechaTermino','Fecha término')}${sortChip('historicos','ultimoPago','Último pago')}</div>` +
-  rows.map((r,idx)=>{
+  el.innerHTML = rows.map((r,idx)=>{
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
     const tagClass = !tieneDeuda ? 'tag-ok' : (r.saldoRemanente>0 ? 'tag-debt' : 'tag-ok');
     const estado = !tieneDeuda ? 'Cerrado (sin deuda)' : (r.saldoRemanente>0 ? 'Cerrado (con deuda)' : 'Cerrado (deuda cobrada)');
@@ -2081,17 +1720,15 @@ function renderHistoricos(){
     </div>`;
   }).join('');
 }
+document.getElementById('historicos-search').addEventListener('input', renderHistoricos);
 
-// ---------- ORDEN DE TABLAS (clic en encabezado) ----------
+// ---------- ORDEN DE TABLAS (solo para tablas tipo <table>) ----------
 const sortState = {};
-
 function toggleSort(tableId, key){
   const cur = sortState[tableId];
-  if(cur && cur.key===key){ cur.dir = -cur.dir; }
-  else { sortState[tableId] = { key, dir: 1 }; }
+  if(cur && cur.key===key){ cur.dir = -cur.dir; } else { sortState[tableId] = { key, dir: 1 }; }
   renderAll();
 }
-
 function sortRows(tableId, rows, getters){
   const state = sortState[tableId];
   if(!state || !getters[state.key]) return rows;
@@ -2107,14 +1744,13 @@ function sortRows(tableId, rows, getters){
     return 0;
   });
 }
-
 function th(tableId, key, label){
   const s = sortState[tableId];
   const arrow = (s && s.key===key) ? (s.dir===1 ? ' ▲' : ' ▼') : '';
   return `<th class="sortable" onclick="toggleSort('${tableId}','${key}')">${label}${arrow}</th>`;
 }
 
-// ---------- HISTOGRAMA MENSUAL (Resumen & Deudas) ----------
+// ---------- HISTOGRAMA MENSUAL ----------
 function computeContratoMonthlySeries(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return [];
@@ -2131,37 +1767,26 @@ function computeContratoMonthlySeries(contratoId){
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
 }
-
-document.getElementById('chart-year-filter').addEventListener('change', ()=>{
-  renderResumenChart(document.getElementById('resumen-filter').value);
-});
-document.getElementById('chart-group-filter').addEventListener('change', ()=>{
-  renderResumenChart(document.getElementById('resumen-filter').value);
-});
+document.getElementById('chart-year-filter').addEventListener('change', ()=>{ renderResumenChart(document.getElementById('resumen-filter').value); });
+document.getElementById('chart-group-filter').addEventListener('change', ()=>{ renderResumenChart(document.getElementById('resumen-filter').value); });
 
 function applyYearGroupFilter(series, yearSel, groupSel){
   const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>a-b);
   const currentYear = yearSel.value;
   yearSel.innerHTML = '<option value="">Todos los años</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
   if(years.map(String).includes(currentYear)) yearSel.value = currentYear;
-
-  const yearFilter = yearSel.value;
-  const groupBy = groupSel.value;
+  const yearFilter = yearSel.value, groupBy = groupSel.value;
   const filtered = yearFilter ? series.filter(d=>d.year===Number(yearFilter)) : series;
-
   if(groupBy==='anio'){
     const byYear = {};
     filtered.forEach(d=>{
       if(!byYear[d.year]) byYear[d.year] = {monto:0,pagado:0,descuento:0};
-      byYear[d.year].monto += d.monto;
-      byYear[d.year].pagado += d.pagado;
-      byYear[d.year].descuento += d.descuento;
+      byYear[d.year].monto += d.monto; byYear[d.year].pagado += d.pagado; byYear[d.year].descuento += d.descuento;
     });
     return Object.keys(byYear).sort((a,b)=>a-b).map(y=>({ label: y, ...byYear[y] }));
   }
   return filtered.map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento }));
 }
-
 function computeGlobalMonthlySeries(){
   const activos = contracts.filter(isActiveContract);
   const starts = activos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
@@ -2185,17 +1810,11 @@ function computeGlobalMonthlySeries(){
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
 }
-
 let histogramaVerTodo = false;
 function histogramToggleHtml(total){
   if(total<=12) return '';
-  return `<div style="text-align:center;margin-top:12px">
-    <button type="button" class="btn btn-secondary" onclick="histogramaVerTodo=!histogramaVerTodo;renderResumenChart(document.getElementById('resumen-filter').value);">
-      ${histogramaVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
-    </button>
-  </div>`;
+  return `<div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-secondary" onclick="histogramaVerTodo=!histogramaVerTodo;renderResumenChart(document.getElementById('resumen-filter').value);">${histogramaVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}</button></div>`;
 }
-
 function renderResumenChart(contratoId){
   const container = document.getElementById('resumen-chart');
   const yearSel = document.getElementById('chart-year-filter');
@@ -2218,7 +1837,6 @@ function renderResumenChart(contratoId){
     renderResumenImpagos(contratoId);
     return;
   }
-
   if(chartControls) chartControls.style.display = 'flex';
   const series = computeContratoMonthlySeries(contratoId);
   if(!series.length){
@@ -2227,7 +1845,6 @@ function renderResumenChart(contratoId){
     renderResumenImpagos(contratoId);
     return;
   }
-
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
@@ -2235,94 +1852,115 @@ function renderResumenChart(contratoId){
   renderResumenImpagos(contratoId);
 }
 
-// Gráfico de columnas verticales (fechas en el eje X): pagado + descuento apilados,
-// deuda/saldo a favor del periodo como segmento apilado adicional, y arriendo pactado
-// como línea punteada con puntos.
+// Gráfico de columnas: eje Y fijo (sticky) a la izquierda + zona de barras con scroll horizontal.
+// Pagado=azul, Descuento=azul claro, Deuda del periodo y Saldo a favor=rojo (saldo a favor bajo el cero),
+// Arriendo pactado=línea punteada gris. Etiquetas de valores en formato MM.
 function buildStackedColumnChartSVG(rows, availableWidth){
   if(!rows.length) return '<div class="empty">No hay datos para este filtro.</div>';
-  const padT = 24, padB = 58, padL = 74, padR = 20;
-  const colGap = 14;
-  const minColW = 34;
-  const w = Math.max(availableWidth || 600, padL+padR+rows.length*(minColW+colGap));
-  const colAreaW = w - padL - padR;
-  const colW = Math.min(46, Math.max(minColW, (colAreaW/rows.length) - colGap));
-  const chartH = 260;
-  const h = padT + chartH + padB;
+  const padT=20, padB=60, axisW=70;
+  const colGap=16, minColW=36;
+  const chartH=260;
+  const h = padT+chartH+padB;
 
-  const maxVal = Math.max(1, ...rows.map(d=> Math.max(d.monto, d.pagado + d.descuento)));
-  const scaleY = v => (v/maxVal)*chartH;
+  const maxAbove = Math.max(1, ...rows.map(d=> Math.max(d.monto, d.pagado+d.descuento)));
+  const maxBelow = Math.max(0, ...rows.map(d=> Math.max(0, (d.pagado+d.descuento) - d.monto)));
+  const aboveH = maxBelow>0 ? Math.round(chartH*(maxAbove/(maxAbove+maxBelow))) : chartH;
+  const belowH = chartH-aboveH;
+  const y0 = padT+aboveH;
+  const scaleAbove = aboveH/maxAbove;
+  const scaleBelow = maxBelow>0 ? belowH/maxBelow : 0;
+
+  const colAreaWMin = rows.length*(minColW+colGap);
+  const barsAvail = Math.max(availableWidth-axisW, colAreaWMin, 260);
+  const colW = Math.min(50, Math.max(minColW, (barsAvail/rows.length)-colGap));
+  const w = colGap + rows.length*(colW+colGap);
+
+  let axisSvg = `<line x1="${axisW-1}" y1="0" x2="${axisW-1}" y2="${h}" stroke="var(--border)"/>`;
+  [1,0.75,0.5,0.25,0].forEach(f=>{
+    const y = padT + (1-f)*aboveH;
+    axisSvg += `<line x1="${axisW-6}" y1="${y}" x2="${axisW-1}" y2="${y}" stroke="var(--border)"/>
+      <text x="${axisW-10}" y="${y+3}" font-size="9.5" text-anchor="end" fill="var(--ink-soft)">${moneyMM(maxAbove*f)}</text>`;
+  });
+  if(maxBelow>0){
+    [0.5,1].forEach(f=>{
+      const y = y0 + f*belowH;
+      axisSvg += `<line x1="${axisW-6}" y1="${y}" x2="${axisW-1}" y2="${y}" stroke="var(--border)"/>
+        <text x="${axisW-10}" y="${y+3}" font-size="9.5" text-anchor="end" fill="var(--ink-soft)">-${moneyMM(maxBelow*f)}</text>`;
+    });
+  }
+  axisSvg += `<text x="${axisW-10}" y="${y0+3}" font-size="9.5" text-anchor="end" fill="var(--ink)" font-weight="700">$0</text>`;
 
   let bars = '';
   const linePoints = [];
-
   rows.forEach((d,i)=>{
-    const x = padL + i*(colW+colGap);
-    const cx = x + colW/2;
-    const yBase = padT + chartH;
+    const x = colGap + i*(colW+colGap);
+    const cx = x+colW/2;
+    const hPagado = d.pagado*scaleAbove;
+    const hDesc = d.descuento*scaleAbove;
+    const saldo = d.monto-(d.pagado+d.descuento);
 
-    const hPagado = scaleY(d.pagado);
-    const hDesc = scaleY(d.descuento);
-    const saldo = d.monto - (d.pagado + d.descuento); // >0 = deuda, <0 = a favor
-    const yTop = yBase - hPagado - hDesc;
-
-    bars += `<rect x="${x}" y="${yBase-hPagado}" width="${colW}" height="${hPagado}" fill="var(--teal)" rx="1.5"/>`;
-    bars += `<rect x="${x}" y="${yBase-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--gold)" rx="1.5"/>`;
-
-    if(saldo > 0){
-      const hDeuda = scaleY(saldo);
-      bars += `<rect x="${x}" y="${yTop-hDeuda}" width="${colW}" height="${hDeuda}" fill="var(--brick)" rx="1.5" opacity="0.85"/>`;
-    } else if(saldo < 0){
-      const hFavor = scaleY(-saldo);
-      bars += `<rect x="${x}" y="${yTop-hFavor}" width="${colW}" height="${hFavor}" fill="var(--teal-dark)" rx="1.5" opacity="0.55"/>`;
+    if(hPagado>0){
+      bars += `<rect x="${x}" y="${y0-hPagado}" width="${colW}" height="${hPagado}" fill="var(--blue)" rx="1.5"/>`;
+      if(hPagado>13) bars += `<text x="${cx}" y="${y0-hPagado/2+3}" font-size="8" text-anchor="middle" fill="#fff" font-weight="600">${moneyMM(d.pagado)}</text>`;
     }
-
+    if(hDesc>0){
+      bars += `<rect x="${x}" y="${y0-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--blue-light)" rx="1.5"/>`;
+      if(hDesc>13) bars += `<text x="${cx}" y="${y0-hPagado-hDesc/2+3}" font-size="8" text-anchor="middle" fill="var(--ink)" font-weight="600">${moneyMM(d.descuento)}</text>`;
+    }
+    let topY = y0-hPagado-hDesc;
+    if(saldo>0){
+      const hDeuda = saldo*scaleAbove;
+      bars += `<rect x="${x}" y="${topY-hDeuda}" width="${colW}" height="${hDeuda}" fill="var(--brick)" rx="1.5"/>`;
+      bars += `<text x="${cx}" y="${topY-hDeuda-4}" font-size="8.5" text-anchor="middle" fill="var(--brick)" font-weight="700">${moneyMM(saldo)}</text>`;
+    } else if(saldo<0){
+      const hFavor = (-saldo)*scaleBelow;
+      bars += `<rect x="${x}" y="${y0}" width="${colW}" height="${hFavor}" fill="var(--brick)" rx="1.5"/>`;
+      bars += `<text x="${cx}" y="${y0+hFavor+12}" font-size="8.5" text-anchor="middle" fill="var(--brick)" font-weight="700">${moneyMM(-saldo)}</text>`;
+    }
     bars += `<text x="${cx}" y="${h-padB+18}" font-size="10.5" text-anchor="middle" fill="var(--ink-soft)" transform="rotate(-40 ${cx} ${h-padB+18})">${esc(d.label)}</text>`;
-
-    const yPactado = yBase - scaleY(d.monto);
-    linePoints.push({x:cx, y:yPactado});
+    linePoints.push({x:cx, y: y0 - d.monto*scaleAbove, monto:d.monto});
   });
 
-  const linePath = linePoints.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
-  const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="var(--brick-soft)" stroke="var(--brick)" stroke-width="1.5"/>`).join('');
-
-  const gridLines = [0,0.25,0.5,0.75,1].map(f=>{
-    const y = padT + chartH - f*chartH;
-    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
-      <text x="${padL-8}" y="${y+3}" font-size="9.5" text-anchor="end" fill="var(--ink-soft)">${money(Math.round(maxVal*f))}</text>`;
+  const linePath = linePoints.map((p,i)=>(i===0?'M':'L')+p.x+' '+p.y).join(' ');
+  const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#fff" stroke="var(--gray-line)" stroke-width="1.6"/>`).join('');
+  const dotLabels = linePoints.map(p=>`<text x="${p.x}" y="${p.y-7}" font-size="8.5" text-anchor="middle" fill="var(--gray-line)" font-weight="700">${moneyMM(p.monto)}</text>`).join('');
+  const zeroLine = `<line x1="0" y1="${y0}" x2="${w}" y2="${y0}" stroke="var(--ink-soft)" stroke-width="1.3"/>`;
+  const gridLines = [1,0.75,0.5,0.25,0].map(f=>{
+    const y = padT + (1-f)*aboveH;
+    return `<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="var(--border)" stroke-dasharray="2,3"/>`;
   }).join('');
 
-  return `<div style="overflow-x:auto">
-  <svg viewBox="0 0 ${w} ${h}" style="width:100%;min-width:${w}px;height:${h}px;display:block;">
-    ${gridLines}
-    ${bars}
-    <path d="${linePath}" fill="none" stroke="var(--brick)" stroke-width="1.8" stroke-dasharray="4,3"/>
-    ${dots}
-  </svg>
+  return `<div style="display:flex;position:relative;">
+    <div style="position:sticky;left:0;z-index:5;background:var(--card);flex-shrink:0;">
+      <svg width="${axisW}" height="${h}" viewBox="0 0 ${axisW} ${h}">${axisSvg}</svg>
+    </div>
+    <div style="overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch;">
+      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+        ${gridLines}${zeroLine}${bars}
+        <path d="${linePath}" fill="none" stroke="var(--gray-line)" stroke-width="1.8" stroke-dasharray="4,3"/>
+        ${dots}${dotLabels}
+      </svg>
+    </div>
   </div>
   <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap">
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:5px;border-radius:2px;"></span>Pagado</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);margin-right:5px;border-radius:2px;"></span>Descuento aplicado</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--brick);margin-right:5px;border-radius:2px;opacity:0.85"></span>Deuda del periodo</span>
-    <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal-dark);margin-right:5px;border-radius:2px;opacity:0.55"></span>Saldo a favor del periodo</span>
-    <span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--brick);margin-right:5px;"></span>Arriendo pactado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--blue);margin-right:5px;border-radius:2px;"></span>Pagado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--blue-light);margin-right:5px;border-radius:2px;"></span>Descuento aplicado</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--brick);margin-right:5px;border-radius:2px;"></span>Deuda / saldo a favor del periodo</span>
+    <span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--gray-line);margin-right:5px;"></span>Arriendo pactado</span>
   </div>`;
 }
 
-// Detalle de meses con saldo, limitado a los últimos 12 (con botón para ver todo). Incluye comentarios.
 let impagosVerTodo = false;
 function renderResumenImpagos(contratoId){
   const el = document.getElementById('resumen-impagos');
   if(!contratoId){ el.innerHTML = '<div class="empty">Selecciona un arrendatario específico arriba para ver el detalle mes a mes.</div>'; return; }
   const series = computeContratoMonthlySeries(contratoId);
-  const conSaldo = series
-    .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => {
-      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
-      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
-      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
-    })
-    .reverse();
-  if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — este arrendatario está exactamente al día en toda su historia.</div>'; return; }
+  const conSaldo = series.filter(d => (d.pagado + d.descuento) !== d.monto).map(d => {
+    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+    const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
+    return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
+  }).reverse();
+  if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor.</div>'; return; }
   const totalFaltante = conSaldo.filter(d=>d.saldo>0).reduce((s,d)=>s+d.saldo,0);
   const totalAFavor = conSaldo.filter(d=>d.saldo<0).reduce((s,d)=>s-d.saldo,0);
   const total = conSaldo.length;
@@ -2342,34 +1980,22 @@ function renderResumenImpagos(contratoId){
   </tr>`;
   }).join('')}
   </tbody></table>
-  ${total>12 ? `<div style="text-align:center;margin-top:12px">
-    <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos(document.getElementById('resumen-filter').value);">
-      ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
-    </button>
-  </div>` : ''}`;
+  ${total>12 ? `<div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos(document.getElementById('resumen-filter').value);">${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}</button></div>` : ''}`;
 }
 
 document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
   const contratoId = document.getElementById('resumen-filter').value;
   if(!contratoId){ alert('Selecciona un arrendatario específico arriba antes de exportar.'); return; }
   const series = computeContratoMonthlySeries(contratoId);
-  const conSaldo = series
-    .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => {
-      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
-      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
-      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
-    })
-    .reverse();
-  if(!conSaldo.length){ alert('Este arrendatario no tiene meses con deuda ni con saldo a favor para exportar.'); return; }
+  const conSaldo = series.filter(d => (d.pagado + d.descuento) !== d.monto).map(d => {
+    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+    const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
+    return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
+  }).reverse();
+  if(!conSaldo.length){ alert('Este arrendatario no tiene meses con deuda ni con saldo a favor.'); return; }
   const rows = conSaldo.map(d=>({
-    Mes: `${MESES_ES[d.month]} ${d.year}`,
-    monto: Number(d.monto),
-    pagado: Number(d.pagado),
-    descuento: Number(d.descuento),
-    saldo: Number(d.saldo),
-    Estado: d.saldo>0 ? 'Debe' : 'A favor',
-    Comentarios: d.comentarios
+    Mes: `${MESES_ES[d.month]} ${d.year}`, monto: Number(d.monto), pagado: Number(d.pagado), descuento: Number(d.descuento),
+    saldo: Number(d.saldo), Estado: d.saldo>0 ? 'Debe' : 'A favor', Comentarios: d.comentarios
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   applyColumnFormats(ws, ['Mes','monto','pagado','descuento','saldo','Estado','Comentarios']);
@@ -2380,64 +2006,66 @@ document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
   exportWorkbookToDrive(wb, `meses-con-deuda-${nombre}`);
 });
 
-// ---------- COMBOBOX BUSCABLE ----------
-function makeSearchable(selectId){
+// ---------- COMBOBOX (lista completa al abrir, se puede escribir para filtrar, no persiste texto) ----------
+function createCombobox(selectId, placeholder){
   const select = document.getElementById(selectId);
-  if(!select || select.dataset.searchable) return;
-  select.dataset.searchable = '1';
+  if(!select || select.dataset.combo) return;
+  select.dataset.combo = '1';
   select.style.display = 'none';
 
-  const wrapper = document.createElement('div');
-  wrapper.className = 'searchable-select';
+  const wrap = document.createElement('div');
+  wrap.className = 'combo-wrap';
   const input = document.createElement('input');
   input.type = 'text';
+  input.className = 'combo-input';
   input.autocomplete = 'off';
-  input.placeholder = '🔎 Escribe para buscar…';
-  const listId = selectId+'-datalist';
-  input.setAttribute('list', listId);
-  const datalist = document.createElement('datalist');
-  datalist.id = listId;
+  input.placeholder = placeholder || 'Selecciona…';
+  const panel = document.createElement('div');
+  panel.className = 'combo-panel';
 
-  select.parentNode.insertBefore(wrapper, select);
-  wrapper.appendChild(input);
-  wrapper.appendChild(datalist);
-  wrapper.appendChild(select);
+  select.parentNode.insertBefore(wrap, select);
+  wrap.appendChild(input);
+  wrap.appendChild(panel);
+  wrap.appendChild(select);
 
-  function optionLabel(o){ return o.textContent.trim(); }
+  function labelFor(opt){ return opt.textContent.trim(); }
 
-  function rebuildDatalist(){
-    datalist.innerHTML = Array.from(select.options).map(o=>`<option value="${esc(optionLabel(o))}">`).join('');
+  function renderPanel(filterText){
+    const term = (filterText||'').trim().toLowerCase();
+    const all = Array.from(select.options);
+    const filtered = all.filter(o=> !term || labelFor(o).toLowerCase().includes(term));
+    if(!filtered.length){ panel.innerHTML = '<div class="combo-empty">Sin resultados</div>'; return; }
+    panel.innerHTML = filtered.map(o=>{
+      const isSel = o.value===select.value && o.value!=='';
+      return `<div class="combo-opt ${isSel?'sel':''}" data-value="${esc(o.value)}">${esc(labelFor(o))}</div>`;
+    }).join('');
   }
-  function syncFromSelect(){
+  function syncInputFromSelect(){
     const opt = select.options[select.selectedIndex];
-    input.value = (opt && opt.value) ? optionLabel(opt) : '';
+    input.value = (opt && opt.value) ? labelFor(opt) : '';
   }
-  rebuildDatalist();
-  syncFromSelect();
+  function openPanel(){ renderPanel(''); panel.classList.add('open'); } // siempre parte con la lista completa
+  function closePanel(){ panel.classList.remove('open'); }
 
-  input.addEventListener('input', ()=>{
-    const typed = input.value.trim().toLowerCase();
-    if(typed===''){
-      if(select.value!==''){ select.value=''; select.dispatchEvent(new Event('change',{bubbles:true})); }
-      return;
-    }
-    const match = Array.from(select.options).find(o=> optionLabel(o).toLowerCase()===typed);
-    if(match && select.value!==match.value){
-      select.value = match.value;
-      select.dispatchEvent(new Event('change',{bubbles:true}));
-    }
+  input.addEventListener('focus', openPanel);
+  input.addEventListener('click', openPanel);
+  input.addEventListener('input', ()=>{ renderPanel(input.value); panel.classList.add('open'); });
+  panel.addEventListener('mousedown', e=>{
+    const opt = e.target.closest('.combo-opt');
+    if(!opt) return;
+    e.preventDefault();
+    select.value = opt.dataset.value;
+    select.dispatchEvent(new Event('change',{bubbles:true}));
+    syncInputFromSelect();
+    closePanel();
   });
-  input.addEventListener('blur', ()=>{
-    const typed = input.value.trim().toLowerCase();
-    const match = Array.from(select.options).find(o=> optionLabel(o).toLowerCase()===typed);
-    if(!match) syncFromSelect();
-  });
+  input.addEventListener('blur', ()=>{ setTimeout(()=>{ syncInputFromSelect(); closePanel(); }, 120); });
 
-  new MutationObserver(()=>{ rebuildDatalist(); syncFromSelect(); }).observe(select, { childList:true });
+  syncInputFromSelect();
+  new MutationObserver(()=>{ syncInputFromSelect(); }).observe(select, { childList:true });
 }
-
 ['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','r-contratoId','r-filter']
-  .forEach(makeSearchable);
+  .forEach(id=> createCombobox(id, '🔎 Selecciona…'));
 
 function esc(s){
   if(s===undefined||s===null) return '';
