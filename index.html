@@ -246,11 +246,12 @@
       <h1>🏠 Propiedades</h1>
       <div class="subtitle">Registro de inmuebles de la cartera.</div>
       <div class="card">
-        <div class="collapsible-header" onclick="toggleCollapse('propForm')">
-          <h2 id="prop-form-title">🏠 Nueva propiedad</h2>
-          <span class="collapse-arrow" id="propForm-arrow">▸</span>
-        </div>
+        <button type="button" class="btn btn-primary" id="propForm-open-btn" onclick="showPropForm()">➕ Registrar nueva propiedad</button>
         <div id="propForm-wrap" style="display:none">
+        <div class="toggle-form">
+          <h2 id="prop-form-title">🏠 Nueva propiedad</h2>
+          <button type="button" class="btn btn-secondary" onclick="hidePropForm()">Ocultar formulario</button>
+        </div>
         <form id="form-propiedad">
           <input type="hidden" id="p-id">
 
@@ -327,11 +328,12 @@
       <div class="subtitle">Registra el arrendatario junto con su contrato — van siempre de la mano.</div>
 
       <div class="card">
-        <div class="collapsible-header" onclick="toggleCollapse('tenantForm')">
-          <h2 id="tc-form-title">🏢 Nuevo arrendatario y contrato</h2>
-          <span class="collapse-arrow" id="tenantForm-arrow">▸</span>
-        </div>
+        <button type="button" class="btn btn-primary" id="tenantForm-open-btn" onclick="showTenantForm()">➕ Registrar nuevo arrendatario y contrato</button>
         <div id="tenantForm-wrap" style="display:none">
+        <div class="toggle-form">
+          <h2 id="tc-form-title">🏢 Nuevo arrendatario y contrato</h2>
+          <button type="button" class="btn btn-secondary" onclick="hideTenantForm()">Ocultar formulario</button>
+        </div>
         <form id="form-arrendatario-contrato">
           <input type="hidden" id="t-id">
           <input type="hidden" id="c-id">
@@ -373,6 +375,7 @@
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo ajuste IPC</label><select id="c-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select></div>
               <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="number" required></div>
+              <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="number"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field full"><label>Información general</label><textarea id="c-infoGeneral"></textarea></div>
@@ -446,6 +449,7 @@
       </div>
       <div class="card">
         <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
+        <select class="filter" id="impagos-tenant-filter"></select>
         <div id="resumen-impagos" class="table-wrap"></div>
       </div>
       <div class="card">
@@ -807,7 +811,7 @@ function styleWorksheet(ws, widths){
 }
 
 const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
-const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo'];
+const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo'];
 function applyColumnFormats(ws, headers){
   if(!ws['!ref']) return;
   const range = XLSX.utils.decode_range(ws['!ref']);
@@ -866,12 +870,12 @@ function buildWorkbook(){
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
     fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato, fechaFinContrato: c.fechaFinContrato||'',
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
-    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, infoGeneral: c.infoGeneral,
+    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','infoGeneral','activo','fechaTermino','deudaPactada']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,14,10,12,16,32,8,14,14]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,14,10,12,16,14,32,8,14,14]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -1050,7 +1054,7 @@ async function exportWorkbookToDrive(wb, filenamePrefix){
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
 let properties = [], tenants = [], contracts = [], payments = [], readings = [];
-const collapseState = { tenants:true, contracts:false, propForm:false, tenantForm:false };
+const collapseState = { tenants:true, contracts:false };
 function toggleCollapse(key){
   collapseState[key] = !collapseState[key];
   const wrap = document.getElementById(key+'-list-wrap') || document.getElementById(key+'-wrap');
@@ -1058,12 +1062,21 @@ function toggleCollapse(key){
   if(wrap) wrap.style.display = collapseState[key] ? 'block' : 'none';
   if(arrow) arrow.style.transform = collapseState[key] ? 'rotate(90deg)' : 'rotate(0deg)';
 }
-function expandCollapse(key){
-  collapseState[key] = true;
-  const wrap = document.getElementById(key+'-list-wrap') || document.getElementById(key+'-wrap');
-  const arrow = document.getElementById(key+'-arrow');
-  if(wrap) wrap.style.display = 'block';
-  if(arrow) arrow.style.transform = 'rotate(90deg)';
+function showPropForm(){
+  document.getElementById('propForm-wrap').style.display = 'block';
+  document.getElementById('propForm-open-btn').style.display = 'none';
+}
+function hidePropForm(){
+  document.getElementById('propForm-wrap').style.display = 'none';
+  document.getElementById('propForm-open-btn').style.display = 'inline-block';
+}
+function showTenantForm(){
+  document.getElementById('tenantForm-wrap').style.display = 'block';
+  document.getElementById('tenantForm-open-btn').style.display = 'none';
+}
+function hideTenantForm(){
+  document.getElementById('tenantForm-wrap').style.display = 'none';
+  document.getElementById('tenantForm-open-btn').style.display = 'inline-block';
 }
 let editingProp = null, editingTenant = null, editingContract = null, editingPay = null, editingReading = null;
 let storageOK = true;
@@ -1178,7 +1191,7 @@ function editProperty(id){
   propFields.forEach(f=> document.getElementById('p-'+f).value = p[f] || '');
   document.getElementById('prop-form-title').textContent='🏠 Editar propiedad';
   document.getElementById('p-cancel').style.display='inline-block';
-  expandCollapse('propForm');
+  showPropForm();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 async function deleteProperty(id){
@@ -1271,7 +1284,7 @@ document.getElementById('prop-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
-const contractFields = ['fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -1349,7 +1362,7 @@ function editTenantContract(tenantId, contractId){
   document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
   document.getElementById('tc-form-title').textContent='🏢 Editar arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='inline-block';
-  expandCollapse('tenantForm');
+  showTenantForm();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -1508,6 +1521,7 @@ function renderTenantsContracts(){
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
         ${propField('Fin contrato', fechaFin)}
         ${propField('Monto pactado', money(c.montoArriendoPactado))}
+        ${propField('Garantía', c.garantia ? money(c.garantia) : '—')}
         ${propField('Comentarios', esc(c.infoGeneral))}
       </div>
     </div>`;
@@ -1657,7 +1671,7 @@ function computeResumenRows(){
 function renderResumenSelect(){
   const activos = contracts.filter(isActiveContract);
   const optionsHtml = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  ['resumen-filter','chart-tenant-filter'].forEach(id=>{
+  ['resumen-filter','chart-tenant-filter','impagos-tenant-filter'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
     sel.innerHTML = optionsHtml;
@@ -1665,11 +1679,21 @@ function renderResumenSelect(){
   });
 }
 document.getElementById('resumen-filter').addEventListener('change', ()=>{
-  document.getElementById('chart-tenant-filter').value = document.getElementById('resumen-filter').value;
+  const v = document.getElementById('resumen-filter').value;
+  document.getElementById('chart-tenant-filter').value = v;
+  document.getElementById('impagos-tenant-filter').value = v;
   renderResumen();
 });
 document.getElementById('chart-tenant-filter').addEventListener('change', ()=>{
-  document.getElementById('resumen-filter').value = document.getElementById('chart-tenant-filter').value;
+  const v = document.getElementById('chart-tenant-filter').value;
+  document.getElementById('resumen-filter').value = v;
+  document.getElementById('impagos-tenant-filter').value = v;
+  renderResumen();
+});
+document.getElementById('impagos-tenant-filter').addEventListener('change', ()=>{
+  const v = document.getElementById('impagos-tenant-filter').value;
+  document.getElementById('resumen-filter').value = v;
+  document.getElementById('chart-tenant-filter').value = v;
   renderResumen();
 });
 
@@ -2451,9 +2475,45 @@ function buildStackedColumnChartSVG(rows, availableWidth){
 
 // Detalle de meses con saldo, limitado a los últimos 12 (con botón para ver todo). Incluye comentarios.
 let impagosVerTodo = false;
+
+// Cuando no hay un arrendatario específico seleccionado ("Todos"), se calcula la sumatoria de
+// deuda / saldo a favor de cada contrato activo (mismo criterio mes a mes que la vista individual)
+// y se arma un desglose por arrendatario, además del total general.
+function computeAllTenantsImpagosSummary(){
+  const activos = contracts.filter(isActiveContract);
+  const perContract = activos.map(c=>{
+    const series = computeContratoMonthlySeries(c.id);
+    let deuda = 0, favor = 0;
+    series.forEach(d=>{
+      const saldo = d.monto - d.pagado - d.descuento;
+      if(saldo>0) deuda += saldo; else if(saldo<0) favor += -saldo;
+    });
+    return { c, deuda, favor, neto: deuda - favor };
+  }).filter(r=> r.deuda!==0 || r.favor!==0);
+  const totalFaltante = perContract.reduce((s,r)=>s+r.deuda,0);
+  const totalAFavor = perContract.reduce((s,r)=>s+r.favor,0);
+  perContract.sort((a,b)=> b.neto - a.neto);
+  return { perContract, totalFaltante, totalAFavor };
+}
+
 function renderResumenImpagos(contratoId){
   const el = document.getElementById('resumen-impagos');
-  if(!contratoId){ el.innerHTML = '<div class="empty">Selecciona un arrendatario específico arriba para ver el detalle mes a mes.</div>'; return; }
+
+  if(!contratoId){
+    const { perContract, totalFaltante, totalAFavor } = computeAllTenantsImpagosSummary();
+    if(!perContract.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor en ningún contrato — todos los arrendatarios están al día.</div>'; return; }
+    el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong> · Neto: <strong style="color:${totalFaltante-totalAFavor>=0?'var(--brick)':'var(--teal-dark)'}">${money(totalFaltante-totalAFavor)}</strong></div>
+    <table><thead><tr><th>Arrendatario (Dirección — Nemo)</th><th>Deuda acumulada</th><th>A favor acumulado</th><th>Saldo neto</th></tr></thead><tbody>
+    ${perContract.map(r=>`<tr>
+      <td><span class="truncate" title="${esc(contractLabel(r.c.id))}">${esc(contractLabel(r.c.id))}</span></td>
+      <td class="mono" style="color:var(--brick)">${r.deuda ? money(r.deuda) : '—'}</td>
+      <td class="mono" style="color:var(--teal-dark)">${r.favor ? money(r.favor) : '—'}</td>
+      <td class="mono" style="color:${r.neto>=0?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(r.neto)}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+    return;
+  }
+
   const series = computeContratoMonthlySeries(contratoId);
   const conSaldo = series
     .filter(d => (d.pagado + d.descuento) !== d.monto)
@@ -2602,7 +2662,7 @@ function makeSearchable(selectId){
   new MutationObserver(()=>{ syncFromSelect(); if(dropdown.style.display!=='none') buildList(input.value); }).observe(select, { childList:true });
 }
 
-['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','r-contratoId','r-filter']
+['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter']
   .forEach(makeSearchable);
 
 function esc(s){
