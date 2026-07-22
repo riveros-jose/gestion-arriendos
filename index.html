@@ -312,7 +312,7 @@
       </div>
       <div class="card">
         <h2>📋 Propiedades registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <input type="text" id="prop-search" class="filter" placeholder="🔎 Buscar propiedad (dirección, unidad, propietario…)" style="width:100%;max-width:420px;margin-bottom:14px;">
+        <select class="filter" id="prop-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
         <div class="subtabs" id="prop-subtabs">
           <button type="button" class="subtab-btn active" data-subtab="prop1">📜 Antecedentes e Inscripción CBR</button>
           <button type="button" class="subtab-btn" data-subtab="prop2">🔧 Servicios</button>
@@ -396,7 +396,7 @@
           <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
         </div>
         <div id="tenants-list-wrap" style="display:block">
-          <input type="text" id="tenant-search" class="filter" placeholder="🔎 Buscar arrendatario (nemo, sociedad, dirección, representante…)" style="width:100%;max-width:420px;margin-bottom:14px;" onclick="event.stopPropagation()">
+          <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
           <div id="tenant-table" class="table-wrap"></div>
         </div>
       </div>
@@ -514,7 +514,7 @@
       <h1>🗂️ Arrendatarios Históricos</h1>
       <div class="subtitle">Arrendatarios cuyo contrato ya terminó. No cuentan en la deuda vigente ni en las alertas. Si quedaron con deuda pactada, puedes seguir abonando desde la pestaña "Pagos" — aparecen ahí marcados como "Cobranza" mientras tengan saldo pendiente.</div>
       <div class="card">
-        <input type="text" id="historicos-search" class="filter" placeholder="🔎 Buscar arrendatario histórico (nombre, dirección…)" style="width:100%;max-width:420px;margin-bottom:14px;">
+        <select class="filter" id="historicos-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
         <div id="historicos-table" class="table-wrap"></div>
       </div>
     </div>
@@ -1213,19 +1213,21 @@ function propField(label, value){
   return `<div class="prop-field"><span class="lbl">${esc(label)}</span><span class="val">${value===''||value==null?'—':value}</span></div>`;
 }
 
-function propertyMatchesSearch(p, term){
-  if(!term) return true;
-  const haystack = [p.direccion,p.unidad,p.propietario,p.rolAvaluo,p.cbrLocalidad,p.clienteLuz,p.clienteAgua,p.clienteGas]
-    .map(v=>String(v||'').toLowerCase()).join(' ');
-  return haystack.includes(term);
+function renderPropSelectOptions(){
+  const optionsHtml = '<option value="">Todos</option>' + properties.map(p=>`<option value="${p.id}">${esc(p.direccion)}${p.unidad?' '+esc(p.unidad):''}</option>`).join('');
+  const sel = document.getElementById('prop-select');
+  const current = sel.value;
+  sel.innerHTML = optionsHtml;
+  if(properties.some(x=>x.id===current)) sel.value = current;
 }
 
 function renderProperties(){
   const el = document.getElementById('prop-table');
   if(!properties.length){ el.innerHTML='<div class="empty">Aún no hay propiedades registradas.</div>'; return; }
-  const term = (document.getElementById('prop-search').value||'').trim().toLowerCase();
-  const list = properties.filter(p=>propertyMatchesSearch(p,term));
-  if(!list.length){ el.innerHTML=`<div class="empty">No se encontraron propiedades para "${esc(term)}".</div>`; return; }
+  renderPropSelectOptions();
+  const selectedId = document.getElementById('prop-select').value;
+  const list = selectedId ? properties.filter(p=>p.id===selectedId) : properties;
+  if(!list.length){ el.innerHTML='<div class="empty">No se encontró la propiedad seleccionada.</div>'; return; }
 
   const intFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? String(Math.round(Number(v))) : esc(v);
   const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
@@ -1273,7 +1275,7 @@ function renderProperties(){
   }
 }
 let propActiveSubtab = 'prop1';
-document.getElementById('prop-search').addEventListener('input', renderProperties);
+document.getElementById('prop-select').addEventListener('change', renderProperties);
 document.getElementById('prop-subtabs').addEventListener('click', e=>{
   const btn = e.target.closest('.subtab-btn');
   if(!btn) return;
@@ -1474,12 +1476,12 @@ function contractLabel(id){
   return propAddresses(c) + ' — ' + identificador;
 }
 
-function tenantContractMatchesSearch(c, term){
-  if(!term) return true;
-  const t = tenants.find(x=>x.id===c.tenantId) || {};
-  const haystack = [t.nemoArrendatario,t.nombreSociedad,t.rutSociedad,t.nombreRepresentante,t.rutRepresentante,t.correo,t.telefono,propAddresses(c)]
-    .map(v=>String(v||'').toLowerCase()).join(' ');
-  return haystack.includes(term);
+function renderTenantSelectOptions(activos){
+  const optionsHtml = '<option value="">Todos</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const sel = document.getElementById('tenant-select');
+  const current = sel.value;
+  sel.innerHTML = optionsHtml;
+  if(activos.some(c=>c.id===current)) sel.value = current;
 }
 
 // Tabla fusionada: un arrendatario y su contrato vigente en una sola fila
@@ -1487,9 +1489,10 @@ function renderTenantsContracts(){
   const el = document.getElementById('tenant-table');
   const activos = contracts.filter(isActiveContract);
   if(!activos.length){ el.innerHTML='<div class="empty">Aún no hay arrendatarios ni contratos registrados. (Los finalizados se ven en "Arrendatarios Históricos")</div>'; return; }
-  const term = (document.getElementById('tenant-search').value||'').trim().toLowerCase();
-  const rows = activos.filter(c=>tenantContractMatchesSearch(c,term));
-  if(!rows.length){ el.innerHTML=`<div class="empty">No se encontraron arrendatarios para "${esc(term)}".</div>`; return; }
+  renderTenantSelectOptions(activos);
+  const selectedId = document.getElementById('tenant-select').value;
+  const rows = selectedId ? activos.filter(c=>c.id===selectedId) : activos;
+  if(!rows.length){ el.innerHTML='<div class="empty">No se encontró el arrendatario seleccionado.</div>'; return; }
   el.innerHTML = rows.map((c,idx)=>{
     const t = tenants.find(x=>x.id===c.tenantId) || {};
     const finCalc = contractEndDate(c);
@@ -1527,7 +1530,7 @@ function renderTenantsContracts(){
     </div>`;
   }).join('');
 }
-document.getElementById('tenant-search').addEventListener('input', renderTenantsContracts);
+document.getElementById('tenant-select').addEventListener('change', renderTenantsContracts);
 
 // ---------- PAGOS ----------
 const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
@@ -2119,11 +2122,12 @@ function computeCobranzaSaldo(c){
   return Number(c.deudaPactada||0) - cobrado;
 }
 
-function historicoMatchesSearch(r, term){
-  if(!term) return true;
-  const haystack = [tenantName(r.c.tenantId), propAddresses(r.c), r.c.fechaTermino]
-    .map(v=>String(v||'').toLowerCase()).join(' ');
-  return haystack.includes(term);
+function renderHistoricosSelectOptions(historicos){
+  const optionsHtml = '<option value="">Todos</option>' + historicos.map(c=>`<option value="${c.id}">${esc(tenantName(c.tenantId))} — ${contractPropertyIds(c).length ? esc(propAddresses(c)) : 'Sin identificar'}</option>`).join('');
+  const sel = document.getElementById('historicos-select');
+  const current = sel.value;
+  sel.innerHTML = optionsHtml;
+  if(historicos.some(c=>c.id===current)) sel.value = current;
 }
 
 function renderHistoricos(){
@@ -2131,7 +2135,11 @@ function renderHistoricos(){
   const historicos = contracts.filter(c=> !isActiveContract(c));
   if(!historicos.length){ el.innerHTML='<div class="empty">No hay arrendatarios históricos registrados.</div>'; return; }
 
-  let rows = historicos.map(c=>{
+  renderHistoricosSelectOptions(historicos);
+  const selectedId = document.getElementById('historicos-select').value;
+  const filteredHistoricos = selectedId ? historicos.filter(c=>c.id===selectedId) : historicos;
+
+  let rows = filteredHistoricos.map(c=>{
     const pagosC = payments.filter(p=>p.contratoId===c.id).sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''));
     const primerPago = pagosC.length ? pagosC[0].fechaPago : '—';
     const ultimoPago = pagosC.length ? pagosC[pagosC.length-1].fechaPago : '—';
@@ -2139,9 +2147,7 @@ function renderHistoricos(){
     return { c, primerPago, ultimoPago, saldoRemanente };
   }).sort((a,b)=> b.saldoRemanente - a.saldoRemanente);
 
-  const term = (document.getElementById('historicos-search').value||'').trim().toLowerCase();
-  rows = rows.filter(r=>historicoMatchesSearch(r,term));
-  if(!rows.length){ el.innerHTML=`<div class="empty">No se encontraron arrendatarios históricos para "${esc(term)}".</div>`; return; }
+  if(!rows.length){ el.innerHTML='<div class="empty">No se encontró el arrendatario histórico seleccionado.</div>'; return; }
 
   el.innerHTML = rows.map((r,idx)=>{
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
@@ -2166,7 +2172,7 @@ function renderHistoricos(){
     </div>`;
   }).join('');
 }
-document.getElementById('historicos-search').addEventListener('input', renderHistoricos);
+document.getElementById('historicos-select').addEventListener('change', renderHistoricos);
 
 // ---------- ORDEN DE TABLAS (clic en encabezado) ----------
 const sortState = {};
@@ -2476,41 +2482,53 @@ function buildStackedColumnChartSVG(rows, availableWidth){
 // Detalle de meses con saldo, limitado a los últimos 12 (con botón para ver todo). Incluye comentarios.
 let impagosVerTodo = false;
 
-// Cuando no hay un arrendatario específico seleccionado ("Todos"), se calcula la sumatoria de
-// deuda / saldo a favor de cada contrato activo (mismo criterio mes a mes que la vista individual)
-// y se arma un desglose por arrendatario, además del total general.
-function computeAllTenantsImpagosSummary(){
-  const activos = contracts.filter(isActiveContract);
-  const perContract = activos.map(c=>{
-    const series = computeContratoMonthlySeries(c.id);
-    let deuda = 0, favor = 0;
-    series.forEach(d=>{
-      const saldo = d.monto - d.pagado - d.descuento;
-      if(saldo>0) deuda += saldo; else if(saldo<0) favor += -saldo;
-    });
-    return { c, deuda, favor, neto: deuda - favor };
-  }).filter(r=> r.deuda!==0 || r.favor!==0);
-  const totalFaltante = perContract.reduce((s,r)=>s+r.deuda,0);
-  const totalAFavor = perContract.reduce((s,r)=>s+r.favor,0);
-  perContract.sort((a,b)=> b.neto - a.neto);
-  return { perContract, totalFaltante, totalAFavor };
+// Cuando no hay un arrendatario específico seleccionado ("Todos"), se arma la misma vista
+// mes a mes que la individual, pero sumando monto/pagado/descuento de TODOS los contratos
+// activos en cada mes (igual criterio que el histograma global), sin desglosar por arrendatario.
+function computeAllTenantsMonthlyImpagos(){
+  const activeIds = new Set(contracts.filter(isActiveContract).map(c=>c.id));
+  const series = computeGlobalMonthlySeries();
+  return series
+    .filter(d => (d.pagado + d.descuento) !== d.monto)
+    .map(d => {
+      const comentarios = payments
+        .filter(p=> activeIds.has(p.contratoId) && p.fechaPago && sameYearMonth(p.fechaPago,d.year,d.month) && p.comentarios)
+        .map(p=>p.comentarios).join(' · ');
+      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
+    })
+    .reverse();
 }
 
 function renderResumenImpagos(contratoId){
   const el = document.getElementById('resumen-impagos');
 
   if(!contratoId){
-    const { perContract, totalFaltante, totalAFavor } = computeAllTenantsImpagosSummary();
-    if(!perContract.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor en ningún contrato — todos los arrendatarios están al día.</div>'; return; }
-    el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong> · Neto: <strong style="color:${totalFaltante-totalAFavor>=0?'var(--brick)':'var(--teal-dark)'}">${money(totalFaltante-totalAFavor)}</strong></div>
-    <table><thead><tr><th>Arrendatario (Dirección — Nemo)</th><th>Deuda acumulada</th><th>A favor acumulado</th><th>Saldo neto</th></tr></thead><tbody>
-    ${perContract.map(r=>`<tr>
-      <td><span class="truncate" title="${esc(contractLabel(r.c.id))}">${esc(contractLabel(r.c.id))}</span></td>
-      <td class="mono" style="color:var(--brick)">${r.deuda ? money(r.deuda) : '—'}</td>
-      <td class="mono" style="color:var(--teal-dark)">${r.favor ? money(r.favor) : '—'}</td>
-      <td class="mono" style="color:${r.neto>=0?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(r.neto)}</td>
-    </tr>`).join('')}
-    </tbody></table>`;
+    const conSaldo = computeAllTenantsMonthlyImpagos();
+    if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — sumando todos los arrendatarios, todo está al día.</div>'; return; }
+    const totalFaltante = conSaldo.filter(d=>d.saldo>0).reduce((s,d)=>s+d.saldo,0);
+    const totalAFavor = conSaldo.filter(d=>d.saldo<0).reduce((s,d)=>s-d.saldo,0);
+    const total = conSaldo.length;
+    const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
+    el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong></div>
+    <table><thead><tr><th>Mes</th><th>Monto pactado (total)</th><th>Pagado (total)</th><th>Descuento (total)</th><th>Saldo</th><th>Estado</th><th>Comentarios</th></tr></thead><tbody>
+    ${mostrar.map(d=>{
+      const esDeuda = d.saldo>0;
+      return `<tr>
+      <td>${MESES_ES[d.month]} ${d.year}</td>
+      <td class="mono">${money(d.monto)}</td>
+      <td class="mono">${money(d.pagado)}</td>
+      <td class="mono">${money(d.descuento)}</td>
+      <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
+      <td><span class="tag ${esDeuda?'tag-debt':'tag-ok'}">${esDeuda?'Debe':'A favor'}</span></td>
+      <td>${esc(d.comentarios)}</td>
+    </tr>`;
+    }).join('')}
+    </tbody></table>
+    ${total>12 ? `<div style="text-align:center;margin-top:12px">
+      <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos('');">
+        ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
+      </button>
+    </div>` : ''}`;
     return;
   }
 
@@ -2662,7 +2680,7 @@ function makeSearchable(selectId){
   new MutationObserver(()=>{ syncFromSelect(); if(dropdown.style.display!=='none') buildList(input.value); }).observe(select, { childList:true });
 }
 
-['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter']
+['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select']
   .forEach(makeSearchable);
 
 function esc(s){
