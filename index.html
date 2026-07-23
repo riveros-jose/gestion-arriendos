@@ -97,6 +97,8 @@
   .toggle-form{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
   .status-msg{font-size:12px;color:var(--ink-soft);margin-top:6px;}
   .badge{background:var(--brick);color:#fff;font-family:'Inter',sans-serif;font-size:11px;padding:1px 7px;border-radius:20px;margin-left:auto;}
+  .alerts-tenant-group{margin-bottom:18px;}
+  .alerts-tenant-header{font-family:'Fraunces',serif;font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
   .alert-card{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:8px;margin-bottom:10px;border-left:4px solid;}
   .alert-card.u1{background:var(--brick-soft);border-color:var(--brick);}
   .alert-card.u2{background:#FBF1DC;border-color:var(--gold);}
@@ -308,6 +310,44 @@
     <div id="drive-gate-action">
       <button class="btn btn-primary" id="drive-gate-connect-btn">Conectar con Google Drive</button>
       <p id="drive-gate-msg" class="drive-gate-fine">Puedes revocar este acceso cuando quieras desde <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">tu cuenta de Google</a>.</p>
+    </div>
+  </div>
+</div>
+
+<div id="contract-update-overlay" class="drive-gate-overlay" style="display:none">
+  <div class="drive-gate-card" style="max-width:460px;text-align:left;">
+    <h2 style="text-align:left;">📝 Actualizar contrato</h2>
+    <p id="cu-subtitle" style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 18px;"></p>
+    <input type="hidden" id="cu-contratoId">
+    <div class="field" style="margin-bottom:14px;text-align:left;">
+      <label id="cu-fecha-label">Nueva fecha de término</label>
+      <input type="date" id="cu-fecha">
+    </div>
+    <div class="field" style="margin-bottom:14px;text-align:left;">
+      <label>Monto de arriendo ($)</label>
+      <input type="number" id="cu-monto">
+    </div>
+    <div class="field" style="margin-bottom:14px;text-align:left;">
+      <label>¿Qué ocurrió con este contrato?</label>
+      <select id="cu-motivo" onchange="updateContractModalUI()">
+        <option value="solo_fecha">Solo se actualizó la fecha</option>
+        <option value="ipc">Se ajustó por IPC</option>
+        <option value="valor">Se ajustó el valor del arriendo</option>
+        <option value="no_renovara">No se renovará</option>
+        <option value="termino">Finalizar contrato (ahora)</option>
+      </select>
+    </div>
+    <div class="field" id="cu-deuda-field" style="margin-bottom:14px;display:none;text-align:left;">
+      <label>Deuda pactada al término ($)</label>
+      <input type="number" id="cu-deuda" value="0">
+    </div>
+    <div class="field" style="margin-bottom:6px;text-align:left;">
+      <label>Comentarios</label>
+      <textarea id="cu-comentarios"></textarea>
+    </div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button type="button" class="btn btn-primary" onclick="submitContractUpdate()">Guardar</button>
+      <button type="button" class="btn btn-secondary" onclick="closeContractUpdateModal()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -1916,7 +1956,7 @@ function buildAlerts(){
       if(m===1||m===2||m===3){ alerts.push({c, tipo:'Ajuste de IPC', meses:m, fecha:toISO(next)}); }
     }
   });
-  return alerts.sort((a,b)=> a.meses - b.meses);
+  return alerts;
 }
 function renderAlertas(){
   const alerts = buildAlerts();
@@ -1928,47 +1968,125 @@ function renderAlertas(){
   });
   const el = document.getElementById('alertas-list');
   if(!alerts.length){ el.innerHTML='<div class="empty">No hay vencimientos ni ajustes de IPC dentro de los próximos 3 meses.</div>'; return; }
-  el.innerHTML = alerts.map(a=>{
-    const urgencyClass = a.vencido ? 'u1' : ('u'+a.meses);
-    const when = a.vencido ? `Venció el ${formatDate(a.fecha)}` : `${formatDate(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
-    return `<div class="alert-card ${urgencyClass}">
-      <div>
-        <div class="title">${esc(a.tipo)} — ${esc(tenantName(a.c.tenantId))}</div>
-        <div class="sub">${esc(propAddresses(a.c))}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="when">${when}</div>
-        ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="updateContractFromAlert('${a.c.id}')">Actualizar contrato</button>` : ''}
-      </div>
+
+  // Se agrupan por arrendatario; los grupos se ordenan por la alerta más urgente que contengan,
+  // y dentro de cada grupo las alertas también quedan ordenadas por urgencia.
+  const groups = {};
+  alerts.forEach(a=>{
+    const key = a.c.tenantId;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(a);
+  });
+  const groupList = Object.values(groups).map(list=>{
+    list.sort((x,y)=> x.meses - y.meses);
+    return { tenantId: list[0].c.tenantId, minMeses: Math.min(...list.map(a=>a.meses)), list };
+  });
+  groupList.sort((a,b)=> a.minMeses - b.minMeses);
+
+  el.innerHTML = groupList.map(g=>{
+    const label = tenantNemo(g.tenantId) || tenantName(g.tenantId);
+    return `<div class="alerts-tenant-group">
+      <div class="alerts-tenant-header">${esc(label)}</div>
+      ${g.list.map(a=> buildAlertCardHtml(a)).join('')}
     </div>`;
   }).join('');
 }
 
-async function updateContractFromAlert(id){
+function buildAlertCardHtml(a){
+  const urgencyClass = a.vencido ? 'u1' : ('u'+a.meses);
+  const when = a.vencido ? `Venció el ${formatDate(a.fecha)}` : `${formatDate(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
+  const nemo = tenantNemo(a.c.tenantId) || tenantName(a.c.tenantId);
+  return `<div class="alert-card ${urgencyClass}">
+    <div>
+      <div class="title">${esc(a.tipo)} — ${esc(nemo)}</div>
+      <div class="sub">${esc(propAddresses(a.c))}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="when">${when}</div>
+      ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="openUpdateContractModal('${a.c.id}')">Actualizar contrato</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function openUpdateContractModal(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
   const vencActual = contractEndDate(c);
   if(!vencActual){ alert('Este contrato no tiene una fecha de fin calculable (falta fecha de inicio o duración).'); return; }
 
   const nuevaFin = new Date(vencActual);
   nuevaFin.setUTCFullYear(nuevaFin.getUTCFullYear()+1);
-  const nuevaFinISO = toISO(nuevaFin);
 
-  if(!confirm(`Vas a actualizar el contrato de:\n${label}\n\nLa fecha de fin de contrato pasará de ${formatDate(toISO(vencActual))} a ${formatDate(nuevaFinISO)} (1 año más). ¿Continuar?`)) return;
+  document.getElementById('cu-contratoId').value = id;
+  const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
+  document.getElementById('cu-subtitle').textContent = `${nemo} — ${propAddresses(c)} · vencimiento actual: ${formatDate(toISO(vencActual))}`;
+  document.getElementById('cu-fecha').value = toISO(nuevaFin);
+  document.getElementById('cu-monto').value = c.montoArriendoPactado || '';
+  document.getElementById('cu-motivo').value = 'solo_fecha';
+  document.getElementById('cu-deuda').value = '0';
+  document.getElementById('cu-comentarios').value = '';
+  updateContractModalUI();
+  document.getElementById('contract-update-overlay').style.display = 'flex';
+}
 
-  const montoActual = Number(c.montoArriendoPactado||0);
-  const nuevoMontoStr = prompt(`Valor de arriendo actual: ${money(montoActual)}\n\n¿Quieres actualizarlo? Escribe el nuevo monto y presiona OK, o deja el mismo valor si no cambia.`, String(montoActual));
-  if(nuevoMontoStr===null) return;
+function closeContractUpdateModal(){
+  document.getElementById('contract-update-overlay').style.display = 'none';
+}
 
-  c.fechaFinContrato = nuevaFinISO;
-  const nuevoMonto = Number(nuevoMontoStr.replace(/[.$\s]/g,''));
-  if(!isNaN(nuevoMonto) && nuevoMonto>0){
-    c.montoArriendoPactado = nuevoMonto;
+function updateContractModalUI(){
+  const motivo = document.getElementById('cu-motivo').value;
+  const esTermino = (motivo==='no_renovara' || motivo==='termino');
+  document.getElementById('cu-deuda-field').style.display = esTermino ? 'block' : 'none';
+  document.getElementById('cu-fecha-label').textContent = esTermino ? 'Fecha de término del contrato' : 'Nueva fecha de término';
+}
+
+const CU_MOTIVO_LABELS = {
+  solo_fecha: 'Se actualizó solo la fecha',
+  ipc: 'Se ajustó por IPC',
+  valor: 'Se ajustó el valor del arriendo',
+  no_renovara: 'No se renovará',
+  termino: 'Se finalizó el contrato'
+};
+
+async function submitContractUpdate(){
+  const id = document.getElementById('cu-contratoId').value;
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return;
+
+  const fecha = document.getElementById('cu-fecha').value;
+  const monto = Number(document.getElementById('cu-monto').value);
+  const motivo = document.getElementById('cu-motivo').value;
+  const comentarios = document.getElementById('cu-comentarios').value.trim();
+
+  if(!fecha){ alert('Ingresa una fecha.'); return; }
+  if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
+
+  // Solo si el motivo es "No se renovará" o "Finalizar contrato (ahora)" el contrato se finaliza de
+  // verdad (pasa a Históricos). Para los demás motivos, solo se actualizan fecha y monto y el
+  // contrato sigue activo.
+  const esTermino = (motivo==='no_renovara' || motivo==='termino');
+  const motivoLabel = CU_MOTIVO_LABELS[motivo] || '';
+  const nota = [motivoLabel, comentarios].filter(Boolean).join(' — ');
+  const hoy = new Date().toISOString().slice(0,10);
+
+  if(esTermino){
+    const deuda = Number(document.getElementById('cu-deuda').value || 0);
+    if(isNaN(deuda) || deuda<0){ alert('Monto de deuda inválido.'); return; }
+    const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
+    if(!confirm(`Vas a finalizar el contrato de:\n${nemo} — ${propAddresses(c)}\n\nPasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas. ¿Continuar?`)) return;
+    c.montoArriendoPactado = monto;
+    c.activo = false;
+    c.fechaTermino = fecha;
+    c.deudaPactada = deuda;
+  } else {
+    c.fechaFinContrato = fecha;
+    c.montoArriendoPactado = monto;
   }
+  if(nota) c.infoGeneral = [c.infoGeneral, `[${formatDate(hoy)}] ${nota}`].filter(Boolean).join(' | ');
 
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
+  closeContractUpdateModal();
   renderAll();
   pushToDriveIfConnected();
 }
