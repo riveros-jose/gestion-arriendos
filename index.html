@@ -93,11 +93,6 @@
   .alert-card .when{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;white-space:nowrap;margin-left:16px;}
   .storage-banner{background:var(--brick-soft);color:var(--brick);border:1px solid var(--brick);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;}
   .date-warning-banner{background:#FBF1DC;color:#8A6410;border:1px solid var(--gold);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;line-height:1.5;}
-  .drive-bar{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:6px;font-size:13px;}
-  .drive-bar .dot{width:9px;height:9px;border-radius:50%;background:#B7BFB9;flex-shrink:0;}
-  .drive-bar .dot.on{background:var(--teal);}
-  .drive-bar .drive-status{color:var(--ink-soft);flex:1;}
-  .drive-bar button{margin-left:auto;}
   .drive-note{font-size:11.5px;color:#8A968F;margin:0 0 20px 2px;}
   .page-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .page-header-row h1{margin-bottom:4px;}
@@ -139,7 +134,7 @@
   .prop-card-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
   .prop-card-dir{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink);}
   .card-index{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink-soft);}
-  .searchable-select{position:relative;}
+  .searchable-select{position:relative;margin-bottom:14px;}
   .searchable-select input{width:100%;}
   .searchable-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;z-index:80;box-shadow:0 8px 20px rgba(0,0,0,0.14);margin-top:4px;}
   .dropdown-item{padding:8px 10px;font-size:13px;cursor:pointer;white-space:normal;}
@@ -181,9 +176,6 @@
     .grid{grid-template-columns:1fr;}
     .line-row{grid-template-columns:1fr;}
     .summary-cards{grid-template-columns:repeat(2,1fr);}
-    .drive-bar{flex-wrap:wrap;row-gap:10px;}
-    .drive-bar .drive-status{order:1;flex:1 1 100%;}
-    .drive-bar button{margin-left:0;}
     .page-header-row h1{font-size:20px;}
     .icon-btn-sm{width:30px;height:30px;font-size:14px;}
     .drive-gate-card{padding:28px 22px;}
@@ -238,12 +230,6 @@
       ⚠ No se detectó almacenamiento persistente en esta ventana. Lo que registres ahora <strong>se perderá al cerrar o recargar</strong>. Para que tus datos se guarden automáticamente, abre y usa esta app dentro del chat de Claude (como artifact), no como archivo descargado y abierto directo en el navegador.
     </div>
     <div id="date-corruption-banner" class="date-warning-banner" style="display:none"></div>
-    <div class="drive-bar">
-      <span class="dot" id="drive-dot"></span>
-      <span class="drive-status" id="drive-status">Google Drive: no conectado</span>
-      <button class="btn btn-secondary" id="drive-pick-btn" style="display:none" title="Elige a mano el archivo Excel en tu Drive">📂 Seleccionar archivo en Drive</button>
-      <button class="btn btn-secondary" id="drive-disconnect-btn" style="display:none" title="Cerrar sesión y usar otra cuenta">Cambiar cuenta</button>
-    </div>
     <div class="drive-note" id="drive-note"></div>
 
     <!-- PROPIEDADES -->
@@ -510,13 +496,23 @@
             <button type="submit" class="btn btn-primary">Guardar lectura</button>
             <button type="button" class="btn btn-secondary" id="r-cancel" style="display:none">Cancelar edición</button>
           </div>
+          <div class="status-msg" id="r-estimate-box" style="display:none;background:var(--teal-soft);color:var(--teal-dark);border:1px solid var(--teal);border-radius:6px;padding:8px 10px;margin-top:10px;font-weight:600;"></div>
           <div class="status-msg" id="r-status"></div>
         </form>
       </div>
       <div class="card">
         <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="r-filter"></select>
-        <div id="reading-table" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <h2>🏘️ Lecturas registradas — Sector 1 <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <div class="subtitle" style="margin-bottom:14px">San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088</div>
+        <div id="reading-table-sector1" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <h2>🏘️ Lecturas registradas — Sector 2 <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <div class="subtitle" style="margin-bottom:14px">Resto de las propiedades</div>
+        <div id="reading-table-sector2" class="table-wrap"></div>
       </div>
     </div>
 
@@ -560,8 +556,10 @@ function driveConfigured(){
 }
 
 function setDriveStatus(text, connected){
-  document.getElementById('drive-status').textContent = 'Google Drive: '+text;
-  document.getElementById('drive-dot').classList.toggle('on', !!connected);
+  const statusEl = document.getElementById('drive-status');
+  const dotEl = document.getElementById('drive-dot');
+  if(statusEl) statusEl.textContent = 'Google Drive: '+text;
+  if(dotEl) dotEl.classList.toggle('on', !!connected);
 }
 
 function showDriveGate(){ document.getElementById('drive-gate-overlay').style.display = 'flex'; }
@@ -652,7 +650,7 @@ function reloadFromDrive(){
   driveSync(true);
 }
 
-document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
+function disconnectDrive(){
   if(!confirm('Esto cerrará tu sesión de Google Drive en este navegador y pedirá reconectar. ¿Continuar?')) return;
   if(driveToken && google.accounts && google.accounts.oauth2){ google.accounts.oauth2.revoke(driveToken, ()=>{}); }
   driveToken = null; driveFolderId = null; driveFileId = null; hasLoadedFromDrive = false;
@@ -662,7 +660,7 @@ document.getElementById('drive-disconnect-btn').addEventListener('click', ()=>{
   document.getElementById('date-corruption-banner').style.display = 'none';
   showDriveGate();
   setGateChecking(false);
-});
+}
 
 function scheduleTokenRefresh(expiresInSec){
   if(tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
@@ -706,7 +704,6 @@ async function openFilePicker(){
     .build();
   picker.setVisible(true);
 }
-document.getElementById('drive-pick-btn').addEventListener('click', openFilePicker);
 
 async function onPickerResult(data){
   if(data.action !== google.picker.Action.PICKED) return;
@@ -1873,6 +1870,64 @@ function updateMedidorCompartidoHint(){
 document.getElementById('r-contratoId').addEventListener('change', updateMedidorCompartidoHint);
 document.getElementById('r-servicio').addEventListener('change', updateMedidorCompartidoHint);
 
+// Estimación en vivo del consumo del periodo y el monto a pagar, mientras se completa el formulario.
+function updateReadingEstimate(){
+  const box = document.getElementById('r-estimate-box');
+  const contratoId = document.getElementById('r-contratoId').value;
+  const servicio = document.getElementById('r-servicio').value;
+  const fechaLectura = document.getElementById('r-fechaLectura').value;
+  const lecturaActual = Number(document.getElementById('r-lecturaActual').value);
+  const valorUnitario = Number(document.getElementById('r-valorUnitario').value);
+
+  if(!contratoId || !servicio || !fechaLectura || isNaN(lecturaActual) || document.getElementById('r-lecturaActual').value==='' || isNaN(valorUnitario) || valorUnitario<=0){
+    box.style.display = 'none';
+    return;
+  }
+
+  const propias = readings
+    .filter(r=> r.contratoId===contratoId && r.servicio===servicio && r.id!==editingReading)
+    .slice().sort((a,b)=> (a.fechaLectura||'').localeCompare(b.fechaLectura||''));
+  const anteriores = propias.filter(r=> r.fechaLectura && r.fechaLectura < fechaLectura);
+  const prev = anteriores.length ? anteriores[anteriores.length-1] : null;
+
+  if(!prev){
+    box.innerHTML = 'Esta sería la <strong>primera lectura</strong> registrada para este contrato y servicio — todavía no hay una lectura anterior con la que calcular el consumo del periodo.';
+    box.style.display = 'block';
+    return;
+  }
+
+  let consumo = Math.max(lecturaActual - Number(prev.lecturaActual||0), 0);
+  let descuentoCompartido = 0;
+
+  if(servicio==='Luz' && contractMatchesAddress(contratoId, MEDIDOR_COMPARTIDO_LUZ.principal)){
+    const remarcadorReadings = readings
+      .filter(r=> r.servicio==='Luz' && contractMatchesAddress(r.contratoId, MEDIDOR_COMPARTIDO_LUZ.remarcador))
+      .slice().sort((a,b)=> (a.fechaLectura||'').localeCompare(b.fechaLectura||''));
+    const gruposRemarcador = {};
+    remarcadorReadings.forEach(r=>{
+      if(!gruposRemarcador[r.contratoId]) gruposRemarcador[r.contratoId] = [];
+      gruposRemarcador[r.contratoId].push(r);
+    });
+    Object.values(gruposRemarcador).forEach(list=>{
+      list.forEach((r,idx)=>{
+        if(!r.fechaLectura || !(r.fechaLectura > prev.fechaLectura && r.fechaLectura <= fechaLectura)) return;
+        const prevR = idx>0 ? list[idx-1] : null;
+        if(!prevR) return;
+        descuentoCompartido += Math.max(Number(r.lecturaActual||0) - Number(prevR.lecturaActual||0), 0);
+      });
+    });
+    if(descuentoCompartido>0) consumo = Math.max(consumo - descuentoCompartido, 0);
+  }
+
+  const monto = consumo * valorUnitario;
+  box.innerHTML = `Consumo estimado del periodo: <strong>${formatNumber(consumo)}</strong> (desde la lectura del ${formatDate(prev.fechaLectura)})`
+    + (descuentoCompartido>0 ? ` — ya se restaron <strong>${formatNumber(descuentoCompartido)}</strong> de San Diego 1712 (medidor compartido)` : '')
+    + ` · Monto estimado a pagar: <strong>${money(monto)}</strong>`;
+  box.style.display = 'block';
+}
+['r-contratoId','r-servicio'].forEach(id=> document.getElementById(id).addEventListener('change', updateReadingEstimate));
+['r-fechaLectura','r-lecturaActual','r-valorUnitario'].forEach(id=> document.getElementById(id).addEventListener('input', updateReadingEstimate));
+
 document.getElementById('form-lectura').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingReading || uid() };
@@ -1896,6 +1951,7 @@ function resetReadingForm(){
   document.getElementById('r-form-title').textContent='🔧 Nueva lectura';
   document.getElementById('r-cancel').style.display='none';
   updateMedidorCompartidoHint();
+  updateReadingEstimate();
 }
 function editReading(id){
   const r = readings.find(x=>x.id===id);
@@ -1906,6 +1962,7 @@ function editReading(id){
   document.getElementById('r-form-title').textContent='🔧 Editar lectura';
   document.getElementById('r-cancel').style.display='inline-block';
   updateMedidorCompartidoHint();
+  updateReadingEstimate();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 async function deleteReading(id){
@@ -2056,9 +2113,21 @@ function buildReadingsTableHtml(list){
   </tbody></table>`;
 }
 
+let readingsSectorVerTodo = { 1:false, 2:false };
+function readingsToggleHtml(sector, total){
+  if(total<=10) return '';
+  const verTodo = readingsSectorVerTodo[sector];
+  return `<div style="text-align:center;margin-top:12px">
+    <button type="button" class="btn btn-secondary" onclick="readingsSectorVerTodo[${sector}]=!readingsSectorVerTodo[${sector}];renderReadings();">
+      ${verTodo ? 'Ver solo las últimas 10' : `Ver todo (${total})`}
+    </button>
+  </div>`;
+}
+
 function renderReadings(){
   const filter = document.getElementById('r-filter').value;
-  const el = document.getElementById('reading-table');
+  const el1 = document.getElementById('reading-table-sector1');
+  const el2 = document.getElementById('reading-table-sector2');
   const all = computeReadingsWithConsumption();
   let list = all.filter(r=> !filter || r.contratoId===filter)
                 .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
@@ -2067,19 +2136,14 @@ function renderReadings(){
     lecturaActual: r=>Number(r.lecturaActual||0), consumo: r=>(r.consumo===null?-Infinity:r.consumo),
     valorUnitario: r=>Number(r.valorUnitario||0), monto: r=>r.monto, estadoEfectivo: r=>r.estadoEfectivo||''
   });
-  if(!list.length){ el.innerHTML='<div class="empty">No hay lecturas registradas.</div>'; return; }
 
   const sector1 = list.filter(r=> contratoSector(r.contratoId)===1);
   const sector2 = list.filter(r=> contratoSector(r.contratoId)===2);
+  const mostrar1 = readingsSectorVerTodo[1] ? sector1 : sector1.slice(0,10);
+  const mostrar2 = readingsSectorVerTodo[2] ? sector2 : sector2.slice(0,10);
 
-  let html = '';
-  if(sector1.length){
-    html += `<h3>🏘️ Sector 1 — San Diego 1712, 1708, 1704 y Sargento Aldea 1088</h3>${buildReadingsTableHtml(sector1)}`;
-  }
-  if(sector2.length){
-    html += `<h3 style="margin-top:${sector1.length?'22px':'0'}">🏘️ Sector 2 — Resto de las propiedades</h3>${buildReadingsTableHtml(sector2)}`;
-  }
-  el.innerHTML = html;
+  el1.innerHTML = mostrar1.length ? (buildReadingsTableHtml(mostrar1) + readingsToggleHtml(1, sector1.length)) : '<div class="empty">No hay lecturas registradas en este sector.</div>';
+  el2.innerHTML = mostrar2.length ? (buildReadingsTableHtml(mostrar2) + readingsToggleHtml(2, sector2.length)) : '<div class="empty">No hay lecturas registradas en este sector.</div>';
 }
 
 // ---------- HISTORIAL MENSUAL ----------
@@ -2808,7 +2872,7 @@ function setupPageHeaderActions(){
     row.appendChild(h1);
     const actions = document.createElement('div');
     actions.className = 'page-header-actions';
-    actions.innerHTML = `<button type="button" class="icon-btn-sm" onclick="reloadFromDrive()" title="Recargar desde Excel">⟳</button><button type="button" class="icon-btn-sm" onclick="requestDriveConnection()" title="Sincronizar con Google Drive">🔄</button>`;
+    actions.innerHTML = `<button type="button" class="icon-btn-sm" onclick="reloadFromDrive()" title="Recargar desde Excel">⟳</button><button type="button" class="icon-btn-sm" onclick="requestDriveConnection()" title="Sincronizar con Google Drive">🔄</button><button type="button" class="icon-btn-sm" onclick="disconnectDrive()" title="Cambiar cuenta de Google Drive">👤</button>`;
     row.appendChild(actions);
   });
 }
