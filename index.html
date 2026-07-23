@@ -181,13 +181,12 @@
   .table-scroll table th:first-child{ z-index:4; background:var(--card); box-shadow:2px 2px 4px -2px rgba(0,0,0,0.12); }
   .table-scroll table tr:hover td:first-child{ background:#FAFBFA !important; }
   .table-scroll-toggle{text-align:center;margin-top:12px;}
-  #resumen-matrix table th:first-child, #resumen-matrix table td:first-child{ max-width:340px; }
+  #resumen-matrix table th:first-child, #resumen-matrix table td:first-child{ max-width:none; white-space:nowrap !important; }
   #resumen-matrix .matrix-total-row td{
     position:sticky; bottom:0; z-index:5; background:var(--paper); font-weight:700;
     box-shadow:0 -2px 4px -2px rgba(0,0,0,0.15);
   }
   #resumen-matrix .matrix-total-row td:first-child{ z-index:6; background:var(--paper); }
-  #resumen-matrix .cell-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3; }
   .cell-truncate{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help;}
   .cell-tap-full{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
@@ -317,7 +316,8 @@
     .cell-clamp-2{
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
-    #resumen-matrix table th:first-child, #resumen-matrix table td:first-child{ max-width:190px; }
+    #resumen-matrix table th:first-child, #resumen-matrix table td:first-child{ max-width:190px; white-space:normal !important; }
+    #resumen-matrix .cell-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3; }
     .table-scroll{max-height:48vh;}
 
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
@@ -3270,7 +3270,7 @@ function renderResumenMatrix(){
       const d = sumas[r.c.id][key];
       if(d){
         // Hay al menos un registro ese mes, aunque sea de $0.
-        if(d.pagado===0 && d.descuento===0) return '<td class="mono" style="text-align:center;color:var(--ink-soft);">$0</td>';
+        if(d.pagado===0 && d.descuento===0) return '<td class="mono" style="text-align:center;color:var(--brick);opacity:0.7;">$0</td>';
         return `<td class="mono cell-stacked" style="text-align:center;">
           <div>${money(d.pagado)}</div>
           ${d.descuento ? `<div class="cell-stacked-sub">Desc: ${money(d.descuento)}</div>` : ''}
