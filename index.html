@@ -214,6 +214,18 @@
     }
     .topbar-btn:active{background:rgba(255,255,255,0.12);}
     .topbar-btn.active{background:rgba(43,111,92,0.55);}
+    .topbar-btn-excel{
+      background:#1D6F42;font-size:17px;
+      box-shadow:0 0 0 1px rgba(255,255,255,0.18) inset;
+    }
+    .topbar-btn-excel:active{background:#186038;}
+    .topbar-btn-excel .excel-refresh{
+      position:absolute;bottom:-1px;right:-1px;
+      background:var(--card);color:#1D6F42;
+      width:15px;height:15px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:700;border:1.5px solid var(--ink);
+    }
     .topbar-btn .badge{
       position:absolute;top:1px;right:-1px;margin-left:0;font-size:10px;padding:1px 5px;
     }
@@ -303,7 +315,7 @@
 <div class="app">
 <div class="mobile-topbar">
   <div class="topbar-group">
-    <button type="button" class="topbar-btn" onclick="reloadFromDrive()" title="Recargar desde Excel">⟳</button>
+    <button type="button" class="topbar-btn topbar-btn-excel" onclick="reloadFromDrive()" title="Recargar desde Excel">📊<span class="excel-refresh">⟳</span></button>
     <button type="button" class="topbar-btn" onclick="requestDriveConnection()" title="Sincronizar con Google Drive">🔄</button>
   </div>
   <span class="topbar-title">🏠 Gestión de Arriendos</span>
