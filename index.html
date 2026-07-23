@@ -36,8 +36,16 @@
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
   .app{display:flex;min-height:100vh;}
   .sidebar{width:230px;background:var(--ink);color:var(--paper);flex-shrink:0;padding:28px 0;display:flex;flex-direction:column;}
-  .brand{font-family:'Fraunces',serif;font-size:20px;font-weight:600;padding:0 24px 24px;border-bottom:1px solid rgba(238,241,239,0.15);margin-bottom:12px;}
+  .brand-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:0 24px 24px;border-bottom:1px solid rgba(238,241,239,0.15);margin-bottom:12px;}
+  .brand{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
   .brand-icon{display:none;}
+  .sidebar-alert-btn{
+    position:relative;flex-shrink:0;background:rgba(255,255,255,0.06);border:1px solid rgba(238,241,239,0.15);
+    border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px;color:var(--paper);
+    display:flex;align-items:center;justify-content:center;padding:0;
+  }
+  .sidebar-alert-btn:hover,.sidebar-alert-btn.active{background:rgba(43,111,92,0.55);border-color:var(--teal);}
+  .sidebar-alert-btn .badge{position:absolute;top:-4px;right:-4px;margin-left:0;font-size:10px;padding:1px 5px;}
   .nav-item{display:flex;align-items:center;gap:12px;padding:14px 24px;cursor:pointer;font-size:14px;color:#C9D3CD;border-left:3px solid transparent;transition:all .15s;}
   .nav-item .num{font-family:'Inter',sans-serif;font-size:12px;color:#6F8478;}
   .nav-item:hover{background:rgba(255,255,255,0.04);color:#fff;}
@@ -85,6 +93,7 @@
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
   .cell-stacked{white-space:normal !important;line-height:1.4;}
+  .cell-comments{max-width:220px;white-space:normal !important;word-break:break-word;line-height:1.4;}
   .cell-stacked-sub{font-size:11px;color:var(--ink-soft);}
   .table-action-btn{
     display:inline-flex;align-items:center;justify-content:center;
@@ -165,7 +174,7 @@
   .table-scroll table th:first-child, .table-scroll table td:first-child{
     position:sticky; left:0; z-index:2;
     box-shadow:2px 0 4px -2px rgba(0,0,0,0.12);
-    max-width:190px; white-space:normal !important; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;
+    max-width:280px; white-space:normal !important; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;
   }
   .table-scroll table tbody tr:nth-child(odd) td:first-child{ background:var(--card); }
   .table-scroll table tbody tr:nth-child(even) td:first-child{ background:var(--paper); }
@@ -261,7 +270,7 @@
     }
     .page-header-actions{display:none;}
     .nav-item[data-tab="alertas"]{display:none;}
-    .brand{display:none;}
+    .brand-row{display:none;}
     .sidebar-foot{display:none;}
     .nav-item{padding:9px 12px;border-left:none;border-radius:10px;white-space:nowrap;flex-shrink:0;position:relative;}
     .nav-item.active{border-left:none;}
@@ -402,14 +411,17 @@
   </div>
 </div>
   <div class="sidebar">
-    <div class="brand"><span class="brand-icon">🏠</span><span class="brand-text">Gestión de Arriendos</span></div>
+    <div class="brand-row">
+      <div class="brand"><span class="brand-icon">🏠</span><span class="brand-text">Gestión de Arriendos</span></div>
+      <button type="button" id="sidebar-alert-btn" class="sidebar-alert-btn" onclick="openAlertsTab()" title="Alertas">🔔<span id="alert-badge-sidebar" class="badge" style="display:none"></span></button>
+    </div>
     <div class="nav-item active" data-tab="resumen" title="Resumen & Deudas"><span class="num">01</span> <span class="nav-icon">📊</span><span class="nav-label"> Resumen &amp; Deudas</span></div>
     <div class="nav-item" data-tab="pagos" title="Pagos"><span class="num">02</span> <span class="nav-icon">💵</span><span class="nav-label"> Pagos</span></div>
     <div class="nav-item" data-tab="servicios" title="Servicios"><span class="num">03</span> <span class="nav-icon">💧</span><span class="nav-label"> Servicios</span></div>
-    <div class="nav-item" data-tab="alertas" title="Alertas"><span class="num">04</span> <span class="nav-icon">🔔</span><span class="nav-label"> Alertas</span> <span id="alert-badge" class="badge" style="display:none"></span></div>
-    <div class="nav-item" data-tab="propiedades" title="Propiedades"><span class="num">05</span> <span class="nav-icon">🏠</span><span class="nav-label"> Propiedades</span></div>
-    <div class="nav-item" data-tab="arrendatarios" title="Arrendatarios & Contratos"><span class="num">06</span> <span class="nav-icon">📄</span><span class="nav-label"> Arrendatarios &amp; Contratos</span></div>
-    <div class="nav-item" data-tab="historicos" title="Arrendatarios Históricos"><span class="num">07</span> <span class="nav-icon">🗂️</span><span class="nav-label"> Arrendatarios Históricos</span></div>
+    <div class="nav-item" data-tab="alertas" title="Alertas" style="display:none"><span class="nav-icon">🔔</span><span class="nav-label"> Alertas</span></div>
+    <div class="nav-item" data-tab="propiedades" title="Propiedades"><span class="num">04</span> <span class="nav-icon">🏠</span><span class="nav-label"> Propiedades</span></div>
+    <div class="nav-item" data-tab="arrendatarios" title="Arrendatarios & Contratos"><span class="num">05</span> <span class="nav-icon">📄</span><span class="nav-label"> Arrendatarios &amp; Contratos</span></div>
+    <div class="nav-item" data-tab="historicos" title="Arrendatarios Históricos"><span class="num">06</span> <span class="nav-icon">🗂️</span><span class="nav-label"> Arrendatarios Históricos</span></div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -1349,20 +1361,24 @@ function renderAll(){
 }
 
 // ---------- NAV ----------
+function switchTab(tabName){
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+  const navItem = document.querySelector('.nav-item[data-tab="'+tabName+'"]');
+  if(navItem) navItem.classList.add('active');
+  const section = document.getElementById('tab-'+tabName);
+  if(section) section.classList.add('active');
+  const topBell = document.getElementById('topbar-alert-btn');
+  if(topBell) topBell.classList.toggle('active', tabName==='alertas');
+  const sideBell = document.getElementById('sidebar-alert-btn');
+  if(sideBell) sideBell.classList.toggle('active', tabName==='alertas');
+}
 document.querySelectorAll('.nav-item').forEach(item=>{
-  item.addEventListener('click',()=>{
-    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
-    document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
-    item.classList.add('active');
-    document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const topBell = document.getElementById('topbar-alert-btn');
-    if(topBell) topBell.classList.toggle('active', item.dataset.tab==='alertas');
-  });
+  item.addEventListener('click',()=> switchTab(item.dataset.tab));
 });
 
 function openAlertsTab(){
-  const item = document.querySelector('.nav-item[data-tab="alertas"]');
-  if(item) item.click();
+  switchTab('alertas');
   scrollAppToTop();
 }
 
@@ -1452,7 +1468,7 @@ function renderProperties(){
   const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
 
   if(propActiveSubtab==='prop1'){
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card collapsed">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${selectedId?'':' collapsed'}">${propCardHeader(p, idx+1)}
       <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
           ${propField('M² construidos', ceilFmt(p.m2Construidos))}
@@ -1469,7 +1485,7 @@ function renderProperties(){
       </div>
       </div>`).join('');
   } else if(propActiveSubtab==='prop2'){
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card collapsed">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${selectedId?'':' collapsed'}">${propCardHeader(p, idx+1)}
       <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
           <div class="prop-service-group">
@@ -1488,7 +1504,7 @@ function renderProperties(){
       </div>
       </div>`).join('');
   } else {
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card collapsed">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${selectedId?'':' collapsed'}">${propCardHeader(p, idx+1)}
       <div class="prop-card-body">
         <div class="prop-fields-grid">
           ${propField('Avalúo fiscal', p.avaluoFiscal?money(p.avaluoFiscal):'—')}
@@ -1742,7 +1758,7 @@ function renderTenantsContracts(){
       ${repRight.length ? `<div class="contact-col">${repRight.join('')}</div>` : ''}
     </div>` : '';
 
-    return `<div class="prop-card collapsed">
+    return `<div class="prop-card${selectedId?'':' collapsed'}">
       <div class="prop-card-header">
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
@@ -2024,7 +2040,7 @@ function buildAlerts(){
 }
 function renderAlertas(){
   const alerts = buildAlerts();
-  ['alert-badge','alert-badge-top'].forEach(id=>{
+  ['alert-badge','alert-badge-top','alert-badge-sidebar'].forEach(id=>{
     const badge = document.getElementById(id);
     if(!badge) return;
     if(alerts.length){ badge.style.display='inline-block'; badge.textContent = alerts.length; }
@@ -2594,7 +2610,7 @@ function renderHistorialTodos(){
       ${Number(p.descuentos)?`<div class="cell-stacked-sub">Desc: ${money(p.descuentos)}</div>`:''}
       ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
     </td>
-    <td style="white-space:normal;">${esc(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
+    <td class="cell-comments">${esc(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -2693,7 +2709,7 @@ function renderHistoricos(){
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
     const tagClass = !tieneDeuda ? 'tag-ok' : (r.saldoRemanente>0 ? 'tag-debt' : 'tag-ok');
     const estado = !tieneDeuda ? 'Cerrado (sin deuda)' : (r.saldoRemanente>0 ? 'Cerrado (con deuda)' : 'Cerrado (deuda cobrada)');
-    return `<div class="prop-card collapsed">
+    return `<div class="prop-card${selectedId?'':' collapsed'}">
       <div class="prop-card-header">
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span><span class="prop-card-chevron">▸</span>
@@ -3063,7 +3079,7 @@ function renderResumenImpagos(contratoId){
       <td class="mono">${money(d.monto)}</td>
       <td class="mono">${money(d.pagado)}</td>
       <td class="mono">${money(d.descuento)}</td>
-      <td>${esc(d.comentarios)}</td>
+      <td class="cell-comments">${esc(d.comentarios)}</td>
     </tr>`;
     }).join('')}
     </tbody></table></div>
@@ -3099,7 +3115,7 @@ function renderResumenImpagos(contratoId){
     <td class="mono">${money(d.monto)}</td>
     <td class="mono">${money(d.pagado)}</td>
     <td class="mono">${money(d.descuento)}</td>
-    <td>${esc(d.comentarios)}</td>
+    <td class="cell-comments">${esc(d.comentarios)}</td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
