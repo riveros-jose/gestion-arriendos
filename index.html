@@ -181,6 +181,13 @@
   .table-scroll table th:first-child{ z-index:4; background:var(--card); box-shadow:2px 2px 4px -2px rgba(0,0,0,0.12); }
   .table-scroll table tr:hover td:first-child{ background:#FAFBFA !important; }
   .table-scroll-toggle{text-align:center;margin-top:12px;}
+  #resumen-matrix table th:first-child, #resumen-matrix table td:first-child{ max-width:340px; }
+  #resumen-matrix .matrix-total-row td{
+    position:sticky; bottom:0; z-index:5; background:var(--paper); font-weight:700;
+    box-shadow:0 -2px 4px -2px rgba(0,0,0,0.15);
+  }
+  #resumen-matrix .matrix-total-row td:first-child{ z-index:6; background:var(--paper); }
+  #resumen-matrix .cell-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3; }
   .cell-truncate{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help;}
   .cell-tap-full{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
@@ -310,6 +317,7 @@
     .cell-clamp-2{
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
+    #resumen-matrix table th:first-child, #resumen-matrix table td:first-child{ max-width:190px; }
     .table-scroll{max-height:48vh;}
 
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
@@ -2870,16 +2878,19 @@ function applyYearGroupFilter(series, yearSel, groupSel){
 }
 
 function computeGlobalMonthlySeries(){
-  const activos = contracts.filter(isActiveContract);
-  const starts = activos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
+  // Se consideran TODOS los contratos (activos e históricos) — cada uno solo aporta a los
+  // meses donde efectivamente tuvo un pago registrado (ver el filtro más abajo), así que un
+  // contrato ya finalizado sigue contando correctamente en los meses en que sí estuvo pagando.
+  const todos = contracts;
+  const starts = todos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
   if(!starts.length) return [];
   const minStart = starts.slice().sort()[0];
   const months = monthsBetween(minStart).slice().reverse();
   return months.map(({year,month})=>{
     let monto=0, pagado=0, descuento=0;
-    activos.forEach(c=>{
+    todos.forEach(c=>{
       // Solo se suman los clientes que tuvieron algún registro de pago ese mes (aunque sea $0) —
-      // no todos los contratos activos desde su fecha de inicio hasta hoy.
+      // no todos los contratos desde su fecha de inicio hasta hoy.
       const pagosMes = payments.filter(p=>p.contratoId===c.id && sameYearMonth(p.fechaPago,year,month));
       if(!pagosMes.length) return;
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
@@ -3100,13 +3111,12 @@ let impagosVerTodo = false;
 // mes a mes que la individual, pero sumando monto/pagado/descuento de TODOS los contratos
 // activos en cada mes (igual criterio que el histograma global), sin desglosar por arrendatario.
 function computeAllTenantsMonthlyImpagos(){
-  const activeIds = new Set(contracts.filter(isActiveContract).map(c=>c.id));
   const series = computeGlobalMonthlySeries();
   return series
     .filter(d => (d.pagado + d.descuento) !== d.monto)
     .map(d => {
       const comentarios = payments
-        .filter(p=> activeIds.has(p.contratoId) && p.fechaPago && sameYearMonth(p.fechaPago,d.year,d.month) && p.comentarios)
+        .filter(p=> p.fechaPago && sameYearMonth(p.fechaPago,d.year,d.month) && p.comentarios)
         .map(p=>p.comentarios).join(' · ');
       return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
     })
@@ -3290,7 +3300,7 @@ function renderResumenMatrix(){
       ${totDescuento ? `<div class="cell-stacked-sub">Desc: ${money(totDescuento)}</div>` : ''}
     </td>`;
   }).join('');
-  const totalRow = `<tr style="background:var(--paper);font-weight:700;"><td>Total</td>${totalCells}</tr>`;
+  const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}</tr>`;
 
   const toggleHtml = (!yearFiltro && total>12) ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
