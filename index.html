@@ -97,21 +97,33 @@
   .toggle-form{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
   .status-msg{font-size:12px;color:var(--ink-soft);margin-top:6px;}
   .badge{background:var(--brick);color:#fff;font-family:'Inter',sans-serif;font-size:11px;padding:1px 7px;border-radius:20px;margin-left:auto;}
-  .alerts-tenant-group{margin-bottom:18px;}
-  .alerts-tenant-header{font-family:'Fraunces',serif;font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
-  .alert-card{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:8px;margin-bottom:10px;border-left:4px solid;}
+  .alerts-tenant-group{margin-bottom:20px;}
+  .alerts-tenant-header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+  .alerts-tenant-name{font-family:'Fraunces',serif;font-size:14.5px;font-weight:600;color:var(--ink);}
+  .alerts-tenant-address{font-family:'Inter',sans-serif;font-size:12px;color:var(--ink-soft);}
+  .alert-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:10px;margin-bottom:10px;border-left:4px solid;}
   .alert-card.u1{background:var(--brick-soft);border-color:var(--brick);}
   .alert-card.u2{background:#FBF1DC;border-color:var(--gold);}
   .alert-card.u3{background:var(--teal-soft);border-color:var(--teal);}
-  .alert-card .title{font-weight:600;font-size:14px;}
-  .alert-card .sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
-  .alert-card .when{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;white-space:nowrap;margin-left:16px;}
+  .alert-card .title{font-weight:700;font-size:14px;color:var(--ink);}
+  .alert-line{font-size:12.5px;color:var(--ink-soft);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+  .alert-line-label{font-weight:600;color:var(--ink);flex-shrink:0;}
+  .alert-card .btn{align-self:flex-start;}
   .date-warning-banner{background:#FBF1DC;color:#8A6410;border:1px solid var(--gold);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;line-height:1.5;}
   .drive-note{font-size:11.5px;color:#8A968F;margin:0 0 20px 2px;}
   .page-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .page-header-row h1{margin-bottom:4px;}
   .page-header-actions{display:flex;gap:8px;flex-shrink:0;padding-top:2px;}
   .icon-btn-sm{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--ink-soft);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:opacity .15s,background .15s,color .15s;}
+  .icon-refresh-badge{
+    position:absolute;bottom:-1px;right:-1px;
+    background:var(--card);
+    width:14px;height:14px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:700;line-height:1;border:1.5px solid var(--ink);
+  }
+  .icon-refresh-badge.c-excel{color:#1D6F42;}
+  .icon-refresh-badge.c-drive{color:#1967D2;}
   .icon-btn-sm:hover{background:var(--teal-soft);color:var(--teal-dark);border-color:var(--teal);}
   .drive-gate-overlay{position:fixed;inset:0;background:rgba(22,38,31,0.82);backdrop-filter:blur(2px);z-index:9999;align-items:center;justify-content:center;padding:20px;}
   .drive-gate-card{background:var(--card);border-radius:14px;max-width:420px;width:100%;padding:36px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.35);}
@@ -157,7 +169,7 @@
   .sort-chip{padding:6px 12px;font-size:11.5px;}
   .sort-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);}
   .prop-card{border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#fdfdfc;}
-  .prop-card-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .prop-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
   .prop-card-dir{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink);}
   .card-index{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink-soft);}
   .searchable-select{position:relative;margin-bottom:14px;}
@@ -168,6 +180,7 @@
   .dropdown-item-reset{font-weight:700;color:var(--teal-dark);border-bottom:1px solid var(--border);}
   .dropdown-empty{padding:8px 10px;font-size:12.5px;color:var(--ink-soft);}
   .prop-card-unidad{font-size:13px;color:var(--ink-soft);}
+  .prop-card-contact{font-size:12px;color:var(--ink-soft);margin-top:4px;font-weight:400;}
   .prop-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 16px;}
   .prop-field{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .prop-field .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);font-weight:600;}
@@ -216,18 +229,8 @@
     }
     .topbar-btn:active{background:rgba(255,255,255,0.12);}
     .topbar-btn.active{background:rgba(43,111,92,0.55);}
-    .topbar-btn-excel{
-      background:#1D6F42;font-size:17px;
-      box-shadow:0 0 0 1px rgba(255,255,255,0.18) inset;
-    }
-    .topbar-btn-excel:active{background:#186038;}
-    .topbar-btn-excel .excel-refresh{
-      position:absolute;bottom:-1px;right:-1px;
-      background:var(--card);color:#1D6F42;
-      width:15px;height:15px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      font-size:11px;font-weight:700;border:1.5px solid var(--ink);
-    }
+    .topbar-btn-icon{width:21px;height:21px;display:block;border-radius:5px;}
+    .topbar-btn .icon-refresh-badge{bottom:2px;right:2px;}
     .topbar-btn .badge{
       position:absolute;top:1px;right:-1px;margin-left:0;font-size:10px;padding:1px 5px;
     }
@@ -275,8 +278,7 @@
     }
     .row-actions button:active{background:var(--teal-soft);border-color:var(--teal);}
 
-    .alert-card{flex-wrap:wrap;row-gap:6px;}
-    .alert-card .when{margin-left:0;}
+    .alert-card .btn{width:100%;}
     .prop-fields-grid{grid-template-columns:repeat(2,1fr) !important;gap:10px 12px;}
     .prop-card{padding:14px;border-radius:10px;}
     .prop-card-header .row-actions{width:100%;}
@@ -320,26 +322,25 @@
     <p id="cu-subtitle" style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 18px;"></p>
     <input type="hidden" id="cu-contratoId">
     <div class="field" style="margin-bottom:14px;text-align:left;">
-      <label id="cu-fecha-label">Nueva fecha de término</label>
-      <input type="date" id="cu-fecha">
-    </div>
-    <div class="field" style="margin-bottom:14px;text-align:left;">
-      <label>Monto de arriendo ($)</label>
-      <input type="number" id="cu-monto">
-    </div>
-    <div class="field" style="margin-bottom:14px;text-align:left;">
-      <label>¿Qué ocurrió con este contrato?</label>
+      <label>¿Qué ocurrirá con este contrato?</label>
       <select id="cu-motivo" onchange="updateContractModalUI()">
-        <option value="solo_fecha">Solo se actualizó la fecha</option>
-        <option value="ipc">Se ajustó por IPC</option>
-        <option value="valor">Se ajustó el valor del arriendo</option>
+        <option value="solo_fecha">Solo se actualizará la fecha</option>
+        <option value="ipc">Se ajustará por IPC</option>
+        <option value="valor">Se ajustará el valor del arriendo</option>
         <option value="no_renovara">No se renovará</option>
         <option value="termino">Finalizar contrato (ahora)</option>
       </select>
     </div>
-    <div class="field" id="cu-deuda-field" style="margin-bottom:14px;display:none;text-align:left;">
-      <label>Deuda pactada al término ($)</label>
-      <input type="number" id="cu-deuda" value="0">
+    <div id="cu-future-fields">
+      <div class="field" style="margin-bottom:14px;text-align:left;">
+        <label>Nueva fecha de término propuesta</label>
+        <input type="date" id="cu-fecha">
+      </div>
+      <div class="field" style="margin-bottom:14px;text-align:left;">
+        <label>Nuevo monto de arriendo ($)</label>
+        <input type="number" id="cu-monto">
+      </div>
+      <p class="drive-gate-fine" style="text-align:left;margin:0 0 14px;">Esto queda guardado como una decisión pendiente — no se aplica todavía al contrato vigente, se materializará recién cuando termine el periodo actual.</p>
     </div>
     <div class="field" style="margin-bottom:6px;text-align:left;">
       <label>Comentarios</label>
@@ -355,8 +356,14 @@
 <div class="app">
 <div class="mobile-topbar">
   <div class="topbar-group">
-    <button type="button" class="topbar-btn topbar-btn-excel" onclick="reloadFromDrive()" title="Recargar desde Excel">📊<span class="excel-refresh">⟳</span></button>
-    <button type="button" class="topbar-btn" onclick="requestDriveConnection()" title="Sincronizar con Google Drive">🔄</button>
+    <button type="button" class="topbar-btn" onclick="reloadFromDrive()" title="Recargar desde Excel">
+      <svg class="topbar-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5" fill="#1D6F42"/><text x="12" y="16.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle">X</text></svg>
+      <span class="icon-refresh-badge c-excel">⟳</span>
+    </button>
+    <button type="button" class="topbar-btn" onclick="requestDriveConnection()" title="Sincronizar con Google Drive">
+      <svg class="topbar-btn-icon" viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,4 44,40 4,40" fill="#4285F4"/><polygon points="24,4 34,22 14,22" fill="#FBBC05"/><polygon points="14,22 34,22 44,40 4,40" fill="#34A853"/></svg>
+      <span class="icon-refresh-badge c-drive">⟳</span>
+    </button>
   </div>
   <span class="topbar-title">🏠 Gestión de Arriendos</span>
   <div class="topbar-group">
@@ -968,8 +975,8 @@ function styleWorksheet(ws, widths){
   }
 }
 
-const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
-const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo'];
+const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
+const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo','proximaDecisionMonto'];
 function applyColumnFormats(ws, headers){
   if(!ws['!ref']) return;
   const range = XLSX.utils.decode_range(ws['!ref']);
@@ -1029,11 +1036,14 @@ function buildWorkbook(){
     fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato, fechaFinContrato: c.fechaFinContrato||'',
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
     tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', infoGeneral: c.infoGeneral,
-    activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||''
+    activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
+    proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
+    proximaDecisionMonto: c.proximaDecisionMonto||'', proximaDecisionComentarios: c.proximaDecisionComentarios||'',
+    proximaDecisionRegistrada: c.proximaDecisionRegistrada||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,14,10,12,16,14,32,8,14,14]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -1071,7 +1081,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -1677,19 +1687,26 @@ function renderTenantsContracts(){
       ? `<div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div><div class="prop-fields-grid">${sociedadFields.join('')}</div>`
       : '';
 
+    // Datos de contacto, en una línea compacta bajo el título de la tarjeta (jerarquía menor).
+    const contactoParts = [];
+    if(t.nombreRepresentante) contactoParts.push(`👤 ${esc(t.nombreRepresentante)}`);
+    if(t.correo) contactoParts.push(`📧 ${esc(t.correo)}`);
+    if(t.telefono) contactoParts.push(`📞 ${esc(t.telefono)}`);
+    const contactoLine = contactoParts.length ? `<div class="prop-card-contact">${contactoParts.join(' &nbsp;·&nbsp; ')}</div>` : '';
+
     return `<div class="prop-card">
       <div class="prop-card-header">
-        <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
+        <div>
+          <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
+          ${contactoLine}
+        </div>
         <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
       ${sociedadSection}
-      <div class="prop-card-section" ${sociedadSection?'':'style="margin-top:0;padding-top:0;border-top:none"'}>👤 Representante</div>
+      ${t.rutRepresentante ? `<div class="prop-card-section" ${sociedadSection?'':'style="margin-top:0;padding-top:0;border-top:none"'}>👤 Representante</div>
       <div class="prop-fields-grid">
-        ${propField('Representante', esc(t.nombreRepresentante))}
         ${propField('Rut Representante', esc(t.rutRepresentante))}
-        ${propField('Correo', esc(t.correo))}
-        ${propField('Teléfono', esc(t.telefono))}
-      </div>
+      </div>` : ''}
       <div class="prop-card-section">📝 Contrato</div>
       <div class="prop-fields-grid">
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
@@ -1698,6 +1715,13 @@ function renderTenantsContracts(){
         ${propField('Garantía', c.garantia ? money(c.garantia) : '—')}
         ${propField('Comentarios', esc(c.infoGeneral))}
       </div>
+      ${c.proximaDecisionMotivo ? `<div class="prop-card-section">📌 Próxima decisión (pendiente)</div>
+      <div class="prop-fields-grid">
+        ${propField('Qué ocurrirá', esc(CU_MOTIVO_LABELS[c.proximaDecisionMotivo] || c.proximaDecisionMotivo))}
+        ${c.proximaDecisionFecha ? propField('Nueva fecha propuesta', formatDate(c.proximaDecisionFecha)) : ''}
+        ${c.proximaDecisionMonto ? propField('Nuevo monto propuesto', money(c.proximaDecisionMonto)) : ''}
+        ${c.proximaDecisionComentarios ? propField('Comentarios', esc(c.proximaDecisionComentarios)) : ''}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1969,42 +1993,71 @@ function renderAlertas(){
   const el = document.getElementById('alertas-list');
   if(!alerts.length){ el.innerHTML='<div class="empty">No hay vencimientos ni ajustes de IPC dentro de los próximos 3 meses.</div>'; return; }
 
-  // Se agrupan por arrendatario; los grupos se ordenan por la alerta más urgente que contengan,
-  // y dentro de cada grupo las alertas también quedan ordenadas por urgencia.
-  const groups = {};
+  // 1er nivel: se agrupan por CONTRATO, así vencimiento + ajuste de IPC del mismo contrato
+  // se fusionan en una sola card en vez de mostrarse por separado.
+  const byContract = {};
   alerts.forEach(a=>{
-    const key = a.c.tenantId;
-    if(!groups[key]) groups[key] = [];
-    groups[key].push(a);
+    const key = a.c.id;
+    if(!byContract[key]) byContract[key] = [];
+    byContract[key].push(a);
   });
-  const groupList = Object.values(groups).map(list=>{
-    list.sort((x,y)=> x.meses - y.meses);
-    return { tenantId: list[0].c.tenantId, minMeses: Math.min(...list.map(a=>a.meses)), list };
+  const contractGroups = Object.values(byContract).map(items=>{
+    items.sort((x,y)=> x.meses - y.meses);
+    return { c: items[0].c, tenantId: items[0].c.tenantId, minMeses: Math.min(...items.map(a=>a.meses)), items };
   });
-  groupList.sort((a,b)=> a.minMeses - b.minMeses);
 
-  el.innerHTML = groupList.map(g=>{
-    const label = tenantNemo(g.tenantId) || tenantName(g.tenantId);
+  // 2do nivel: se agrupan por ARRENDATARIO, para juntar visualmente todas sus alertas bajo un
+  // mismo encabezado (con su dirección al lado, para no repetirla dentro de cada card).
+  const byTenant = {};
+  contractGroups.forEach(g=>{
+    if(!byTenant[g.tenantId]) byTenant[g.tenantId] = [];
+    byTenant[g.tenantId].push(g);
+  });
+  const tenantGroups = Object.values(byTenant).map(list=>{
+    list.sort((a,b)=> a.minMeses - b.minMeses);
+    return { tenantId: list[0].tenantId, minMeses: Math.min(...list.map(g=>g.minMeses)), contractGroups: list };
+  });
+  tenantGroups.sort((a,b)=> a.minMeses - b.minMeses);
+
+  el.innerHTML = tenantGroups.map(tg=>{
+    const label = tenantNemo(tg.tenantId) || tenantName(tg.tenantId);
+    const direcciones = [...new Set(tg.contractGroups.map(g=>propAddresses(g.c)))].join(' + ');
     return `<div class="alerts-tenant-group">
-      <div class="alerts-tenant-header">${esc(label)}</div>
-      ${g.list.map(a=> buildAlertCardHtml(a)).join('')}
+      <div class="alerts-tenant-header">
+        <span class="alerts-tenant-name">${esc(label)}</span>
+        <span class="alerts-tenant-address">${esc(direcciones)}</span>
+      </div>
+      ${tg.contractGroups.map(g=> buildAlertCardHtml(g)).join('')}
     </div>`;
   }).join('');
 }
 
-function buildAlertCardHtml(a){
-  const urgencyClass = a.vencido ? 'u1' : ('u'+a.meses);
-  const when = a.vencido ? `Venció el ${formatDate(a.fecha)}` : `${formatDate(a.fecha)} · en ${a.meses} mes${a.meses>1?'es':''}`;
-  const nemo = tenantNemo(a.c.tenantId) || tenantName(a.c.tenantId);
+function buildAlertCardHtml(g){
+  const items = g.items;
+  const vencItem = items.find(a=> a.tipo==='Vencimiento de contrato' || a.tipo==='Contrato vencido');
+  const ipcItem = items.find(a=> a.tipo==='Ajuste de IPC');
+  const anyVencido = items.some(a=>a.vencido);
+  const minMeses = Math.min(...items.map(a=>a.meses));
+  const urgencyClass = anyVencido ? 'u1' : ('u'+minMeses);
+
+  const titleParts = [];
+  if(vencItem) titleParts.push(vencItem.vencido ? 'Contrato vencido' : 'Vencimiento de contrato');
+  if(ipcItem) titleParts.push('Ajuste de IPC');
+
+  const lines = [];
+  if(vencItem){
+    const when = vencItem.vencido ? `Venció el ${formatDate(vencItem.fecha)}` : `${formatDate(vencItem.fecha)} · en ${vencItem.meses} mes${vencItem.meses>1?'es':''}`;
+    lines.push(`<div class="alert-line"><span class="alert-line-label">📅 Vencimiento:</span> ${when}</div>`);
+  }
+  if(ipcItem){
+    const when = `${formatDate(ipcItem.fecha)} · en ${ipcItem.meses} mes${ipcItem.meses>1?'es':''}`;
+    lines.push(`<div class="alert-line"><span class="alert-line-label">📈 Ajuste IPC:</span> ${when} — arriendo actual: ${money(g.c.montoArriendoPactado)}</div>`);
+  }
+
   return `<div class="alert-card ${urgencyClass}">
-    <div>
-      <div class="title">${esc(a.tipo)} — ${esc(nemo)}</div>
-      <div class="sub">${esc(propAddresses(a.c))}</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="when">${when}</div>
-      ${a.vencido ? `<button type="button" class="btn btn-secondary" onclick="openUpdateContractModal('${a.c.id}')">Actualizar contrato</button>` : ''}
-    </div>
+    <div class="title">${esc(titleParts.join(' + '))}</div>
+    ${lines.join('')}
+    ${anyVencido ? `<button type="button" class="btn btn-secondary" onclick="openUpdateContractModal('${g.c.id}')">Actualizar contrato</button>` : ''}
   </div>`;
 }
 
@@ -2023,7 +2076,6 @@ function openUpdateContractModal(id){
   document.getElementById('cu-fecha').value = toISO(nuevaFin);
   document.getElementById('cu-monto').value = c.montoArriendoPactado || '';
   document.getElementById('cu-motivo').value = 'solo_fecha';
-  document.getElementById('cu-deuda').value = '0';
   document.getElementById('cu-comentarios').value = '';
   updateContractModalUI();
   document.getElementById('contract-update-overlay').style.display = 'flex';
@@ -2033,17 +2085,19 @@ function closeContractUpdateModal(){
   document.getElementById('contract-update-overlay').style.display = 'none';
 }
 
+// Las tres primeras opciones son decisiones A FUTURO (se guardan pero no se aplican al
+// contrato vigente todavía). "No se renovará" y "Finalizar contrato (ahora)" no necesitan
+// fecha/monto propuestos, así que esos campos se ocultan y solo queda el de comentarios.
 function updateContractModalUI(){
   const motivo = document.getElementById('cu-motivo').value;
-  const esTermino = (motivo==='no_renovara' || motivo==='termino');
-  document.getElementById('cu-deuda-field').style.display = esTermino ? 'block' : 'none';
-  document.getElementById('cu-fecha-label').textContent = esTermino ? 'Fecha de término del contrato' : 'Nueva fecha de término';
+  const esFuturo = (motivo==='solo_fecha' || motivo==='ipc' || motivo==='valor');
+  document.getElementById('cu-future-fields').style.display = esFuturo ? 'block' : 'none';
 }
 
 const CU_MOTIVO_LABELS = {
-  solo_fecha: 'Se actualizó solo la fecha',
-  ipc: 'Se ajustó por IPC',
-  valor: 'Se ajustó el valor del arriendo',
+  solo_fecha: 'Solo se actualizará la fecha',
+  ipc: 'Se ajustará por IPC',
+  valor: 'Se ajustará el valor del arriendo',
   no_renovara: 'No se renovará',
   termino: 'Se finalizó el contrato'
 };
@@ -2053,34 +2107,43 @@ async function submitContractUpdate(){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
 
-  const fecha = document.getElementById('cu-fecha').value;
-  const monto = Number(document.getElementById('cu-monto').value);
   const motivo = document.getElementById('cu-motivo').value;
   const comentarios = document.getElementById('cu-comentarios').value.trim();
-
-  if(!fecha){ alert('Ingresa una fecha.'); return; }
-  if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
-
-  // Solo si el motivo es "No se renovará" o "Finalizar contrato (ahora)" el contrato se finaliza de
-  // verdad (pasa a Históricos). Para los demás motivos, solo se actualizan fecha y monto y el
-  // contrato sigue activo.
-  const esTermino = (motivo==='no_renovara' || motivo==='termino');
+  const esFuturo = (motivo==='solo_fecha' || motivo==='ipc' || motivo==='valor');
+  const esTermino = motivo==='termino';
+  const hoy = new Date().toISOString().slice(0,10);
   const motivoLabel = CU_MOTIVO_LABELS[motivo] || '';
   const nota = [motivoLabel, comentarios].filter(Boolean).join(' — ');
-  const hoy = new Date().toISOString().slice(0,10);
 
-  if(esTermino){
-    const deuda = Number(document.getElementById('cu-deuda').value || 0);
-    if(isNaN(deuda) || deuda<0){ alert('Monto de deuda inválido.'); return; }
+  if(esFuturo){
+    const fecha = document.getElementById('cu-fecha').value;
+    const monto = Number(document.getElementById('cu-monto').value);
+    if(!fecha){ alert('Ingresa una fecha.'); return; }
+    if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
+    // Se guarda como decisión PENDIENTE: no se toca fechaFinContrato ni montoArriendoPactado
+    // del contrato vigente — recién se materializa cuando termine el periodo actual.
+    c.proximaDecisionMotivo = motivo;
+    c.proximaDecisionFecha = fecha;
+    c.proximaDecisionMonto = monto;
+    c.proximaDecisionComentarios = comentarios;
+    c.proximaDecisionRegistrada = hoy;
+  } else if(motivo==='no_renovara'){
+    c.proximaDecisionMotivo = motivo;
+    c.proximaDecisionFecha = '';
+    c.proximaDecisionMonto = '';
+    c.proximaDecisionComentarios = comentarios;
+    c.proximaDecisionRegistrada = hoy;
+  } else if(esTermino){
     const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
-    if(!confirm(`Vas a finalizar el contrato de:\n${nemo} — ${propAddresses(c)}\n\nPasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas. ¿Continuar?`)) return;
-    c.montoArriendoPactado = monto;
+    if(!confirm(`Vas a finalizar el contrato de:\n${nemo} — ${propAddresses(c)}\n\nPasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas. La deuda pactada queda en $0 (puedes ajustarla luego desde esa pestaña). ¿Continuar?`)) return;
     c.activo = false;
-    c.fechaTermino = fecha;
-    c.deudaPactada = deuda;
-  } else {
-    c.fechaFinContrato = fecha;
-    c.montoArriendoPactado = monto;
+    c.fechaTermino = hoy;
+    c.deudaPactada = 0;
+    c.proximaDecisionMotivo = '';
+    c.proximaDecisionFecha = '';
+    c.proximaDecisionMonto = '';
+    c.proximaDecisionComentarios = '';
+    c.proximaDecisionRegistrada = '';
   }
   if(nota) c.infoGeneral = [c.infoGeneral, `[${formatDate(hoy)}] ${nota}`].filter(Boolean).join(' | ');
 
@@ -3133,7 +3196,7 @@ function setupPageHeaderActions(){
     row.appendChild(h1);
     const actions = document.createElement('div');
     actions.className = 'page-header-actions';
-    actions.innerHTML = `<button type="button" class="icon-btn-sm" onclick="reloadFromDrive()" title="Recargar desde Excel">⟳</button><button type="button" class="icon-btn-sm" onclick="requestDriveConnection()" title="Sincronizar con Google Drive">🔄</button><button type="button" class="icon-btn-sm" onclick="disconnectDrive()" title="Cambiar cuenta de Google Drive">👤</button>`;
+    actions.innerHTML = `<button type="button" class="icon-btn-sm" onclick="reloadFromDrive()" title="Recargar desde Excel" style="position:relative;"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5" fill="#1D6F42"/><text x="12" y="16.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle">X</text></svg><span class="icon-refresh-badge c-excel" style="width:12px;height:12px;font-size:9px;bottom:-2px;right:-2px;">⟳</span></button><button type="button" class="icon-btn-sm" onclick="requestDriveConnection()" title="Sincronizar con Google Drive" style="position:relative;"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,4 44,40 4,40" fill="#4285F4"/><polygon points="24,4 34,22 14,22" fill="#FBBC05"/><polygon points="14,22 34,22 44,40 4,40" fill="#34A853"/></svg><span class="icon-refresh-badge c-drive" style="width:12px;height:12px;font-size:9px;bottom:-2px;right:-2px;">⟳</span></button><button type="button" class="icon-btn-sm" onclick="disconnectDrive()" title="Cambiar cuenta de Google Drive">👤</button>`;
     row.appendChild(actions);
   });
 }
