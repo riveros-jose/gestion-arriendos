@@ -1925,7 +1925,7 @@ function effectiveDebtStartDate(contratoId){
 }
 
 function computeResumenRows(){
-  return contracts.filter(isActiveContract).map(c=>{
+  const activos = contracts.filter(isActiveContract).map(c=>{
     const series = computeContratoMonthlySeries(c.id);
     const totalPagado = series.reduce((s,d)=>s+d.pagado,0);
     const totalDescuentos = series.reduce((s,d)=>s+d.descuento,0);
@@ -1933,18 +1933,26 @@ function computeResumenRows(){
     const meses = series.length;
     const monto = Number(c.montoArriendoPactado||0);
     const saldo = totalEsperado - (totalPagado + totalDescuentos);
-    return {c, monto, meses, totalEsperado, totalPagado, totalDescuentos, saldo};
-  }).sort((a,b)=> b.saldo - a.saldo);
+    return {c, monto, meses, totalEsperado, totalPagado, totalDescuentos, saldo, historico:false};
+  });
+  const historicos = contratosConCobranza().map(c=>{
+    const saldo = computeCobranzaSaldo(c);
+    return {c, monto: Number(c.deudaPactada||0), meses:0, totalEsperado:0, totalPagado:0, totalDescuentos:0, saldo, historico:true};
+  });
+  return [...activos, ...historicos].sort((a,b)=> b.saldo - a.saldo);
 }
 
 function renderResumenSelect(){
   const activos = contracts.filter(isActiveContract);
-  const optionsHtml = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const historicos = contratosConCobranza();
+  const optionsHtml = '<option value="">Todos los arrendatarios</option>'
+    + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('')
+    + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))} (Histórico)</option>`).join('');
   ['resumen-filter','chart-tenant-filter','impagos-tenant-filter'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
     sel.innerHTML = optionsHtml;
-    if(activos.some(c=>c.id===current)) sel.value = current;
+    if(activos.some(c=>c.id===current) || historicos.some(c=>c.id===current)) sel.value = current;
   });
 }
 document.getElementById('resumen-filter').addEventListener('change', ()=>{
@@ -1983,12 +1991,13 @@ function renderResumen(){
   if(!rows.length){ el.innerHTML='<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>'; }
   else {
     el.innerHTML = `<div class="table-scroll"><table><thead><tr>
-      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto mensual')}${th('resumen','saldo','Saldo')}
+      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto')}${th('resumen','saldo','Saldo')}
     </tr></thead><tbody>
     ${rows.map(r=>{
       const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
+      const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
       return `<tr>
-      <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${esc(contractLabel(r.c.id))}</span></td>
+      <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
       <td class="mono">${money(r.monto)}</td>
       <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
     </tr>`;
@@ -2775,7 +2784,11 @@ function computeContratoMonthlySeries(contratoId){
   if(!c) return [];
   const desde = effectiveDebtStartDate(contratoId);
   if(!desde) return [];
-  const months = monthsBetween(desde).slice().reverse();
+  let months = monthsBetween(desde).slice().reverse();
+  if(!isActiveContract(c) && c.fechaTermino){
+    const finY = Number(c.fechaTermino.slice(0,4)), finM = Number(c.fechaTermino.slice(5,7))-1;
+    months = months.filter(({year,month})=> year<finY || (year===finY && month<=finM));
+  }
   const montoContrato = Number(c.montoArriendoPactado||0);
   return months.map(({year,month})=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
@@ -3067,30 +3080,41 @@ function renderResumenImpagos(contratoId){
 
   if(!contratoId){
     const conSaldo = computeAllTenantsMonthlyImpagos();
-    if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — sumando todos los arrendatarios, todo está al día.</div>'; return; }
+    const totalHistoricoCobranza = contratosConCobranza().reduce((s,c)=> s+computeCobranzaSaldo(c), 0);
+    if(!conSaldo.length && !totalHistoricoCobranza){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — sumando todos los arrendatarios, todo está al día.</div>'; return; }
     const totalFaltante = conSaldo.filter(d=>d.saldo>0).reduce((s,d)=>s+d.saldo,0);
     const totalAFavor = conSaldo.filter(d=>d.saldo<0).reduce((s,d)=>s-d.saldo,0);
     const total = conSaldo.length;
     const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
-    el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong></div>
-    <div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado (total)</th><th>Pagado (total)</th><th>Descuento (total)</th><th>Comentarios</th></tr></thead><tbody>
-    ${mostrar.map(d=>{
-      const esDeuda = d.saldo>0;
-      return `<tr>
-      <td>${MESES_ES[d.month]} ${d.year}</td>
-      <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
-      <td class="mono">${money(d.monto)}</td>
-      <td class="mono">${money(d.pagado)}</td>
-      <td class="mono">${money(d.descuento)}</td>
-      <td class="cell-comments">${esc(d.comentarios)}</td>
-    </tr>`;
-    }).join('')}
-    </tbody></table></div>
-    ${total>12 ? `<div class="table-scroll-toggle">
-      <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos('');">
-        ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
-      </button>
-    </div>` : ''}`;
+
+    const cobranzaTxt = totalHistoricoCobranza>0 ? ` · + <strong style="color:var(--brick)">${money(totalHistoricoCobranza)}</strong> en cobranza de arrendatarios históricos` : '';
+    const summaryLine = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong>${cobranzaTxt}</div>`;
+
+    let tableHtml;
+    if(conSaldo.length){
+      const toggleHtml = total>12 ? `<div class="table-scroll-toggle">
+        <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos('');">
+          ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
+        </button>
+      </div>` : '';
+      tableHtml = `<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado (total)</th><th>Pagado (total)</th><th>Descuento (total)</th><th>Comentarios</th></tr></thead><tbody>
+      ${mostrar.map(d=>{
+        const esDeuda = d.saldo>0;
+        return `<tr>
+        <td>${MESES_ES[d.month]} ${d.year}</td>
+        <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
+        <td class="mono">${money(d.monto)}</td>
+        <td class="mono">${money(d.pagado)}</td>
+        <td class="mono">${money(d.descuento)}</td>
+        <td class="cell-comments">${esc(d.comentarios)}</td>
+      </tr>`;
+      }).join('')}
+      </tbody></table></div>${toggleHtml}`;
+    } else {
+      tableHtml = '<div class="empty">No hay meses con saldo pendiente en contratos activos — la deuda mostrada arriba es de arrendatarios históricos (cobranza).</div>';
+    }
+
+    el.innerHTML = summaryLine + tableHtml;
     return;
   }
 
