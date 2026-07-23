@@ -86,9 +86,16 @@
   .row-actions button:hover{color:var(--teal-dark);}
   .cell-stacked{white-space:normal !important;line-height:1.4;}
   .cell-stacked-sub{font-size:11px;color:var(--ink-soft);}
-  .row-actions-inline{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle;}
-  .row-actions-inline button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px;opacity:0.55;line-height:1;}
-  .row-actions-inline button:hover{opacity:1;}
+  .table-action-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:27px;height:27px;border-radius:7px;border:1px solid var(--border);
+    background:var(--card);cursor:pointer;font-size:12.5px;padding:0;line-height:1;
+    transition:background .15s,border-color .15s;
+  }
+  .table-action-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
+  .table-action-btn.danger:hover{background:var(--brick-soft);border-color:var(--brick);}
+  .table-actions-group{display:flex;gap:5px;flex-wrap:wrap;}
+  .row-actions-inline{display:inline-flex;gap:5px;margin-left:8px;vertical-align:middle;}
   .empty{color:var(--ink-soft);font-size:13.5px;padding:20px 0;text-align:center;}
   .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
   .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
@@ -158,6 +165,7 @@
   .table-scroll table th:first-child, .table-scroll table td:first-child{
     position:sticky; left:0; z-index:2;
     box-shadow:2px 0 4px -2px rgba(0,0,0,0.12);
+    max-width:190px; white-space:normal !important; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;
   }
   .table-scroll table tbody tr:nth-child(odd) td:first-child{ background:var(--card); }
   .table-scroll table tbody tr:nth-child(even) td:first-child{ background:var(--paper); }
@@ -178,6 +186,12 @@
   .sort-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);}
   .prop-card{border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#fdfdfc;}
   .prop-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .prop-card.collapsed .prop-card-header{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+  .prop-card-body{display:none;margin-top:14px;}
+  .prop-card:not(.collapsed) .prop-card-body{display:block;}
+  .prop-card-title-toggle{cursor:pointer;display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
+  .prop-card-chevron{color:var(--ink-soft);font-size:13px;transition:transform .15s;flex-shrink:0;}
+  .prop-card:not(.collapsed) .prop-card-chevron{transform:rotate(90deg);}
   .prop-card-dir{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink);}
   .card-index{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink-soft);}
   .searchable-select{position:relative;margin-bottom:14px;}
@@ -280,7 +294,7 @@
     }
     td{padding:8px 6px;white-space:nowrap;}
     .table-scroll table th:first-child, .table-scroll table td:first-child{
-      max-width:150px;overflow:hidden;text-overflow:ellipsis;
+      max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;
     }
     /* .table-scroll ya no tiene alto máximo; el scroll vertical lo maneja .main directamente */
 
@@ -292,6 +306,7 @@
       min-height:32px;
     }
     .row-actions button:active{background:var(--teal-soft);border-color:var(--teal);}
+    .table-action-btn{width:32px;height:32px;font-size:14px;}
 
     .alert-card .btn{width:100%;}
     .prop-fields-grid{grid-template-columns:repeat(2,1fr) !important;gap:10px 12px;}
@@ -1400,9 +1415,16 @@ async function deleteProperty(id){
   pushToDriveIfConnected();
 }
 
+function toggleCardExpand(el){
+  const card = el.closest('.prop-card');
+  if(card) card.classList.toggle('collapsed');
+}
+
 function propCardHeader(p, idx){
   return `<div class="prop-card-header">
-    <div>${idx?`<span class="card-index">${idx})</span> `:''}<span class="prop-card-dir">${esc(p.direccion)}</span>${p.unidad?` <span class="prop-card-unidad">${esc(p.unidad)}</span>`:''}</div>
+    <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
+      ${idx?`<span class="card-index">${idx})</span> `:''}<span class="prop-card-dir">${esc(p.direccion)}</span>${p.unidad?` <span class="prop-card-unidad">${esc(p.unidad)}</span>`:''}<span class="prop-card-chevron">▸</span>
+    </div>
     <div class="row-actions"><button onclick="editProperty('${p.id}')">Editar</button><button onclick="deleteProperty('${p.id}')">Eliminar</button></div>
   </div>`;
 }
@@ -1430,7 +1452,8 @@ function renderProperties(){
   const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
 
   if(propActiveSubtab==='prop1'){
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card collapsed">${propCardHeader(p, idx+1)}
+      <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
           ${propField('M² construidos', ceilFmt(p.m2Construidos))}
           ${propField('M² terreno', ceilFmt(p.m2Terreno))}
@@ -1443,9 +1466,11 @@ function renderProperties(){
           ${propField('Año', intFmt(p.cbrAnio))}
           ${propField('Localidad', esc(p.cbrLocalidad))}
         </div>
+      </div>
       </div>`).join('');
   } else if(propActiveSubtab==='prop2'){
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card collapsed">${propCardHeader(p, idx+1)}
+      <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
           <div class="prop-service-group">
             ${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}
@@ -1460,14 +1485,17 @@ function renderProperties(){
             ${propField('Medidor Gas', esc(p.medidorGas))}
           </div>
         </div>
+      </div>
       </div>`).join('');
   } else {
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card collapsed">${propCardHeader(p, idx+1)}
+      <div class="prop-card-body">
         <div class="prop-fields-grid">
           ${propField('Avalúo fiscal', p.avaluoFiscal?money(p.avaluoFiscal):'—')}
           ${propField('Valor comercial probable', p.valorComercial?money(p.valorComercial):'—')}
           ${propField('Contribuciones', p.contribuciones?money(p.contribuciones):'—')}
         </div>
+      </div>
       </div>`).join('');
   }
 }
@@ -1714,14 +1742,15 @@ function renderTenantsContracts(){
       ${repRight.length ? `<div class="contact-col">${repRight.join('')}</div>` : ''}
     </div>` : '';
 
-    return `<div class="prop-card">
+    return `<div class="prop-card collapsed">
       <div class="prop-card-header">
-        <div>
-          <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span></div>
-          ${contactoLine}
+        <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
+          <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
         <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
+      <div class="prop-card-body">
+      ${contactoLine}
       <div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">📝 Contrato</div>
       <div class="prop-fields-grid">
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
@@ -1737,6 +1766,7 @@ function renderTenantsContracts(){
         ${c.proximaDecisionMonto ? propField('Nuevo monto propuesto', money(c.proximaDecisionMonto)) : ''}
         ${c.proximaDecisionComentarios ? propField('Comentarios', esc(c.proximaDecisionComentarios)) : ''}
       </div>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -2411,7 +2441,7 @@ function buildReadingsTableHtml(list){
     const tagClass = r.estadoEfectivo==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
     const contratoFull = contractLabel(r.contratoId);
     return `<tr>
-    <td class="cell-tap-full" title="${esc(contratoFull)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(truncateText(contratoFull,20))}</td>
+    <td class="cell-tap-full" title="${esc(contratoFull)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(contratoFull)}</td>
     <td>${servicioIcono(r.servicio)}</td>
     <td class="mono cell-stacked">
       <div>${money(r.monto)}</div>
@@ -2425,10 +2455,10 @@ function buildReadingsTableHtml(list){
       <div class="cell-stacked-sub">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)} → ${formatNumber(r.lecturaActual)}</div>
     </td>
     <td class="mono">${formatDate(r.fechaLectura)}</td>
-    <td class="row-actions">
-      <button onclick="editReading('${r.id}')">Editar</button>
-      ${r.estadoEfectivo!=='Pagado' ? `<button onclick="setReadingEstado('${r.id}','Pagado')">Marcar pagado</button>` : ''}
-      <button onclick="deleteReading('${r.id}')">Eliminar</button>
+    <td class="table-actions-group">
+      <button class="table-action-btn" onclick="editReading('${r.id}')" title="Editar">✏️</button>
+      ${r.estadoEfectivo!=='Pagado' ? `<button class="table-action-btn" onclick="setReadingEstado('${r.id}','Pagado')" title="Marcar pagado">✅</button>` : ''}
+      <button class="table-action-btn danger" onclick="deleteReading('${r.id}')" title="Eliminar">🗑️</button>
     </td>
   </tr>`;
   }).join('')}
@@ -2437,11 +2467,11 @@ function buildReadingsTableHtml(list){
 
 let readingsSectorVerTodo = { 1:false, 2:false };
 function readingsToggleHtml(sector, total){
-  if(total<=10) return '';
+  if(total<=5) return '';
   const verTodo = readingsSectorVerTodo[sector];
   return `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="readingsSectorVerTodo[${sector}]=!readingsSectorVerTodo[${sector}];renderReadings();">
-      ${verTodo ? 'Ver solo las últimas 10' : `Ver todo (${total})`}
+      ${verTodo ? 'Ver solo las últimas 5' : `Ver todo (${total})`}
     </button>
   </div>`;
 }
@@ -2461,8 +2491,8 @@ function renderReadings(){
 
   const sector1 = list.filter(r=> contratoSector(r.contratoId)===1);
   const sector2 = list.filter(r=> contratoSector(r.contratoId)===2);
-  const mostrar1 = readingsSectorVerTodo[1] ? sector1 : sector1.slice(0,10);
-  const mostrar2 = readingsSectorVerTodo[2] ? sector2 : sector2.slice(0,10);
+  const mostrar1 = readingsSectorVerTodo[1] ? sector1 : sector1.slice(0,5);
+  const mostrar2 = readingsSectorVerTodo[2] ? sector2 : sector2.slice(0,5);
 
   el1.innerHTML = mostrar1.length ? (buildReadingsTableHtml(mostrar1) + readingsToggleHtml(1, sector1.length)) : '<div class="empty">No hay lecturas registradas en este sector.</div>';
   el2.innerHTML = mostrar2.length ? (buildReadingsTableHtml(mostrar2) + readingsToggleHtml(2, sector2.length)) : '<div class="empty">No hay lecturas registradas en este sector.</div>';
@@ -2557,14 +2587,14 @@ function renderHistorialTodos(){
   ${mostrar.map(p=>{
     const full = contractLabel(p.contratoId);
     return `<tr>
-    <td class="cell-tap-full" title="${esc(full)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(truncateText(full,20))}</td>
+    <td class="cell-tap-full" title="${esc(full)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(full)}</td>
     <td class="mono">${formatDate(p.fechaPago)}</td>
     <td class="mono cell-stacked">
       <div>${money(p.montoPagado)}</div>
       ${Number(p.descuentos)?`<div class="cell-stacked-sub">Desc: ${money(p.descuentos)}</div>`:''}
       ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
     </td>
-    <td style="white-space:normal;">${esc(p.comentarios)}<span class="row-actions-inline"><button onclick="editPayment('${p.id}')" title="Editar">✏️</button><button onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
+    <td style="white-space:normal;">${esc(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -2663,14 +2693,17 @@ function renderHistoricos(){
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
     const tagClass = !tieneDeuda ? 'tag-ok' : (r.saldoRemanente>0 ? 'tag-debt' : 'tag-ok');
     const estado = !tieneDeuda ? 'Cerrado (sin deuda)' : (r.saldoRemanente>0 ? 'Cerrado (con deuda)' : 'Cerrado (deuda cobrada)');
-    return `<div class="prop-card">
+    return `<div class="prop-card collapsed">
       <div class="prop-card-header">
-        <div><span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span></div>
+        <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
+          <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span><span class="prop-card-chevron">▸</span>
+        </div>
         <div class="row-actions">
           ${tieneDeuda && r.saldoRemanente>0 ? `<button onclick="closeDebtManually('${r.c.id}')">Cerrar deuda</button>` : ''}
           <button onclick="reactivateContract('${r.c.id}')">Reactivar</button>
         </div>
       </div>
+      <div class="prop-card-body">
       <div class="prop-fields-grid">
         ${propField('Estado', `<span class="tag ${tagClass}">${estado}</span>`)}
         ${propField('Fecha término', r.c.fechaTermino?formatDate(r.c.fechaTermino):'—')}
@@ -2678,6 +2711,7 @@ function renderHistoricos(){
         ${propField('Deuda Final', tieneDeuda?`<span style="color:${r.saldoRemanente>0?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(Math.max(r.saldoRemanente,0))}</span>`:'—')}
         ${propField('Primer pago', r.primerPago==="—"?"—":formatDate(r.primerPago))}
         ${propField('Último pago', r.ultimoPago==="—"?"—":formatDate(r.ultimoPago))}
+      </div>
       </div>
     </div>`;
   }).join('');
