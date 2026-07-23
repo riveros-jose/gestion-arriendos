@@ -168,8 +168,11 @@
     .brand{padding:0 14px 0 0;margin:0;border-bottom:none;border-right:1px solid rgba(238,241,239,0.15);flex-shrink:0;font-size:16px;white-space:nowrap;}
     .brand span{display:none;}
     .sidebar-foot{display:none;}
-    .nav-item{padding:9px 12px;border-left:none;border-radius:6px;white-space:nowrap;flex-shrink:0;}
+    .nav-item{padding:9px 14px;border-left:none;border-radius:6px;white-space:nowrap;flex-shrink:0;}
     .nav-item.active{border-left:none;}
+    .nav-item .num{display:none;}
+    .nav-item .nav-label{display:none;}
+    .nav-item .nav-icon{font-size:19px;}
     .main{padding:18px 16px 60px;max-width:100%;}
     h1{font-size:22px;}
     .card{padding:18px;}
@@ -215,13 +218,13 @@
 <div class="app">
   <div class="sidebar">
     <div class="brand">Cartera<span>Gestión de Arriendos</span></div>
-    <div class="nav-item active" data-tab="resumen"><span class="num">01</span> 📊 Resumen &amp; Deudas</div>
-    <div class="nav-item" data-tab="pagos"><span class="num">02</span> 💵 Pagos</div>
-    <div class="nav-item" data-tab="servicios"><span class="num">03</span> 🔧 Servicios</div>
-    <div class="nav-item" data-tab="alertas"><span class="num">04</span> 🔔 Alertas <span id="alert-badge" class="badge" style="display:none"></span></div>
-    <div class="nav-item" data-tab="propiedades"><span class="num">05</span> 🏠 Propiedades</div>
-    <div class="nav-item" data-tab="arrendatarios"><span class="num">06</span> 📄 Arrendatarios &amp; Contratos</div>
-    <div class="nav-item" data-tab="historicos"><span class="num">07</span> 🗂️ Arrendatarios Históricos</div>
+    <div class="nav-item active" data-tab="resumen" title="Resumen & Deudas"><span class="num">01</span> <span class="nav-icon">📊</span><span class="nav-label"> Resumen &amp; Deudas</span></div>
+    <div class="nav-item" data-tab="pagos" title="Pagos"><span class="num">02</span> <span class="nav-icon">💵</span><span class="nav-label"> Pagos</span></div>
+    <div class="nav-item" data-tab="servicios" title="Servicios"><span class="num">03</span> <span class="nav-icon">🔧</span><span class="nav-label"> Servicios</span></div>
+    <div class="nav-item" data-tab="alertas" title="Alertas"><span class="num">04</span> <span class="nav-icon">🔔</span><span class="nav-label"> Alertas</span> <span id="alert-badge" class="badge" style="display:none"></span></div>
+    <div class="nav-item" data-tab="propiedades" title="Propiedades"><span class="num">05</span> <span class="nav-icon">🏠</span><span class="nav-label"> Propiedades</span></div>
+    <div class="nav-item" data-tab="arrendatarios" title="Arrendatarios & Contratos"><span class="num">06</span> <span class="nav-icon">📄</span><span class="nav-label"> Arrendatarios &amp; Contratos</span></div>
+    <div class="nav-item" data-tab="historicos" title="Arrendatarios Históricos"><span class="num">07</span> <span class="nav-icon">🗂️</span><span class="nav-label"> Arrendatarios Históricos</span></div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -597,14 +600,26 @@ function initGoogleDrive(){
 }
 window.addEventListener('load', initGoogleDrive);
 
+let userInitiatedConnect = false;
+
 async function handleTokenResponse(resp){
   if(resp.error){
+    if(userInitiatedConnect){
+      // Este intento fue disparado por el usuario (botón "Conectar"/"Sincronizar") y el intento
+      // silencioso falló — recién ahí se pide el consentimiento completo. Si en cambio fue el
+      // intento automático al cargar la página, no se muestra ningún popup: solo se deja el
+      // botón de conectar disponible en la pantalla de bienvenida.
+      userInitiatedConnect = false;
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+      return;
+    }
     driveToken = null;
     setDriveStatus('no conectado', false);
     setGateChecking(false);
     showDriveGate();
     return;
   }
+  userInitiatedConnect = false;
   driveToken = resp.access_token;
   rememberConnectedHint();
   scheduleTokenRefresh(resp.expires_in);
@@ -636,7 +651,10 @@ function attemptSilentConnect(){
 function requestDriveConnection(){
   if(!driveConfigured()){ alert('Falta configurar el Client ID en el código.'); return; }
   if(!tokenClient){ alert('Google aún está cargando, intenta de nuevo en un segundo.'); return; }
-  tokenClient.requestAccessToken({ prompt: driveToken ? '' : 'consent' });
+  // Siempre se intenta primero en silencio (sin mostrar pantalla de permisos). Solo si eso
+  // falla (handleTokenResponse lo detecta) se pide el consentimiento completo.
+  userInitiatedConnect = true;
+  tokenClient.requestAccessToken({ prompt: '' });
 }
 document.getElementById('drive-gate-connect-btn').addEventListener('click', requestDriveConnection);
 
