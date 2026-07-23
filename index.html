@@ -303,7 +303,8 @@
     }
     td{padding:8px 6px;white-space:nowrap;}
     .table-scroll table th:first-child, .table-scroll table td:first-child{
-      max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;
+      max-width:150px;white-space:normal !important;word-break:break-word;overflow-wrap:anywhere;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;
     }
     /* .table-scroll ya no tiene alto máximo; el scroll vertical lo maneja .main directamente */
 
@@ -1985,7 +1986,7 @@ function renderResumen(){
     ${rows.map(r=>{
       const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
       return `<tr>
-      <td><span class="truncate" title="${esc(contractLabel(r.c.id))}" style="cursor:pointer" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(contractLabel(r.c.id))}</span></td>
+      <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(contractLabel(r.c.id))}</td>
       <td class="mono">${money(r.monto)}</td>
       <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
     </tr>`;
