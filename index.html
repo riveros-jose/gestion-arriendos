@@ -660,7 +660,6 @@
       </div>
       <div class="card">
         <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <div class="subtitle" style="margin-bottom:14px">Monto pagado y descuento aplicado por arrendatario en cada mes (incluye arrendatarios históricos).</div>
         <div class="line-row" style="margin-bottom:16px;max-width:520px">
           <div class="field"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0"></select></div>
           <div class="field"><label>Año</label><select id="matrix-year-filter"></select></div>
@@ -3229,14 +3228,15 @@ function renderResumenMatrix(){
   if(anios.map(String).includes(currentYear)) yearSel.value = currentYear;
   const yearFiltro = yearSel.value;
 
-  const rows = tenantFiltro ? allRows.filter(r=> r.c.id===tenantFiltro) : allRows;
+  const rows0 = tenantFiltro ? allRows.filter(r=> r.c.id===tenantFiltro) : allRows;
   let months = yearFiltro ? allMonths.filter(m=> String(m.year)===yearFiltro) : allMonths;
   const total = months.length;
   const mostrarMonths = (yearFiltro || matrixVerTodo) ? months : months.slice(0,12);
+  const clavesVisibles = new Set(mostrarMonths.map(({year,month})=> `${year}-${String(month+1).padStart(2,'0')}`));
 
   // Se pre-calculan las sumas por contrato+mes para no recorrer todos los pagos por cada celda.
   const sumas = {};
-  rows.forEach(r=>{ sumas[r.c.id] = {}; });
+  rows0.forEach(r=>{ sumas[r.c.id] = {}; });
   payments.forEach(p=>{
     if(!sumas[p.contratoId] || !p.fechaPago) return;
     const key = p.fechaPago.slice(0,7);
@@ -3245,7 +3245,11 @@ function renderResumenMatrix(){
     sumas[p.contratoId][key].descuento += Number(p.descuentos||0);
   });
 
-  if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay datos para este filtro.</div>'; return; }
+  // Solo se muestran arrendatarios que tuvieron algún movimiento de pago dentro del período
+  // actualmente visible (no simplemente "alguna vez tuvieron un pago").
+  const rows = rows0.filter(r=> Object.keys(sumas[r.c.id]).some(k=> clavesVisibles.has(k)));
+
+  if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay arrendatarios con movimientos de pago en el período visible.</div>'; return; }
 
   const headerCells = mostrarMonths.map(({year,month})=> `<th>${MESES_ES[month].slice(0,3)} ${String(year).slice(2)}</th>`).join('');
 
