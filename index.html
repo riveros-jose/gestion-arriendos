@@ -3083,13 +3083,8 @@ function renderResumenImpagos(contratoId){
     const conSaldo = computeAllTenantsMonthlyImpagos();
     const totalHistoricoCobranza = contratosConCobranza().reduce((s,c)=> s+computeCobranzaSaldo(c), 0);
     if(!conSaldo.length && !totalHistoricoCobranza){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — sumando todos los arrendatarios, todo está al día.</div>'; return; }
-    const totalFaltante = conSaldo.filter(d=>d.saldo>0).reduce((s,d)=>s+d.saldo,0);
-    const totalAFavor = conSaldo.filter(d=>d.saldo<0).reduce((s,d)=>s-d.saldo,0);
     const total = conSaldo.length;
     const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
-
-    const cobranzaTxt = totalHistoricoCobranza>0 ? ` · + <strong style="color:var(--brick)">${money(totalHistoricoCobranza)}</strong> en cobranza de arrendatarios históricos` : '';
-    const summaryLine = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong>${cobranzaTxt}</div>`;
 
     let tableHtml;
     if(conSaldo.length){
@@ -3115,7 +3110,7 @@ function renderResumenImpagos(contratoId){
       tableHtml = '<div class="empty">No hay meses con saldo pendiente en contratos activos — la deuda mostrada arriba es de arrendatarios históricos (cobranza).</div>';
     }
 
-    el.innerHTML = summaryLine + tableHtml;
+    el.innerHTML = tableHtml;
     return;
   }
 
@@ -3129,12 +3124,9 @@ function renderResumenImpagos(contratoId){
     })
     .reverse();
   if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — este arrendatario está exactamente al día en toda su historia.</div>'; return; }
-  const totalFaltante = conSaldo.filter(d=>d.saldo>0).reduce((s,d)=>s+d.saldo,0);
-  const totalAFavor = conSaldo.filter(d=>d.saldo<0).reduce((s,d)=>s-d.saldo,0);
   const total = conSaldo.length;
   const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
-  el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong></div>
-  <div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Comentarios</th></tr></thead><tbody>
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Comentarios</th></tr></thead><tbody>
   ${mostrar.map(d=>{
     const esDeuda = d.saldo>0;
     return `<tr>
