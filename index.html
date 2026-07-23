@@ -145,22 +145,25 @@
   .table-wrap h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--teal-dark);margin:0 0 10px;font-weight:700;}
   .line-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .table-wrap:has(table){overflow:auto;max-height:65vh;scrollbar-width:thin;scrollbar-color:var(--gris-linea) transparent;}
-  .table-wrap:has(table)::-webkit-scrollbar{height:6px;width:6px;}
-  .table-wrap:has(table)::-webkit-scrollbar-thumb{background:var(--gris-linea);border-radius:3px;}
-  .table-wrap:has(table)::-webkit-scrollbar-track{background:transparent;}
-  .table-wrap table th{
+  /* El scroll (con fila/columna fijas) queda en su propio contenedor, .table-scroll — separado
+     del botón "Ver todo", que así siempre queda visible debajo y nunca atrapado dentro del scroll. */
+  .table-scroll{overflow:auto;max-height:65vh;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--gris-linea) transparent;}
+  .table-scroll::-webkit-scrollbar{height:6px;width:6px;}
+  .table-scroll::-webkit-scrollbar-thumb{background:var(--gris-linea);border-radius:3px;}
+  .table-scroll::-webkit-scrollbar-track{background:transparent;}
+  .table-scroll table th{
     position:sticky; top:0; z-index:3; background:var(--card);
     box-shadow:0 2px 4px -2px rgba(0,0,0,0.12);
   }
-  .table-wrap table th:first-child, .table-wrap table td:first-child{
+  .table-scroll table th:first-child, .table-scroll table td:first-child{
     position:sticky; left:0; z-index:2;
     box-shadow:2px 0 4px -2px rgba(0,0,0,0.12);
   }
-  .table-wrap table tbody tr:nth-child(odd) td:first-child{ background:var(--card); }
-  .table-wrap table tbody tr:nth-child(even) td:first-child{ background:var(--paper); }
-  .table-wrap table th:first-child{ z-index:4; background:var(--card); box-shadow:2px 2px 4px -2px rgba(0,0,0,0.12); }
-  .table-wrap table tr:hover td:first-child{ background:#FAFBFA !important; }
+  .table-scroll table tbody tr:nth-child(odd) td:first-child{ background:var(--card); }
+  .table-scroll table tbody tr:nth-child(even) td:first-child{ background:var(--paper); }
+  .table-scroll table th:first-child{ z-index:4; background:var(--card); box-shadow:2px 2px 4px -2px rgba(0,0,0,0.12); }
+  .table-scroll table tr:hover td:first-child{ background:#FAFBFA !important; }
+  .table-scroll-toggle{text-align:center;margin-top:12px;}
   .cell-truncate{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help;}
   .cell-tap-full{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
@@ -275,10 +278,10 @@
       letter-spacing:0.01em;min-width:40px;vertical-align:bottom;
     }
     td{padding:8px 6px;white-space:nowrap;}
-    .table-wrap table th:first-child, .table-wrap table td:first-child{
+    .table-scroll table th:first-child, .table-scroll table td:first-child{
       max-width:150px;overflow:hidden;text-overflow:ellipsis;
     }
-    .table-wrap:has(table){max-height:60vh;}
+    .table-scroll{max-height:52vh;}
 
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
     .row-actions{gap:6px;flex-wrap:wrap;}
@@ -1931,7 +1934,7 @@ function renderResumen(){
   const el = document.getElementById('resumen-table');
   if(!rows.length){ el.innerHTML='<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>'; }
   else {
-    el.innerHTML = `<table><thead><tr>
+    el.innerHTML = `<div class="table-scroll"><table><thead><tr>
       ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto mensual')}${th('resumen','saldo','Saldo')}
     </tr></thead><tbody>
     ${rows.map(r=>{
@@ -1942,7 +1945,7 @@ function renderResumen(){
       <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
     </tr>`;
     }).join('')}
-    </tbody></table>`;
+    </tbody></table></div>`;
   }
 
   renderResumenChart(filtro);
@@ -2402,7 +2405,7 @@ function contratoSector(contratoId){
 }
 
 function buildReadingsTableHtml(list){
-  return `<table><thead><tr>
+  return `<div class="table-scroll"><table><thead><tr>
     ${th('readings','contrato','Arrendatario')}${th('readings','servicio','Servicio')}${th('readings','fechaLectura','Fecha lectura')}<th>Lectura ant.</th>${th('readings','lecturaActual','Lectura actual')}${th('readings','consumo','Consumo')}${th('readings','valorUnitario','Valor unit.')}${th('readings','monto','Monto a pagar')}${th('readings','estadoEfectivo','Estado')}<th></th>
   </tr></thead><tbody>
   ${list.map(r=>{
@@ -2427,14 +2430,14 @@ function buildReadingsTableHtml(list){
     </td>
   </tr>`;
   }).join('')}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }
 
 let readingsSectorVerTodo = { 1:false, 2:false };
 function readingsToggleHtml(sector, total){
   if(total<=10) return '';
   const verTodo = readingsSectorVerTodo[sector];
-  return `<div style="text-align:center;margin-top:12px">
+  return `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="readingsSectorVerTodo[${sector}]=!readingsSectorVerTodo[${sector}];renderReadings();">
       ${verTodo ? 'Ver solo las últimas 10' : `Ver todo (${total})`}
     </button>
@@ -2546,7 +2549,7 @@ function renderHistorialTodos(){
   const total = list.length;
   const mostrar = historialTodosVerTodo ? list : list.slice(0,12);
 
-  el.innerHTML = `<table><thead><tr>
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr>
     ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Pagado / Desc. / Arriendo')}${th('payments-todos','comentarios','Comentarios')}
   </tr></thead><tbody>
   ${mostrar.map(p=>{
@@ -2562,8 +2565,8 @@ function renderHistorialTodos(){
     <td style="white-space:normal;">${esc(p.comentarios)}<span class="row-actions-inline"><button onclick="editPayment('${p.id}')" title="Editar">✏️</button><button onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
   </tr>`;
   }).join('')}
-  </tbody></table>
-  ${total>12 ? `<div style="text-align:center;margin-top:12px">
+  </tbody></table></div>
+  ${total>12 ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="historialTodosVerTodo=!historialTodosVerTodo;renderHistorialTodos();">
       ${historialTodosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
     </button>
@@ -2583,7 +2586,7 @@ function renderHistorial(){
   const seriesTotal = computeContratoMonthlySeries(contratoId).slice().reverse();
   const series = historialMensualVerTodo ? seriesTotal : seriesTotal.slice(0,12);
 
-  el.innerHTML = `<table><thead><tr>
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr>
     <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
   </tr></thead><tbody>
   ${series.map(d=>{
@@ -2610,8 +2613,8 @@ function renderHistorial(){
       <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
     </tr>`;
   }).join('')}
-  </tbody></table>
-  ${seriesTotal.length>12 ? `<div style="text-align:center;margin-top:12px">
+  </tbody></table></div>
+  ${seriesTotal.length>12 ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">
       ${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}
     </button>
@@ -3015,7 +3018,7 @@ function renderResumenImpagos(contratoId){
     const total = conSaldo.length;
     const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
     el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Sumatoria de <strong>todos los arrendatarios</strong> — Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong></div>
-    <table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado (total)</th><th>Pagado (total)</th><th>Descuento (total)</th><th>Comentarios</th></tr></thead><tbody>
+    <div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado (total)</th><th>Pagado (total)</th><th>Descuento (total)</th><th>Comentarios</th></tr></thead><tbody>
     ${mostrar.map(d=>{
       const esDeuda = d.saldo>0;
       return `<tr>
@@ -3027,8 +3030,8 @@ function renderResumenImpagos(contratoId){
       <td>${esc(d.comentarios)}</td>
     </tr>`;
     }).join('')}
-    </tbody></table>
-    ${total>12 ? `<div style="text-align:center;margin-top:12px">
+    </tbody></table></div>
+    ${total>12 ? `<div class="table-scroll-toggle">
       <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos('');">
         ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
       </button>
@@ -3051,7 +3054,7 @@ function renderResumenImpagos(contratoId){
   const total = conSaldo.length;
   const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
   el.innerHTML = `<div class="status-msg" style="margin-bottom:10px">Deuda acumulada: <strong style="color:var(--brick)">${money(totalFaltante)}</strong> · A favor acumulado: <strong style="color:var(--teal-dark)">${money(totalAFavor)}</strong></div>
-  <table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Comentarios</th></tr></thead><tbody>
+  <div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Comentarios</th></tr></thead><tbody>
   ${mostrar.map(d=>{
     const esDeuda = d.saldo>0;
     return `<tr>
@@ -3063,8 +3066,8 @@ function renderResumenImpagos(contratoId){
     <td>${esc(d.comentarios)}</td>
   </tr>`;
   }).join('')}
-  </tbody></table>
-  ${total>12 ? `<div style="text-align:center;margin-top:12px">
+  </tbody></table></div>
+  ${total>12 ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos(document.getElementById('resumen-filter').value);">
       ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
     </button>
