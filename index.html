@@ -658,6 +658,11 @@
         <select class="filter" id="impagos-tenant-filter"></select>
         <div id="resumen-impagos" class="table-wrap"></div>
       </div>
+      <div class="card">
+        <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <div class="subtitle" style="margin-bottom:14px">Monto pagado y descuento aplicado por arrendatario en cada mes (incluye arrendatarios históricos).</div>
+        <div id="resumen-matrix" class="table-wrap"></div>
+      </div>
     </div>
 
     <!-- ALERTAS -->
@@ -1358,6 +1363,7 @@ function renderAll(){
   renderTenantsContracts();
   renderPaySelects();
   renderResumen();
+  renderResumenMatrix();
   renderAlertas();
   renderReadingSelects();
   renderReadings();
@@ -1436,9 +1442,21 @@ async function deleteProperty(id){
   pushToDriveIfConnected();
 }
 
+// Recuerda qué tarjetas están desplegadas (por una clave única, ej. "prop:ID") para que el
+// estado sobreviva a los re-renders — por ejemplo al cambiar de subtab en Propiedades.
+const expandedCards = new Set();
 function toggleCardExpand(el){
   const card = el.closest('.prop-card');
-  if(card) card.classList.toggle('collapsed');
+  if(!card) return;
+  card.classList.toggle('collapsed');
+  const key = card.dataset.cardKey;
+  if(key){
+    if(card.classList.contains('collapsed')) expandedCards.delete(key);
+    else expandedCards.add(key);
+  }
+}
+function cardCollapsedClass(key, forceExpand){
+  return (forceExpand || expandedCards.has(key)) ? '' : ' collapsed';
 }
 
 function propCardHeader(p, idx){
@@ -1473,7 +1491,7 @@ function renderProperties(){
   const ceilFmt = v => (v!=='' && v!=null && !isNaN(Number(v))) ? formatNumber(Math.ceil(Number(v))) : esc(v);
 
   if(propActiveSubtab==='prop1'){
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${selectedId?'':' collapsed'}">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${cardCollapsedClass('prop:'+p.id, !!selectedId)}" data-card-key="prop:${p.id}">${propCardHeader(p, idx+1)}
       <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,180px));margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);">
           ${propField('M² construidos', ceilFmt(p.m2Construidos))}
@@ -1490,7 +1508,7 @@ function renderProperties(){
       </div>
       </div>`).join('');
   } else if(propActiveSubtab==='prop2'){
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${selectedId?'':' collapsed'}">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${cardCollapsedClass('prop:'+p.id, !!selectedId)}" data-card-key="prop:${p.id}">${propCardHeader(p, idx+1)}
       <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
           <div class="prop-service-group">
@@ -1509,7 +1527,7 @@ function renderProperties(){
       </div>
       </div>`).join('');
   } else {
-    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${selectedId?'':' collapsed'}">${propCardHeader(p, idx+1)}
+    el.innerHTML = list.map((p,idx)=>`<div class="prop-card${cardCollapsedClass('prop:'+p.id, !!selectedId)}" data-card-key="prop:${p.id}">${propCardHeader(p, idx+1)}
       <div class="prop-card-body">
         <div class="prop-fields-grid">
           ${propField('Avalúo fiscal', p.avaluoFiscal?money(p.avaluoFiscal):'—')}
@@ -1763,7 +1781,7 @@ function renderTenantsContracts(){
       ${repRight.length ? `<div class="contact-col">${repRight.join('')}</div>` : ''}
     </div>` : '';
 
-    return `<div class="prop-card${selectedId?'':' collapsed'}">
+    return `<div class="prop-card${cardCollapsedClass('tenant:'+c.id, !!selectedId)}" data-card-key="tenant:${c.id}">
       <div class="prop-card-header">
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
@@ -2722,7 +2740,7 @@ function renderHistoricos(){
     const tieneDeuda = Number(r.c.deudaPactada||0) > 0;
     const tagClass = !tieneDeuda ? 'tag-ok' : (r.saldoRemanente>0 ? 'tag-debt' : 'tag-ok');
     const estado = !tieneDeuda ? 'Cerrado (sin deuda)' : (r.saldoRemanente>0 ? 'Cerrado (con deuda)' : 'Cerrado (deuda cobrada)');
-    return `<div class="prop-card${selectedId?'':' collapsed'}">
+    return `<div class="prop-card${cardCollapsedClass('historico:'+r.c.id, !!selectedId)}" data-card-key="historico:${r.c.id}">
       <div class="prop-card-header">
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span><span class="prop-card-chevron">▸</span>
@@ -2780,6 +2798,23 @@ function th(tableId, key, label){
 }
 
 // ---------- HISTOGRAMA MENSUAL (Resumen & Deudas) ----------
+// Busca el valor de arriendo históricamente vigente para un contrato en un mes dado, usando
+// el valorArriendo explícito más reciente registrado en un pago de ESE contrato hasta ese mes
+// (inclusive). Evita usar el monto pactado ACTUAL para meses antiguos donde el arriendo era
+// otro — que es justo lo que generaba cifras retroactivas incorrectas.
+function historicalValorArriendo(contratoId, year, month, fallback){
+  const cutoff = `${year}-${String(month+1).padStart(2,'0')}`;
+  const conocidos = payments
+    .filter(p=> p.contratoId===contratoId && Number(p.valorArriendo||0)>0 && p.fechaPago)
+    .sort((a,b)=> a.fechaPago.localeCompare(b.fechaPago));
+  const anteriores = conocidos.filter(p=> p.fechaPago.slice(0,7) <= cutoff);
+  if(anteriores.length) return Number(anteriores[anteriores.length-1].valorArriendo);
+  // Si no hay ningún valor registrado hasta ese mes, se usa el primero conocido más adelante
+  // (mejor aproximación histórica que el valor actual del contrato).
+  if(conocidos.length) return Number(conocidos[0].valorArriendo);
+  return fallback;
+}
+
 function computeContratoMonthlySeries(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return [];
@@ -2796,7 +2831,7 @@ function computeContratoMonthlySeries(contratoId){
     const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
     const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-    const monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : montoContrato;
+    const monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(contratoId, year, month, montoContrato);
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
 }
@@ -2840,15 +2875,14 @@ function computeGlobalMonthlySeries(){
   return months.map(({year,month})=>{
     let monto=0, pagado=0, descuento=0;
     activos.forEach(c=>{
-      const start = effectiveDebtStartDate(c.id);
-      if(!start) return;
-      const sy = Number(start.slice(0,4)), sm = Number(start.slice(5,7))-1;
-      if(year<sy || (year===sy && month<sm)) return;
+      // Solo se suman los clientes que tuvieron algún registro de pago ese mes (aunque sea $0) —
+      // no todos los contratos activos desde su fecha de inicio hasta hoy.
       const pagosMes = payments.filter(p=>p.contratoId===c.id && sameYearMonth(p.fechaPago,year,month));
+      if(!pagosMes.length) return;
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
       const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
       const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-      const montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : Number(c.montoArriendoPactado||0);
+      const montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
       monto += montoC; pagado += pagadoC; descuento += descC;
     });
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
@@ -3144,6 +3178,66 @@ function renderResumenImpagos(contratoId){
       ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
     </button>
   </div>` : ''}`;
+}
+
+// ---------- MATRIZ DE PAGOS: Arrendatario × Mes ----------
+let matrixVerTodo = false;
+function renderResumenMatrix(){
+  const el = document.getElementById('resumen-matrix');
+  if(!el) return;
+
+  // Se incluyen todos los contratos (activos e históricos) que tengan al menos un pago registrado.
+  const contractIdsConPago = new Set(payments.map(p=>p.contratoId));
+  const rows = contracts
+    .filter(c=> contractIdsConPago.has(c.id))
+    .map(c=> ({ c, label: tenantNemo(c.tenantId) || tenantName(c.tenantId), historico: !isActiveContract(c) }))
+    .sort((a,b)=>{
+      if(a.historico !== b.historico) return a.historico ? 1 : -1;
+      return a.label.localeCompare(b.label);
+    });
+
+  const fechas = payments.map(p=>p.fechaPago).filter(Boolean).sort();
+  if(!rows.length || !fechas.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para mostrar la matriz.</div>'; return; }
+
+  const months = monthsBetween(fechas[0]).slice().reverse(); // ascendente, del más antiguo al más reciente
+  const total = months.length;
+  const mostrarMonths = matrixVerTodo ? months : months.slice(-12);
+
+  // Se pre-calculan las sumas por contrato+mes para no recorrer todos los pagos por cada celda.
+  const sumas = {};
+  rows.forEach(r=>{ sumas[r.c.id] = {}; });
+  payments.forEach(p=>{
+    if(!sumas[p.contratoId] || !p.fechaPago) return;
+    const key = p.fechaPago.slice(0,7);
+    if(!sumas[p.contratoId][key]) sumas[p.contratoId][key] = { pagado:0, descuento:0 };
+    sumas[p.contratoId][key].pagado += Number(p.montoPagado||0);
+    sumas[p.contratoId][key].descuento += Number(p.descuentos||0);
+  });
+
+  const headerCells = mostrarMonths.map(({year,month})=> `<th>${MESES_ES[month].slice(0,3)} ${String(year).slice(2)}</th>`).join('');
+
+  const bodyRows = rows.map(r=>{
+    const full = contractLabel(r.c.id);
+    const etiqueta = r.historico ? esc(r.label) + ' <span class="tag tag-pending">Hist.</span>' : esc(r.label);
+    const cells = mostrarMonths.map(({year,month})=>{
+      const key = `${year}-${String(month+1).padStart(2,'0')}`;
+      const d = sumas[r.c.id][key];
+      if(!d || (d.pagado===0 && d.descuento===0)) return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
+      return `<td class="mono cell-stacked" style="text-align:center;">
+        <div>${money(d.pagado)}</div>
+        ${d.descuento ? `<div class="cell-stacked-sub">Desc: ${money(d.descuento)}</div>` : ''}
+      </td>`;
+    }).join('');
+    return `<tr><td class="cell-tap-full" title="${esc(full)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
+  }).join('');
+
+  const toggleHtml = total>12 ? `<div class="table-scroll-toggle">
+    <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
+      ${matrixVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${total} meses)`}
+    </button>
+  </div>` : '';
+
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>${toggleHtml}`;
 }
 
 document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
