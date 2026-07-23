@@ -147,7 +147,7 @@
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   /* El scroll (con fila/columna fijas) queda en su propio contenedor, .table-scroll — separado
      del botón "Ver todo", que así siempre queda visible debajo y nunca atrapado dentro del scroll. */
-  .table-scroll{overflow:auto;max-height:65vh;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--gris-linea) transparent;}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--gris-linea) transparent;}
   .table-scroll::-webkit-scrollbar{height:6px;width:6px;}
   .table-scroll::-webkit-scrollbar-thumb{background:var(--gris-linea);border-radius:3px;}
   .table-scroll::-webkit-scrollbar-track{background:transparent;}
@@ -193,6 +193,7 @@
   .prop-card-contact-rut{font-size:11px;color:var(--ink-soft);padding-left:18px;}
   .prop-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 16px;}
   .prop-field{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .prop-field-full{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);}
   .prop-field .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);font-weight:600;}
   .prop-field .val{font-size:13.5px;color:var(--ink);font-family:'Inter',sans-serif;word-break:break-word;}
   .prop-service-group{display:flex;flex-direction:column;gap:10px;}
@@ -281,7 +282,7 @@
     .table-scroll table th:first-child, .table-scroll table td:first-child{
       max-width:150px;overflow:hidden;text-overflow:ellipsis;
     }
-    .table-scroll{max-height:52vh;}
+    /* .table-scroll ya no tiene alto máximo; el scroll vertical lo maneja .main directamente */
 
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
     .row-actions{gap:6px;flex-wrap:wrap;}
@@ -1693,23 +1694,22 @@ function renderTenantsContracts(){
     const finCalc = contractEndDate(c);
     const fechaFin = finCalc ? formatDate(toISO(finCalc)) : '—';
 
-    // Solo se muestran los campos de Nombre sociedad / Rut sociedad si tienen información.
-    const sociedadFields = [];
-    if(t.nombreSociedad) sociedadFields.push(propField('Nombre sociedad', esc(t.nombreSociedad)));
-    if(t.rutSociedad) sociedadFields.push(propField('Rut Sociedad', esc(t.rutSociedad)));
-    const sociedadSection = sociedadFields.length
-      ? `<div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">🏢 Sociedad</div><div class="prop-fields-grid">${sociedadFields.join('')}</div>`
-      : '';
+    // Datos de identificación/contacto, en un bloque compacto bajo el título de la tarjeta
+    // (jerarquía menor): Sociedad, Representante (nombre+RUT apilados) y Contacto, en columnas.
+    const socCol = [];
+    if(t.nombreSociedad) socCol.push(`<div>🏢 ${esc(t.nombreSociedad)}</div>`);
+    if(t.rutSociedad) socCol.push(`<div class="prop-card-contact-rut">${esc(t.rutSociedad)}</div>`);
 
-    // Datos de contacto, en un bloque compacto bajo el título de la tarjeta (jerarquía menor):
-    // nombre + RUT del representante apilados a la izquierda, correo/teléfono a la derecha.
     const repLeft = [];
     if(t.nombreRepresentante) repLeft.push(`<div>👤 ${esc(t.nombreRepresentante)}</div>`);
     if(t.rutRepresentante) repLeft.push(`<div class="prop-card-contact-rut">${esc(t.rutRepresentante)}</div>`);
+
     const repRight = [];
     if(t.correo) repRight.push(`<div>📧 ${esc(t.correo)}</div>`);
     if(t.telefono) repRight.push(`<div>📞 ${esc(t.telefono)}</div>`);
-    const contactoLine = (repLeft.length || repRight.length) ? `<div class="prop-card-contact">
+
+    const contactoLine = (socCol.length || repLeft.length || repRight.length) ? `<div class="prop-card-contact">
+      ${socCol.length ? `<div class="contact-col">${socCol.join('')}</div>` : ''}
       ${repLeft.length ? `<div class="contact-col">${repLeft.join('')}</div>` : ''}
       ${repRight.length ? `<div class="contact-col">${repRight.join('')}</div>` : ''}
     </div>` : '';
@@ -1722,15 +1722,14 @@ function renderTenantsContracts(){
         </div>
         <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
-      ${sociedadSection}
-      <div class="prop-card-section" ${sociedadSection?'':'style="margin-top:0;padding-top:0;border-top:none"'}>📝 Contrato</div>
+      <div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">📝 Contrato</div>
       <div class="prop-fields-grid">
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
         ${propField('Fin contrato', fechaFin)}
         ${propField('Monto pactado', money(c.montoArriendoPactado))}
         ${propField('Garantía', c.garantia ? money(c.garantia) : '—')}
-        ${propField('Comentarios', esc(c.infoGeneral))}
       </div>
+      ${c.infoGeneral ? `<div class="prop-field prop-field-full"><span class="lbl">Comentarios</span><span class="val">${esc(c.infoGeneral)}</span></div>` : ''}
       ${c.proximaDecisionMotivo ? `<div class="prop-card-section">📌 Próxima decisión (pendiente)</div>
       <div class="prop-fields-grid">
         ${propField('Qué ocurrirá', esc(CU_MOTIVO_LABELS[c.proximaDecisionMotivo] || c.proximaDecisionMotivo))}
@@ -2406,7 +2405,7 @@ function contratoSector(contratoId){
 
 function buildReadingsTableHtml(list){
   return `<div class="table-scroll"><table><thead><tr>
-    ${th('readings','contrato','Arrendatario')}${th('readings','servicio','Servicio')}${th('readings','fechaLectura','Fecha lectura')}<th>Lectura ant.</th>${th('readings','lecturaActual','Lectura actual')}${th('readings','consumo','Consumo')}${th('readings','valorUnitario','Valor unit.')}${th('readings','monto','Monto a pagar')}${th('readings','estadoEfectivo','Estado')}<th></th>
+    ${th('readings','contrato','Arrendatario')}${th('readings','servicio','Servicio')}${th('readings','monto','Monto a pagar')}${th('readings','estadoEfectivo','Estado')}${th('readings','consumo','Consumo')}${th('readings','fechaLectura','Fecha lectura')}<th></th>
   </tr></thead><tbody>
   ${list.map(r=>{
     const tagClass = r.estadoEfectivo==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
@@ -2414,15 +2413,18 @@ function buildReadingsTableHtml(list){
     return `<tr>
     <td class="cell-tap-full" title="${esc(contratoFull)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(truncateText(contratoFull,20))}</td>
     <td>${servicioIcono(r.servicio)}</td>
-    <td class="mono">${formatDate(r.fechaLectura)}</td>
-    <td class="mono">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)}</td>
-    <td class="mono">${formatNumber(r.lecturaActual)}</td>
-    <td class="mono">${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</td>
-    <td class="mono">${money(r.valorUnitario)}</td>
-    <td class="mono">${money(r.monto)}</td>
+    <td class="mono cell-stacked">
+      <div>${money(r.monto)}</div>
+      <div class="cell-stacked-sub">$${formatNumber(r.valorUnitario)} c/u</div>
+    </td>
     <td>
       <span class="tag ${tagClass}">${esc(r.estadoEfectivo)}</span>
     </td>
+    <td class="mono cell-stacked">
+      <div>${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</div>
+      <div class="cell-stacked-sub">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)} → ${formatNumber(r.lecturaActual)}</div>
+    </td>
+    <td class="mono">${formatDate(r.fechaLectura)}</td>
     <td class="row-actions">
       <button onclick="editReading('${r.id}')">Editar</button>
       ${r.estadoEfectivo!=='Pagado' ? `<button onclick="setReadingEstado('${r.id}','Pagado')">Marcar pagado</button>` : ''}
