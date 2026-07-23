@@ -67,7 +67,7 @@
   .btn-add-new .plus-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--teal);color:#fff;font-size:16px;font-weight:700;line-height:1;flex-shrink:0;transition:background .15s,color .15s;}
   .btn-add-new:hover .plus-icon{background:#fff;color:var(--teal-dark);}
   table{width:100%;border-collapse:collapse;font-size:13.5px;}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);resize:horizontal;overflow:hidden;min-width:48px;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.02em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);resize:horizontal;overflow:hidden;min-width:48px;white-space:normal;line-height:1.25;}
   th.sortable{cursor:pointer;user-select:none;}
   th.sortable:hover{color:var(--teal-dark);}
   td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap;}
@@ -261,9 +261,13 @@
     .dropdown-item{padding:13px 14px;font-size:14px;}
     .searchable-dropdown{max-height:260px;}
 
-    /* Tablas: más aire en celdas y primera columna acotada para que no se coma la pantalla */
-    table{font-size:13px;}
-    th,td{padding:10px 8px;white-space:nowrap;}
+    /* Tablas: encabezados compactos que envuelven en 2 líneas, para ver más columnas de una */
+    table{font-size:12px;}
+    th{
+      white-space:normal;font-size:9.5px;padding:6px 5px;line-height:1.2;
+      letter-spacing:0.01em;min-width:40px;vertical-align:bottom;
+    }
+    td{padding:8px 6px;white-space:nowrap;}
     .table-wrap table th:first-child, .table-wrap table td:first-child{
       max-width:150px;overflow:hidden;text-overflow:ellipsis;
     }
