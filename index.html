@@ -184,6 +184,7 @@
   .cell-truncate{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;cursor:help;}
   .cell-tap-full{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .subtabs-sticky{position:sticky;top:0;z-index:20;background:var(--card);padding:10px 0;margin:-24px -24px 16px;padding-left:24px;padding-right:24px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.15);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
   .subtab-btn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
   .checkbox-list{border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:150px;overflow-y:auto;background:#fdfdfc;}
@@ -281,6 +282,7 @@
     .main{padding:calc(60px + env(safe-area-inset-top)) 14px calc(84px + env(safe-area-inset-bottom));max-width:100%;}
     h1{font-size:21px;}
     .card{padding:16px 14px;margin-bottom:18px;border-radius:12px;}
+    .subtabs-sticky{margin:-16px -14px 16px;padding:10px 14px;}
     .grid{grid-template-columns:1fr;}
     .line-row{grid-template-columns:1fr;}
     .summary-cards{grid-template-columns:repeat(2,1fr);}
@@ -502,12 +504,12 @@
       </div>
       <div class="card">
         <h2>📋 Propiedades registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <select class="filter" id="prop-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
-        <div class="subtabs" id="prop-subtabs">
+        <div class="subtabs subtabs-sticky" id="prop-subtabs">
           <button type="button" class="subtab-btn active" data-subtab="prop1">📜 Antecedentes e Inscripción CBR</button>
           <button type="button" class="subtab-btn" data-subtab="prop2">🔧 Servicios</button>
           <button type="button" class="subtab-btn" data-subtab="prop3">💰 Antecedentes Comerciales</button>
         </div>
+        <select class="filter" id="prop-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
         <div id="prop-table" class="table-wrap"></div>
       </div>
     </div>
@@ -636,16 +638,6 @@
     <div class="tab-section active" id="tab-resumen">
       <h1>📊 Resumen &amp; Deudas</h1>
       <div class="card">
-        <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <select class="filter" id="resumen-filter"></select>
-        <div id="resumen-table" class="table-wrap"></div>
-      </div>
-      <div class="card">
-        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
-        <select class="filter" id="impagos-tenant-filter"></select>
-        <div id="resumen-impagos" class="table-wrap"></div>
-      </div>
-      <div class="card">
         <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <div class="line-row" style="margin-bottom:12px;max-width:420px">
           <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
@@ -655,6 +647,16 @@
           <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
         </div>
         <div id="resumen-chart"></div>
+      </div>
+      <div class="card">
+        <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <select class="filter" id="resumen-filter"></select>
+        <div id="resumen-table" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
+        <select class="filter" id="impagos-tenant-filter"></select>
+        <div id="resumen-impagos" class="table-wrap"></div>
       </div>
     </div>
 
@@ -1991,14 +1993,13 @@ function renderResumen(){
   if(!rows.length){ el.innerHTML='<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>'; }
   else {
     el.innerHTML = `<div class="table-scroll"><table><thead><tr>
-      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','monto','Monto')}${th('resumen','saldo','Saldo')}
+      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}
     </tr></thead><tbody>
     ${rows.map(r=>{
       const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
       const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
       return `<tr>
       <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
-      <td class="mono">${money(r.monto)}</td>
       <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
     </tr>`;
     }).join('')}
