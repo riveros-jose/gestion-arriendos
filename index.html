@@ -661,6 +661,10 @@
       <div class="card">
         <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <div class="subtitle" style="margin-bottom:14px">Monto pagado y descuento aplicado por arrendatario en cada mes (incluye arrendatarios históricos).</div>
+        <div class="line-row" style="margin-bottom:16px;max-width:520px">
+          <div class="field"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0"></select></div>
+          <div class="field"><label>Año</label><select id="matrix-year-filter"></select></div>
+        </div>
         <div id="resumen-matrix" class="table-wrap"></div>
       </div>
     </div>
@@ -3188,20 +3192,47 @@ function renderResumenMatrix(){
 
   // Se incluyen todos los contratos (activos e históricos) que tengan al menos un pago registrado.
   const contractIdsConPago = new Set(payments.map(p=>p.contratoId));
-  const rows = contracts
+  const allRows = contracts
     .filter(c=> contractIdsConPago.has(c.id))
-    .map(c=> ({ c, label: tenantNemo(c.tenantId) || tenantName(c.tenantId), historico: !isActiveContract(c) }))
+    .map(c=> ({
+      c,
+      label: contractLabel(c.id),
+      historico: !isActiveContract(c),
+      // Mes desde el cual este contrato debería tener registros (su propio inicio), para saber
+      // a partir de cuándo "falta un registro" realmente cuenta como una alerta.
+      startKey: (effectiveDebtStartDate(c.id) || '').slice(0,7)
+    }))
     .sort((a,b)=>{
       if(a.historico !== b.historico) return a.historico ? 1 : -1;
       return a.label.localeCompare(b.label);
     });
 
   const fechas = payments.map(p=>p.fechaPago).filter(Boolean).sort();
-  if(!rows.length || !fechas.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para mostrar la matriz.</div>'; return; }
+  if(!allRows.length || !fechas.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para mostrar la matriz.</div>'; return; }
 
-  const months = monthsBetween(fechas[0]).slice().reverse(); // ascendente, del más antiguo al más reciente
+  // monthsBetween ya devuelve del más reciente al más antiguo (orden descendente).
+  const allMonths = monthsBetween(fechas[0]);
+
+  // ---- Combobox de arrendatario ----
+  const tenantSel = document.getElementById('matrix-tenant-filter');
+  const currentTenant = tenantSel.value;
+  tenantSel.innerHTML = '<option value="">Todos los arrendatarios</option>'
+    + allRows.map(r=> `<option value="${r.c.id}">${esc(r.label)}${r.historico?' (Histórico)':''}</option>`).join('');
+  if(allRows.some(r=>r.c.id===currentTenant)) tenantSel.value = currentTenant;
+  const tenantFiltro = tenantSel.value;
+
+  // ---- Combobox de año ----
+  const yearSel = document.getElementById('matrix-year-filter');
+  const currentYear = yearSel.value;
+  const anios = [...new Set(allMonths.map(m=>m.year))].sort((a,b)=>b-a);
+  yearSel.innerHTML = '<option value="">Todos los años</option>' + anios.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(anios.map(String).includes(currentYear)) yearSel.value = currentYear;
+  const yearFiltro = yearSel.value;
+
+  const rows = tenantFiltro ? allRows.filter(r=> r.c.id===tenantFiltro) : allRows;
+  let months = yearFiltro ? allMonths.filter(m=> String(m.year)===yearFiltro) : allMonths;
   const total = months.length;
-  const mostrarMonths = matrixVerTodo ? months : months.slice(-12);
+  const mostrarMonths = (yearFiltro || matrixVerTodo) ? months : months.slice(0,12);
 
   // Se pre-calculan las sumas por contrato+mes para no recorrer todos los pagos por cada celda.
   const sumas = {};
@@ -3214,31 +3245,59 @@ function renderResumenMatrix(){
     sumas[p.contratoId][key].descuento += Number(p.descuentos||0);
   });
 
+  if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay datos para este filtro.</div>'; return; }
+
   const headerCells = mostrarMonths.map(({year,month})=> `<th>${MESES_ES[month].slice(0,3)} ${String(year).slice(2)}</th>`).join('');
 
   const bodyRows = rows.map(r=>{
-    const full = contractLabel(r.c.id);
     const etiqueta = r.historico ? esc(r.label) + ' <span class="tag tag-pending">Hist.</span>' : esc(r.label);
     const cells = mostrarMonths.map(({year,month})=>{
       const key = `${year}-${String(month+1).padStart(2,'0')}`;
       const d = sumas[r.c.id][key];
-      if(!d || (d.pagado===0 && d.descuento===0)) return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
-      return `<td class="mono cell-stacked" style="text-align:center;">
-        <div>${money(d.pagado)}</div>
-        ${d.descuento ? `<div class="cell-stacked-sub">Desc: ${money(d.descuento)}</div>` : ''}
-      </td>`;
+      if(d){
+        // Hay al menos un registro ese mes, aunque sea de $0.
+        if(d.pagado===0 && d.descuento===0) return '<td class="mono" style="text-align:center;color:var(--ink-soft);">$0</td>';
+        return `<td class="mono cell-stacked" style="text-align:center;">
+          <div>${money(d.pagado)}</div>
+          ${d.descuento ? `<div class="cell-stacked-sub">Desc: ${money(d.descuento)}</div>` : ''}
+        </td>`;
+      }
+      // No hay ningún registro. Si el contrato está activo y el mes cae dentro de su propio
+      // periodo (desde que empezó), se destaca en rojo como una alerta real.
+      const esperado = !r.historico && r.startKey && key >= r.startKey;
+      if(esperado){
+        return '<td class="mono" style="text-align:center;background:var(--brick-soft);color:var(--brick);font-weight:700;" title="Sin ningún pago registrado este mes">Sin registro</td>';
+      }
+      return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr><td class="cell-tap-full" title="${esc(full)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
+    return `<tr><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
   }).join('');
 
-  const toggleHtml = total>12 ? `<div class="table-scroll-toggle">
+  // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
+  const totalCells = mostrarMonths.map(({year,month})=>{
+    const key = `${year}-${String(month+1).padStart(2,'0')}`;
+    let totPagado=0, totDescuento=0;
+    rows.forEach(r=>{
+      const d = sumas[r.c.id][key];
+      if(d){ totPagado += d.pagado; totDescuento += d.descuento; }
+    });
+    return `<td class="mono cell-stacked" style="text-align:center;">
+      <div>${money(totPagado)}</div>
+      ${totDescuento ? `<div class="cell-stacked-sub">Desc: ${money(totDescuento)}</div>` : ''}
+    </td>`;
+  }).join('');
+  const totalRow = `<tr style="background:var(--paper);font-weight:700;"><td>Total</td>${totalCells}</tr>`;
+
+  const toggleHtml = (!yearFiltro && total>12) ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
       ${matrixVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${total} meses)`}
     </button>
   </div>` : '';
 
-  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>${toggleHtml}`;
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
 }
+document.getElementById('matrix-tenant-filter').addEventListener('change', renderResumenMatrix);
+document.getElementById('matrix-year-filter').addEventListener('change', renderResumenMatrix);
 
 document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
   const contratoId = document.getElementById('resumen-filter').value;
@@ -3352,7 +3411,7 @@ function makeSearchable(selectId){
   new MutationObserver(()=>{ syncFromSelect(); if(dropdown.style.display!=='none') buildList(input.value); }).observe(select, { childList:true });
 }
 
-['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select']
+['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select','matrix-tenant-filter']
   .forEach(makeSearchable);
 
 function esc(s){
