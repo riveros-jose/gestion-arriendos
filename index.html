@@ -2943,7 +2943,6 @@ function renderResumenChart(contratoId){
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
-      rows = rows.slice().reverse(); // más reciente primero, hacia lo más antiguo
       const chart = buildStackedColumnChartSVG(rows, availableWidth);
       container.innerHTML = chart.html + histogramToggleHtml(total);
       chart.attach(container);
@@ -2964,7 +2963,6 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
-  rows = rows.slice().reverse(); // más reciente primero, hacia lo más antiguo
   const chart = buildStackedColumnChartSVG(rows, availableWidth);
   container.innerHTML = chart.html + histogramToggleHtml(total);
   chart.attach(container);
@@ -3112,6 +3110,11 @@ function buildStackedColumnChartSVG(rows, availableWidth){
       if(scaleTimer) clearTimeout(scaleTimer);
       scaleTimer = setTimeout(recompute, 120);
     });
+    // En mobile, el gráfico parte posicionado en el extremo más reciente (a la derecha), ya
+    // que el orden cronológico va de lo más viejo (izquierda) a lo más nuevo (derecha).
+    if(window.innerWidth <= 860){
+      barsEl.scrollLeft = barsEl.scrollWidth;
+    }
     // Ajuste inicial a la ventana realmente visible (recién ahora se conoce el ancho real en pantalla)
     recompute();
   }
@@ -3276,18 +3279,25 @@ function renderResumenMatrix(){
 
   if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay arrendatarios con movimientos de pago en el período visible.</div>'; return; }
 
-  // Orden: primero quienes NO tienen ningún registro en el último período visible (el más
-  // reciente, ya que las columnas van de más nuevo a más viejo), segundo quienes tienen $0
-  // registrado ese último período, y el resto — alfabético dentro de cada grupo.
+  // Orden de las filas:
+  // 1) Contratos activos sin ningún registro en el último período visible (máxima urgencia)
+  // 2) Contratos activos con $0 registrado ese último período
+  // 3) Contratos activos con pagos normales
+  // 4) Contratos históricos (no activos) que todavía tienen deuda pendiente por cobrar
+  // 5) Contratos históricos sin deuda pendiente — al fondo de todo
+  // Dentro de cada grupo, orden alfabético.
   const ultimoKey = `${mostrarMonths[0].year}-${String(mostrarMonths[0].month+1).padStart(2,'0')}`;
-  const categoriaUltimoPeriodo = (r)=>{
-    const d = sumas[r.c.id][ultimoKey];
-    if(!d) return 0;
-    if(d.pagado===0 && d.descuento===0) return 1;
-    return 2;
+  const categoriaFila = (r)=>{
+    if(!r.historico){
+      const d = sumas[r.c.id][ultimoKey];
+      if(!d) return 0;
+      if(d.pagado===0 && d.descuento===0) return 1;
+      return 2;
+    }
+    return computeCobranzaSaldo(r.c) > 0 ? 3 : 4;
   };
   rows.sort((a,b)=>{
-    const ca = categoriaUltimoPeriodo(a), cb = categoriaUltimoPeriodo(b);
+    const ca = categoriaFila(a), cb = categoriaFila(b);
     if(ca!==cb) return ca-cb;
     return a.label.localeCompare(b.label);
   });
