@@ -94,6 +94,10 @@
   .row-actions button:hover{color:var(--teal-dark);}
   .cell-stacked{white-space:normal !important;line-height:1.4;}
   .cell-comments{max-width:220px;white-space:normal !important;word-break:break-word;line-height:1.4;}
+  .cell-comments-clamp{
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;
+  }
   .cell-stacked-sub{font-size:11px;color:var(--ink-soft);}
   .table-action-btn{
     display:inline-flex;align-items:center;justify-content:center;
@@ -2603,6 +2607,15 @@ function showFullTextTooltip(text){
   box.addEventListener('click', ()=>{ clearTimeout(timer); box.remove(); });
 }
 
+// Comentarios en tablas: se recortan a un máximo de 2 líneas, y se puede ver el texto completo
+// pasando el mouse (title nativo) o tocando/haciendo clic (toast), igual que el resto de las
+// celdas largas de la app.
+function commentCellHtml(text){
+  const t = (text||'').trim();
+  if(!t) return '';
+  return `<span class="cell-comments-clamp" title="${esc(t)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(t)}</span>`;
+}
+
 function sameYearMonth(fechaStr, year, month){
   if(!fechaStr) return false;
   const parts = fechaStr.split('-');
@@ -2652,7 +2665,7 @@ function renderHistorialTodos(){
       ${Number(p.descuentos)?`<div class="cell-stacked-sub">Desc: ${money(p.descuentos)}</div>`:''}
       ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
     </td>
-    <td class="cell-comments">${esc(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
+    <td class="cell-comments">${commentCellHtml(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -2930,6 +2943,7 @@ function renderResumenChart(contratoId){
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
+      rows = rows.slice().reverse(); // más reciente primero, hacia lo más antiguo
       const chart = buildStackedColumnChartSVG(rows, availableWidth);
       container.innerHTML = chart.html + histogramToggleHtml(total);
       chart.attach(container);
@@ -2950,6 +2964,7 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
+  rows = rows.slice().reverse(); // más reciente primero, hacia lo más antiguo
   const chart = buildStackedColumnChartSVG(rows, availableWidth);
   container.innerHTML = chart.html + histogramToggleHtml(total);
   chart.attach(container);
@@ -3149,7 +3164,7 @@ function renderResumenImpagos(contratoId){
         <td class="mono">${money(d.monto)}</td>
         <td class="mono">${money(d.pagado)}</td>
         <td class="mono">${money(d.descuento)}</td>
-        <td class="cell-comments">${esc(d.comentarios)}</td>
+        <td class="cell-comments">${commentCellHtml(d.comentarios)}</td>
       </tr>`;
       }).join('')}
       </tbody></table></div>${toggleHtml}`;
@@ -3182,7 +3197,7 @@ function renderResumenImpagos(contratoId){
     <td class="mono">${money(d.monto)}</td>
     <td class="mono">${money(d.pagado)}</td>
     <td class="mono">${money(d.descuento)}</td>
-    <td class="cell-comments">${esc(d.comentarios)}</td>
+    <td class="cell-comments">${commentCellHtml(d.comentarios)}</td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -3260,6 +3275,22 @@ function renderResumenMatrix(){
   const rows = rows0.filter(r=> Object.keys(sumas[r.c.id]).some(k=> clavesVisibles.has(k)));
 
   if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay arrendatarios con movimientos de pago en el período visible.</div>'; return; }
+
+  // Orden: primero quienes NO tienen ningún registro en el último período visible (el más
+  // reciente, ya que las columnas van de más nuevo a más viejo), segundo quienes tienen $0
+  // registrado ese último período, y el resto — alfabético dentro de cada grupo.
+  const ultimoKey = `${mostrarMonths[0].year}-${String(mostrarMonths[0].month+1).padStart(2,'0')}`;
+  const categoriaUltimoPeriodo = (r)=>{
+    const d = sumas[r.c.id][ultimoKey];
+    if(!d) return 0;
+    if(d.pagado===0 && d.descuento===0) return 1;
+    return 2;
+  };
+  rows.sort((a,b)=>{
+    const ca = categoriaUltimoPeriodo(a), cb = categoriaUltimoPeriodo(b);
+    if(ca!==cb) return ca-cb;
+    return a.label.localeCompare(b.label);
+  });
 
   const headerCells = mostrarMonths.map(({year,month})=> `<th>${MESES_ES[month].slice(0,3)} ${String(year).slice(2)}</th>`).join('');
 
