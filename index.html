@@ -955,9 +955,15 @@ async function openFilePicker(){
     .setIncludeFolders(true)
     .setSelectFolderEnabled(false)
     .setOwnedByMe(false);
+  // Número de proyecto de Google Cloud (el prefijo numérico del Client ID). Con el permiso
+  // acotado drive.file, el Picker DEBE llevar setAppId con este número: sin él, elegir un
+  // archivo NO le concede acceso a la app, y cualquier lectura posterior da "404 File not
+  // found" aunque el archivo exista y esté bien compartido.
+  const APP_PROJECT_NUMBER = GOOGLE_CLIENT_ID.split('-')[0];
   const picker = new google.picker.PickerBuilder()
     .setOAuthToken(driveToken)
     .setDeveloperKey(GOOGLE_API_KEY)
+    .setAppId(APP_PROJECT_NUMBER)
     .addView(viewPropios)
     .addView(viewCompartidos)
     .addView(new google.picker.DocsView(google.picker.ViewId.DOCS).setMimeTypes(XLSX_MIME).setEnableDrives(true))
@@ -1286,7 +1292,19 @@ async function driveSync(isInitialLoad){
       // dispositivo de una vez anterior (por ejemplo, si la búsqueda falla entre cuentas
       // distintas aunque la carpeta esté compartida).
       driveFileId = await driveFindFile(driveFolderId);
-      if(!driveFileId){ driveFileId = getRememberedFileId(); }
+      if(!driveFileId){
+        // Respaldo: un ID recordado de una sesión anterior — se valida silenciosamente antes
+        // de usarlo; si ya no es accesible (borrado, o quedó guardado sin concesión válida),
+        // se descarta sin molestar y se sigue con el flujo normal de elegir archivo.
+        const recordado = getRememberedFileId();
+        if(recordado){
+          try{
+            const check = await fetch(`https://www.googleapis.com/drive/v3/files/${recordado}?fields=id`, { headers:{ Authorization:'Bearer '+driveToken } });
+            if(check.ok){ driveFileId = recordado; }
+            else { forgetFileId(); }
+          }catch(e){ forgetFileId(); }
+        }
+      }
     }
     if(isInitialLoad && driveFileId){
       const buf = await driveReadXlsxFile(driveFileId);
