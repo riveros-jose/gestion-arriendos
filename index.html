@@ -438,6 +438,7 @@
   <span class="topbar-title">🏠 Gestión de Arriendos</span>
   <div class="topbar-group">
     <button type="button" class="topbar-btn" onclick="disconnectDrive()" title="Cambiar cuenta de Google">👤</button>
+    <button type="button" class="topbar-btn" onclick="openFilePicker()" title="Seleccionar archivo Excel manualmente en Drive">📂</button>
     <button type="button" class="topbar-btn" id="topbar-alert-btn" onclick="openAlertsTab()" title="Alertas">🔔<span id="alert-badge-top" class="badge" style="display:none"></span></button>
   </div>
 </div>
@@ -942,14 +943,24 @@ async function openFilePicker(){
     alert(e.message);
     return;
   }
-  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+  const viewPropios = new google.picker.DocsView(google.picker.ViewId.DOCS)
     .setMimeTypes(XLSX_MIME)
     .setIncludeFolders(true)
     .setSelectFolderEnabled(false);
+  // Vista aparte para archivos COMPARTIDOS con esta cuenta (no de su propiedad) — sin esto,
+  // el selector por defecto solo muestra "Mi unidad" y una cuenta invitada no ve el archivo
+  // aunque la carpeta esté compartida con ella.
+  const viewCompartidos = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setMimeTypes(XLSX_MIME)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(false)
+    .setOwnedByMe(false);
   const picker = new google.picker.PickerBuilder()
     .setOAuthToken(driveToken)
     .setDeveloperKey(GOOGLE_API_KEY)
-    .addView(view)
+    .addView(viewPropios)
+    .addView(viewCompartidos)
+    .addView(new google.picker.DocsView(google.picker.ViewId.DOCS).setMimeTypes(XLSX_MIME).setEnableDrives(true))
     .setTitle('Elige tu archivo registros-arriendos.xlsx')
     .setCallback(onPickerResult)
     .build();
@@ -3530,7 +3541,7 @@ function setupPageHeaderActions(){
     row.appendChild(h1);
     const actions = document.createElement('div');
     actions.className = 'page-header-actions';
-    actions.innerHTML = `<button type="button" class="icon-btn-sm" onclick="reloadFromDrive()" title="Recargar desde Excel" style="position:relative;"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5" fill="#1D6F42"/><text x="12" y="16.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle">X</text></svg><span class="icon-refresh-badge c-excel" style="width:12px;height:12px;font-size:9px;bottom:-2px;right:-2px;">⟳</span></button><button type="button" class="icon-btn-sm" onclick="requestDriveConnection()" title="Sincronizar con Google Drive" style="position:relative;"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,4 44,40 4,40" fill="#4285F4"/><polygon points="24,4 34,22 14,22" fill="#FBBC05"/><polygon points="14,22 34,22 44,40 4,40" fill="#34A853"/></svg><span class="icon-refresh-badge c-drive" style="width:12px;height:12px;font-size:9px;bottom:-2px;right:-2px;">⟳</span></button><button type="button" class="icon-btn-sm" onclick="disconnectDrive()" title="Cambiar cuenta de Google Drive">👤</button>`;
+    actions.innerHTML = `<button type="button" class="icon-btn-sm" onclick="reloadFromDrive()" title="Recargar desde Excel" style="position:relative;"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5" fill="#1D6F42"/><text x="12" y="16.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle">X</text></svg><span class="icon-refresh-badge c-excel" style="width:12px;height:12px;font-size:9px;bottom:-2px;right:-2px;">⟳</span></button><button type="button" class="icon-btn-sm" onclick="requestDriveConnection()" title="Sincronizar con Google Drive" style="position:relative;"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,4 44,40 4,40" fill="#4285F4"/><polygon points="24,4 34,22 14,22" fill="#FBBC05"/><polygon points="14,22 34,22 44,40 4,40" fill="#34A853"/></svg><span class="icon-refresh-badge c-drive" style="width:12px;height:12px;font-size:9px;bottom:-2px;right:-2px;">⟳</span></button><button type="button" class="icon-btn-sm" onclick="openFilePicker()" title="Seleccionar archivo Excel manualmente en Drive">📂</button><button type="button" class="icon-btn-sm" onclick="disconnectDrive()" title="Cambiar cuenta de Google Drive">👤</button>`;
     row.appendChild(actions);
   });
 }
