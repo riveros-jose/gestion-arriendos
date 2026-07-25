@@ -770,6 +770,7 @@ const DRIVE_FOLDER_NAME = 'RentaPro';
 const DRIVE_FILENAME = 'registros-arriendos.xlsx';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DRIVE_HINT_KEY = 'arriendos_drive_connected_hint';
+const DRIVE_FILE_ID_KEY = 'arriendos_drive_file_id_v1';
 
 let tokenClient = null;
 let driveToken = null;
@@ -801,6 +802,15 @@ function setGateChecking(isChecking){
 function rememberConnectedHint(){ try{ localStorage.setItem(DRIVE_HINT_KEY, DRIVE_SCOPE); }catch(e){} }
 function hadConnectedBefore(){ try{ return localStorage.getItem(DRIVE_HINT_KEY) === DRIVE_SCOPE; }catch(e){ return false; } }
 function forgetConnectedHint(){ try{ localStorage.removeItem(DRIVE_HINT_KEY); }catch(e){} }
+
+// El permiso drive.file restringe las búsquedas (files.list) a solo lo que la app tiene
+// concedido para CADA cuenta — eso puede fallar entre cuentas distintas aunque la carpeta esté
+// compartida (por ejemplo, si la app nunca vio la carpeta en sí, solo el archivo elegido a
+// mano). Por eso, una vez que se encuentra o se elige el archivo correcto, se recuerda su ID
+// en este dispositivo/cuenta para no depender de esa búsqueda en las próximas conexiones.
+function rememberFileId(id){ try{ localStorage.setItem(DRIVE_FILE_ID_KEY, id); }catch(e){} }
+function getRememberedFileId(){ try{ return localStorage.getItem(DRIVE_FILE_ID_KEY) || null; }catch(e){ return null; } }
+function forgetFileId(){ try{ localStorage.removeItem(DRIVE_FILE_ID_KEY); }catch(e){} }
 
 function initGoogleDrive(){
   if(!driveConfigured()){
@@ -950,6 +960,7 @@ async function onPickerResult(data){
   if(data.action !== google.picker.Action.PICKED) return;
   const file = data.docs[0];
   driveFileId = file.id;
+  rememberFileId(driveFileId);
   setDriveStatus('archivo elegido, cargando…', true);
   try{
     const res = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?fields=parents`, { headers:{ Authorization:'Bearer '+driveToken } });
@@ -1227,10 +1238,16 @@ async function driveSync(isInitialLoad){
   driveSyncBusy = true;
   try{
     if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
-    if(driveFileId===null){ driveFileId = await driveFindFile(driveFolderId); }
+    if(driveFileId===null){
+      // Primero se intenta con el ID ya recordado en este dispositivo/cuenta (evita depender
+      // de la búsqueda por carpeta, que puede fallar entre cuentas distintas aunque la carpeta
+      // esté compartida). Solo si no hay nada recordado, se busca por nombre.
+      driveFileId = getRememberedFileId() || await driveFindFile(driveFolderId);
+    }
     if(isInitialLoad && driveFileId){
       const buf = await driveReadXlsxFile(driveFileId);
       loadFromWorkbook(buf);
+      rememberFileId(driveFileId);
       await saveKey('properties',properties);
       await saveKey('tenants',tenants);
       await saveKey('contracts',contracts);
@@ -1247,10 +1264,12 @@ async function driveSync(isInitialLoad){
       }
       const buf = buildWorkbook();
       driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
+      rememberFileId(driveFileId);
     } else {
       const buf = buildWorkbook();
       if(!driveFileId){
         driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
+        rememberFileId(driveFileId);
       } else {
         await driveUpdateXlsxFile(driveFileId, buf);
       }
@@ -1259,6 +1278,9 @@ async function driveSync(isInitialLoad){
     setDriveStatus('conectado ✓ · última sync '+now, true);
   }catch(e){
     console.error('Error sincronizando con Drive', e);
+    // Si el ID recordado ya no es válido (archivo borrado, o el acceso fue revocado), se
+    // olvida para que el próximo intento vuelva a buscarlo o pida elegirlo a mano.
+    if(getRememberedFileId() === driveFileId){ forgetFileId(); }
     driveToken = null;
     setDriveStatus('sesión expirada, reconectando…', false);
     if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
