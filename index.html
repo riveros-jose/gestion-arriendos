@@ -1059,6 +1059,11 @@ async function driveUpdateXlsxFile(fileId, arrayBuffer){
 async function driveReadXlsxFile(fileId){
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers:{ Authorization:'Bearer '+driveToken } });
   if(res.status===401) throw new Error('token expirado');
+  if(!res.ok){
+    let detalle = '';
+    try{ const errJson = await res.json(); detalle = errJson.error && errJson.error.message ? errJson.error.message : ''; }catch(e){}
+    throw new Error(`No se pudo leer el archivo desde Drive (HTTP ${res.status}). ${detalle}`.trim());
+  }
   return await res.arrayBuffer();
 }
 
@@ -1299,9 +1304,17 @@ async function driveSync(isInitialLoad){
     // que el próximo intento vuelva a buscarlo desde cero en vez de reintentar con el mismo ID.
     if(getRememberedFileId() === driveFileId){ forgetFileId(); }
     driveFileId = null;
-    driveToken = null;
-    setDriveStatus('sesión expirada, reconectando…', false);
-    if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+    const esTokenExpirado = /token expirado/i.test(e.message||'');
+    if(esTokenExpirado){
+      driveToken = null;
+      setDriveStatus('sesión expirada, reconectando…', false);
+      if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+    } else {
+      // No es un problema de sesión (ej. archivo sin permiso o inaccesible): se muestra el
+      // motivo real en vez de intentar una reconexión silenciosa que no da ninguna señal visible.
+      setDriveStatus('error al leer el archivo — revisa el aviso', false);
+      alert('No se pudo cargar el archivo desde Google Drive.\n\n'+(e.message||'Error desconocido')+'\n\nVerifica que el archivo esté compartido contigo con permiso de Editor, e intenta elegirlo de nuevo con el selector (📂).');
+    }
   } finally {
     driveSyncBusy = false;
     if(driveSyncQueued){ driveSyncQueued = false; driveSync(false); }
