@@ -859,8 +859,8 @@ async function handleTokenResponse(resp){
   setDriveStatus('conectado ✓ sincronizando…', true);
   hideDriveGate();
   if(!hasLoadedFromDrive){
-    hasLoadedFromDrive = true;
-    await driveSync(true);
+    const ok = await driveSync(true);
+    if(ok) hasLoadedFromDrive = true;
   } else {
     await driveSync(false);
   }
@@ -1233,16 +1233,19 @@ function loadFromWorkbook(arrayBuffer){
 }
 
 async function driveSync(isInitialLoad){
-  if(!driveToken){ showDriveGate(); setGateChecking(false); return; }
-  if(driveSyncBusy){ driveSyncQueued = true; return; }
+  if(!driveToken){ showDriveGate(); setGateChecking(false); return false; }
+  if(driveSyncBusy){ driveSyncQueued = true; return false; }
   driveSyncBusy = true;
+  let ok = false;
   try{
     if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
     if(driveFileId===null){
-      // Primero se intenta con el ID ya recordado en este dispositivo/cuenta (evita depender
-      // de la búsqueda por carpeta, que puede fallar entre cuentas distintas aunque la carpeta
-      // esté compartida). Solo si no hay nada recordado, se busca por nombre.
-      driveFileId = getRememberedFileId() || await driveFindFile(driveFolderId);
+      // Se busca primero por nombre dentro de la carpeta (comportamiento normal). Si eso no
+      // encuentra nada, se intenta como respaldo con un ID que haya quedado recordado en este
+      // dispositivo de una vez anterior (por ejemplo, si la búsqueda falla entre cuentas
+      // distintas aunque la carpeta esté compartida).
+      driveFileId = await driveFindFile(driveFolderId);
+      if(!driveFileId){ driveFileId = getRememberedFileId(); }
     }
     if(isInitialLoad && driveFileId){
       const buf = await driveReadXlsxFile(driveFileId);
@@ -1255,16 +1258,18 @@ async function driveSync(isInitialLoad){
       await saveKey('readings',readings);
       renderAll();
       checkDateCorruptionBanner();
+      ok = true;
     } else if(isInitialLoad && !driveFileId){
       const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = crear un archivo NUEVO (vacío).');
       if(usarPicker){
         driveSyncBusy = false;
         openFilePicker();
-        return;
+        return false;
       }
       const buf = buildWorkbook();
       driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
       rememberFileId(driveFileId);
+      ok = true;
     } else {
       const buf = buildWorkbook();
       if(!driveFileId){
@@ -1273,14 +1278,16 @@ async function driveSync(isInitialLoad){
       } else {
         await driveUpdateXlsxFile(driveFileId, buf);
       }
+      ok = true;
     }
     const now = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
     setDriveStatus('conectado ✓ · última sync '+now, true);
   }catch(e){
     console.error('Error sincronizando con Drive', e);
-    // Si el ID recordado ya no es válido (archivo borrado, o el acceso fue revocado), se
-    // olvida para que el próximo intento vuelva a buscarlo o pida elegirlo a mano.
+    // Si el archivo que se estaba usando (recordado o no) falló, se descarta por completo para
+    // que el próximo intento vuelva a buscarlo desde cero en vez de reintentar con el mismo ID.
     if(getRememberedFileId() === driveFileId){ forgetFileId(); }
+    driveFileId = null;
     driveToken = null;
     setDriveStatus('sesión expirada, reconectando…', false);
     if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
@@ -1288,6 +1295,7 @@ async function driveSync(isInitialLoad){
     driveSyncBusy = false;
     if(driveSyncQueued){ driveSyncQueued = false; driveSync(false); }
   }
+  return ok;
 }
 
 function pushToDriveIfConnected(){ if(driveToken) driveSync(false); }
