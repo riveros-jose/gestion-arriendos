@@ -60,6 +60,11 @@
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
   .field{display:flex;flex-direction:column;gap:5px;}
   .field.full{grid-column:1 / -1;}
+  .rep-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+  .rep-row .rep-nombre{flex:2;min-width:0;}
+  .rep-row .rep-rut{flex:1;min-width:0;}
+  .rep-row .rep-remove-btn{flex-shrink:0;}
+  #rep-rows + button{width:100%;justify-content:center;display:flex;}
   label{font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;}
   input,select,textarea{font-family:'Inter',sans-serif;font-size:14px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:#fdfdfc;color:var(--ink);}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal);}
@@ -350,6 +355,8 @@
 
     .alert-card .btn{width:100%;}
     .prop-fields-grid{grid-template-columns:repeat(2,1fr) !important;gap:10px 12px;}
+    .rep-row{flex-wrap:wrap;}
+    .rep-row .rep-nombre,.rep-row .rep-rut{flex:1 1 100%;}
     .prop-card{padding:14px;border-radius:10px;}
     .prop-card-header .row-actions{width:100%;}
     .sort-bar{gap:6px;}
@@ -1486,10 +1493,9 @@ function addRepRow(nombre, rut){
   const wrap = document.getElementById('rep-rows');
   const row = document.createElement('div');
   row.className = 'rep-row';
-  row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center;';
-  row.innerHTML = `<input type="text" class="rep-nombre" placeholder="Nombre representante" style="flex:2" value="${esc(nombre||'')}">
-    <input type="text" class="rep-rut rut-mask" placeholder="12.345.678-9" style="flex:1" value="${esc(rut||'')}">
-    <button type="button" class="table-action-btn danger" title="Quitar" onclick="this.closest('.rep-row').remove()">🗑️</button>`;
+  row.innerHTML = `<input type="text" class="rep-nombre" placeholder="Nombre representante" value="${esc(nombre||'')}">
+    <input type="text" class="rep-rut rut-mask" placeholder="12.345.678-9" value="${esc(rut||'')}">
+    <button type="button" class="table-action-btn danger rep-remove-btn" title="Quitar" onclick="this.closest('.rep-row').remove()">🗑️</button>`;
   wrap.appendChild(row);
   attachRutMask(row.querySelector('.rep-rut'));
 }
