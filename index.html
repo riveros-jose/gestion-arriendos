@@ -515,9 +515,9 @@
           <div class="line-group">
             <h3>💰 Antecedentes Comerciales</h3>
             <div class="line-row">
-              <div class="field"><label>Avalúo fiscal ($)</label><input id="p-avaluoFiscal" type="number"></div>
-              <div class="field"><label>Valor comercial probable ($)</label><input id="p-valorComercial" type="number"></div>
-              <div class="field"><label>Contribuciones ($)</label><input id="p-contribuciones" type="number"></div>
+              <div class="field"><label>Avalúo fiscal ($)</label><input id="p-avaluoFiscal" type="text" inputmode="numeric" class="money-mask"></div>
+              <div class="field"><label>Valor comercial probable ($)</label><input id="p-valorComercial" type="text" inputmode="numeric" class="money-mask"></div>
+              <div class="field"><label>Contribuciones ($)</label><input id="p-contribuciones" type="text" inputmode="numeric" class="money-mask"></div>
             </div>
           </div>
 
@@ -560,14 +560,17 @@
             <div class="line-row">
               <div class="field"><label>Nemo arrendatario</label><input id="t-nemoArrendatario" placeholder="Ej: Imprenta, Cine, Marcelo…"></div>
               <div class="field"><label>Nombre sociedad</label><input id="t-nombreSociedad" required></div>
-              <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad"></div>
+              <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad" class="rut-mask" placeholder="12.345.678-9"></div>
             </div>
           </div>
           <div class="line-group">
             <h3>👤 Información del Representante</h3>
             <div class="line-row">
-              <div class="field"><label>Nombre representante</label><input id="t-nombreRepresentante"></div>
-              <div class="field"><label>Rut representante</label><input id="t-rutRepresentante"></div>
+              <div class="field full">
+                <label>Representante(s) — nombre y RUT</label>
+                <div id="rep-rows"></div>
+                <button type="button" class="btn btn-secondary" style="margin-top:4px" onclick="addRepRow()">+ Agregar otro representante</button>
+              </div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Correo</label><input id="t-correo" type="email"></div>
@@ -584,7 +587,6 @@
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required></div>
-              <div class="field"><label>Fecha firma contrato</label><input id="c-fechaFirmaContrato" type="date"></div>
               <div class="field"><label>Fecha fin contrato</label><input id="c-fechaFinContrato" type="date"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
@@ -592,8 +594,8 @@
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo ajuste IPC</label><select id="c-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select></div>
-              <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="number" required></div>
-              <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="number"></div>
+              <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="text" inputmode="numeric" class="money-mask" required></div>
+              <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="text" inputmode="numeric" class="money-mask"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field full"><label>Información general</label><textarea id="c-infoGeneral"></textarea></div>
@@ -630,8 +632,8 @@
           <div class="grid">
             <div class="field full"><label>Contrato (Arrendatario — Propiedad)</label><select id="pay-contratoId" required></select></div>
             <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
-            <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="number" required></div>
-            <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="number" value="0"></div>
+            <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="text" inputmode="numeric" class="money-mask" required></div>
+            <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="text" inputmode="numeric" class="money-mask" value="0"></div>
             <div class="field"><label>Medio de pago</label>
               <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
             </div>
@@ -644,7 +646,7 @@
           <div class="line-group">
             <div class="field" style="max-width:320px">
               <label>Actualizar valor arriendo contrato ($) — opcional</label>
-              <input id="pay-valorArriendo" type="number" placeholder="Se autocompleta con el valor actual del contrato">
+              <input id="pay-valorArriendo" type="text" inputmode="numeric" class="money-mask" placeholder="Se autocompleta con el valor actual del contrato">
               <span class="status-msg" id="pay-valorArriendo-clp"></span>
             </div>
           </div>
@@ -1114,7 +1116,7 @@ function styleWorksheet(ws, widths){
   }
 }
 
-const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
+const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
 const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo','proximaDecisionMonto'];
 function applyColumnFormats(ws, headers){
   if(!ws['!ref']) return;
@@ -1172,7 +1174,7 @@ function buildWorkbook(){
     direccion: propAddresses(c),
     nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
-    fechaInicioContrato: c.fechaInicioContrato, fechaFirmaContrato: c.fechaFirmaContrato, fechaFinContrato: c.fechaFinContrato||'',
+    fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'',
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
     tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
@@ -1181,8 +1183,8 @@ function buildWorkbook(){
     proximaDecisionRegistrada: c.proximaDecisionRegistrada||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -1220,7 +1222,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -1437,6 +1439,78 @@ let storageOK = true;
 const memoryStore = {};
 
 const money = n => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(n||0));
+
+// Formato en vivo de montos en pesos ($ con puntos de miles) en los campos de formulario que
+// llevan la clase .money-mask. El valor que se guarda internamente siempre se limpia a solo
+// dígitos (ver rawMoneyValue) — el punto es solo visual mientras se escribe.
+function formatThousandsCLP(digitsStr){
+  if(!digitsStr) return '';
+  return Number(digitsStr).toLocaleString('es-CL');
+}
+function rawMoneyValue(str){
+  return String(str||'').replace(/[^\d]/g,'');
+}
+function attachMoneyMask(el){
+  el.addEventListener('input', ()=>{
+    const pos = el.selectionStart;
+    const before = el.value;
+    const digits = rawMoneyValue(before);
+    el.value = formatThousandsCLP(digits);
+    // Se intenta mantener el cursor cerca de donde estaba pese al cambio de largo del texto.
+    const delta = el.value.length - before.length;
+    const newPos = Math.max(0, pos + delta);
+    try{ el.setSelectionRange(newPos, newPos); }catch(e){}
+  });
+}
+
+// Formato en vivo de RUT chileno (12.345.678-9) en los campos con la clase .rut-mask. A
+// diferencia del dinero, el RUT se guarda tal cual se ve (con puntos y guion), ya que es texto
+// y no participa en cálculos.
+function formatRut(raw){
+  let v = String(raw||'').toUpperCase().replace(/[^0-9K]/g,'');
+  if(!v) return '';
+  const dv = v.slice(-1);
+  let body = v.slice(0,-1);
+  body = body.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  return body ? body+'-'+dv : dv;
+}
+function attachRutMask(el){
+  el.addEventListener('input', ()=>{ el.value = formatRut(el.value); });
+}
+document.querySelectorAll('.money-mask').forEach(attachMoneyMask);
+document.querySelectorAll('.rut-mask').forEach(attachRutMask);
+
+// Se pueden agregar varios representantes; todos quedan guardados en la MISMA celda de Excel
+// (nombreRepresentante / rutRepresentante), separados por " ; ".
+function addRepRow(nombre, rut){
+  const wrap = document.getElementById('rep-rows');
+  const row = document.createElement('div');
+  row.className = 'rep-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center;';
+  row.innerHTML = `<input type="text" class="rep-nombre" placeholder="Nombre representante" style="flex:2" value="${esc(nombre||'')}">
+    <input type="text" class="rep-rut rut-mask" placeholder="12.345.678-9" style="flex:1" value="${esc(rut||'')}">
+    <button type="button" class="table-action-btn danger" title="Quitar" onclick="this.closest('.rep-row').remove()">🗑️</button>`;
+  wrap.appendChild(row);
+  attachRutMask(row.querySelector('.rep-rut'));
+}
+function resetRepRows(){
+  document.getElementById('rep-rows').innerHTML = '';
+  addRepRow();
+}
+function loadRepRows(t){
+  document.getElementById('rep-rows').innerHTML = '';
+  const nombres = (t.nombreRepresentante||'').split(';').map(s=>s.trim()).filter(Boolean);
+  const ruts = (t.rutRepresentante||'').split(';').map(s=>s.trim()).filter(Boolean);
+  const total = Math.max(nombres.length, ruts.length, 1);
+  for(let i=0;i<total;i++){ addRepRow(nombres[i]||'', ruts[i]||''); }
+}
+function collectRepFields(tObj){
+  const rows = Array.from(document.querySelectorAll('#rep-rows .rep-row'));
+  tObj.nombreRepresentante = rows.map(r=>r.querySelector('.rep-nombre').value.trim()).filter(Boolean).join(' ; ');
+  tObj.rutRepresentante = rows.map(r=>r.querySelector('.rep-rut').value.trim()).filter(Boolean).join(' ; ');
+}
+resetRepRows();
+
 const formatDate = iso => {
   if(!iso) return '';
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1525,7 +1599,7 @@ const propFields = ['direccion','unidad','m2Construidos','m2Terreno','propietari
 document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingProp || uid() };
-  propFields.forEach(f=> obj[f] = document.getElementById('p-'+f).value);
+  propFields.forEach(f=> obj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('p-'+f).value) : document.getElementById('p-'+f).value);
   ['cbrFoja','cbrNumero','cbrAnio'].forEach(f=>{
     if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.round(Number(obj[f])));
   });
@@ -1535,9 +1609,9 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   if(editingProp){ properties = properties.map(p=> p.id===editingProp ? obj : p); }
   else { properties.push(obj); }
   const ok = await saveKey('properties',properties);
-  document.getElementById('p-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (no se detectó almacenamiento persistente)';
-  setTimeout(()=>document.getElementById('p-status').textContent='',ok?1500:4000);
+  alert(ok ? 'Propiedad guardada con éxito ✓' : '⚠ No se pudo guardar (no se detectó almacenamiento persistente). Intenta de nuevo.');
   resetPropForm();
+  if(ok) hidePropForm();
   renderAll();
   pushToDriveIfConnected();
 });
@@ -1553,7 +1627,7 @@ function editProperty(id){
   const p = properties.find(x=>x.id===id);
   if(!p) return;
   editingProp = id;
-  propFields.forEach(f=> document.getElementById('p-'+f).value = p[f] || '');
+  propFields.forEach(f=> document.getElementById('p-'+f).value = (MONEY_COLUMNS.includes(f) && p[f]) ? formatThousandsCLP(rawMoneyValue(p[f])) : (p[f] || ''));
   document.getElementById('prop-form-title').textContent='🏠 Editar propiedad';
   document.getElementById('p-cancel').style.display='inline-block';
   showPropForm();
@@ -1676,7 +1750,7 @@ document.getElementById('prop-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
-const contractFields = ['fechaInicioContrato','fechaFirmaContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -1703,12 +1777,16 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
   if(!propiedadIds.length){ alert('Selecciona al menos una propiedad para el contrato.'); return; }
 
   const tObj = { id: editingTenant || uid() };
-  tenantFields.forEach(f=> tObj[f] = document.getElementById('t-'+f).value);
+  tenantFields.forEach(f=>{
+    if(f==='nombreRepresentante' || f==='rutRepresentante') return; // se maneja aparte (multi-representante)
+    tObj[f] = document.getElementById('t-'+f).value;
+  });
+  collectRepFields(tObj);
   if(editingTenant){ tenants = tenants.map(t=> t.id===editingTenant ? tObj : t); }
   else { tenants.push(tObj); }
 
   const cObj = { id: editingContract || uid(), tenantId: tObj.id, activo: true };
-  contractFields.forEach(f=> cObj[f] = document.getElementById('c-'+f).value);
+  contractFields.forEach(f=> cObj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('c-'+f).value) : document.getElementById('c-'+f).value);
   cObj.propiedadIds = propiedadIds;
   if(editingContract){
     const anterior = contracts.find(c=>c.id===editingContract) || {};
@@ -1723,9 +1801,9 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
   const ok1 = await saveKey('tenants',tenants);
   const ok2 = await saveKey('contracts',contracts);
   const ok = ok1 && ok2;
-  document.getElementById('tc-status').textContent = ok ? 'Guardado ✓' : '⚠ Guardado solo temporal (no se detectó almacenamiento persistente)';
-  setTimeout(()=>document.getElementById('tc-status').textContent='',ok?1500:4000);
+  alert(ok ? 'Arrendatario y contrato guardados con éxito ✓' : '⚠ No se pudo guardar (no se detectó almacenamiento persistente). Intenta de nuevo.');
   resetTenantContractForm();
+  if(ok) hideTenantForm();
   renderAll();
   pushToDriveIfConnected();
 });
@@ -1737,6 +1815,7 @@ function resetTenantContractForm(){
   document.getElementById('form-arrendatario-contrato').reset();
   document.getElementById('tc-form-title').textContent='🏢 Nuevo arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='none';
+  resetRepRows();
   renderContractSelects();
 }
 
@@ -1746,8 +1825,12 @@ function editTenantContract(tenantId, contractId){
   if(!t || !c) return;
   editingTenant = tenantId;
   editingContract = contractId;
-  tenantFields.forEach(f=> document.getElementById('t-'+f).value = t[f] || '');
-  contractFields.forEach(f=> document.getElementById('c-'+f).value = c[f] || '');
+  tenantFields.forEach(f=>{
+    if(f==='nombreRepresentante' || f==='rutRepresentante') return;
+    document.getElementById('t-'+f).value = t[f] || '';
+  });
+  loadRepRows(t);
+  contractFields.forEach(f=> document.getElementById('c-'+f).value = (MONEY_COLUMNS.includes(f) && c[f]) ? formatThousandsCLP(rawMoneyValue(c[f])) : (c[f] || ''));
   renderContractSelects();
   const seleccionadas = contractPropertyIds(c);
   document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
@@ -1968,7 +2051,7 @@ document.getElementById('pay-valorArriendo').addEventListener('input', updateVal
 document.getElementById('form-pago').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingPay || uid() };
-  payFields.forEach(f=> obj[f] = document.getElementById('pay-'+f).value);
+  payFields.forEach(f=> obj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('pay-'+f).value) : document.getElementById('pay-'+f).value);
 
   const c = contracts.find(x=>x.id===obj.contratoId);
   if(c && isActiveContract(c) && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
@@ -2009,7 +2092,7 @@ function editPayment(id){
   const p = payments.find(x=>x.id===id);
   if(!p) return;
   editingPay = id;
-  payFields.forEach(f=> document.getElementById('pay-'+f).value = p[f] || '');
+  payFields.forEach(f=> document.getElementById('pay-'+f).value = (MONEY_COLUMNS.includes(f) && p[f]) ? formatThousandsCLP(rawMoneyValue(p[f])) : (p[f] || ''));
   document.getElementById('pay-form-title').textContent='💵 Editar pago';
   document.getElementById('pay-cancel').style.display='inline-block';
   updateValorArriendoClpPreview();
