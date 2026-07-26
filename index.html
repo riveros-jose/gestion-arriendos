@@ -1614,8 +1614,9 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   });
   if(editingProp){ properties = properties.map(p=> p.id===editingProp ? obj : p); }
   else { properties.push(obj); }
-  const ok = await saveKey('properties',properties);
-  alert(ok ? 'Propiedad guardada con éxito ✓' : '⚠ No se pudo guardar (no se detectó almacenamiento persistente). Intenta de nuevo.');
+  await saveKey('properties',properties);
+  const ok = !!driveToken;
+  alert(ok ? 'Propiedad guardada con éxito ✓' : '⚠ No estás conectado a Google Drive, así que este cambio no quedará guardado de forma permanente. Conéctate (ícono 🔄) e intenta de nuevo.');
   resetPropForm();
   if(ok) hidePropForm();
   renderAll();
@@ -1804,10 +1805,10 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
     contracts.push(cObj);
   }
 
-  const ok1 = await saveKey('tenants',tenants);
-  const ok2 = await saveKey('contracts',contracts);
-  const ok = ok1 && ok2;
-  alert(ok ? 'Arrendatario y contrato guardados con éxito ✓' : '⚠ No se pudo guardar (no se detectó almacenamiento persistente). Intenta de nuevo.');
+  await saveKey('tenants',tenants);
+  await saveKey('contracts',contracts);
+  const ok = !!driveToken;
+  alert(ok ? 'Arrendatario y contrato guardados con éxito ✓' : '⚠ No estás conectado a Google Drive, así que este cambio no quedará guardado de forma permanente. Conéctate (ícono 🔄) e intenta de nuevo.');
   resetTenantContractForm();
   if(ok) hideTenantForm();
   renderAll();
