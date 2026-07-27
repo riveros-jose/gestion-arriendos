@@ -500,9 +500,9 @@
               <div class="field"><label>Rol de avalúo</label><input id="p-rolAvaluo"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
-              <div class="field"><label>Foja (Paulina/Antonio)</label><input id="p-cbrFoja" type="number" step="1"></div>
-              <div class="field"><label>Número</label><input id="p-cbrNumero" type="number" step="1"></div>
-              <div class="field"><label>Año</label><input id="p-cbrAnio" type="number" step="1"></div>
+              <div class="field"><label>Foja (Paulina/Antonio)</label><input id="p-cbrFoja" type="text" inputmode="numeric"></div>
+              <div class="field"><label>Número</label><input id="p-cbrNumero" type="text" inputmode="numeric"></div>
+              <div class="field"><label>Año</label><input id="p-cbrAnio" type="text" inputmode="numeric"></div>
               <div class="field"><label>Localidad</label><input id="p-cbrLocalidad"></div>
             </div>
           </div>
@@ -1606,9 +1606,6 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingProp || uid() };
   propFields.forEach(f=> obj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('p-'+f).value) : document.getElementById('p-'+f).value);
-  ['cbrFoja','cbrNumero','cbrAnio'].forEach(f=>{
-    if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.round(Number(obj[f])));
-  });
   ['m2Construidos','m2Terreno'].forEach(f=>{
     if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.ceil(Number(obj[f])));
   });
