@@ -398,6 +398,7 @@
     <h2 style="text-align:left;">📝 Actualizar contrato</h2>
     <p id="cu-subtitle" style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 18px;"></p>
     <input type="hidden" id="cu-contratoId">
+    <input type="hidden" id="cu-monto-actual">
     <div class="field" style="margin-bottom:14px;text-align:left;">
       <label>¿Qué ocurrirá con este contrato?</label>
       <select id="cu-motivo" onchange="updateContractModalUI()">
@@ -415,9 +416,9 @@
       </div>
       <div class="field" style="margin-bottom:14px;text-align:left;">
         <label>Nuevo monto de arriendo ($)</label>
-        <input type="number" id="cu-monto">
+        <input type="text" inputmode="numeric" class="money-mask" id="cu-monto">
       </div>
-      <p class="drive-gate-fine" style="text-align:left;margin:0 0 14px;">Esto queda guardado como una decisión pendiente — no se aplica todavía al contrato vigente, se materializará recién cuando termine el periodo actual.</p>
+      <p class="drive-gate-fine" style="text-align:left;margin:0 0 14px;">Esto actualiza de inmediato la fecha de fin y el monto pactado del contrato vigente.</p>
     </div>
     <div class="field" style="margin-bottom:6px;text-align:left;">
       <label>Comentarios</label>
@@ -2374,7 +2375,8 @@ function openUpdateContractModal(id){
   const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
   document.getElementById('cu-subtitle').textContent = `${nemo} — ${propAddresses(c)} · vencimiento actual: ${formatDate(toISO(vencActual))}`;
   document.getElementById('cu-fecha').value = toISO(nuevaFin);
-  document.getElementById('cu-monto').value = c.montoArriendoPactado || '';
+  document.getElementById('cu-monto').value = c.montoArriendoPactado ? formatThousandsCLP(rawMoneyValue(c.montoArriendoPactado)) : '';
+  document.getElementById('cu-monto-actual').value = c.montoArriendoPactado || '';
   document.getElementById('cu-motivo').value = 'solo_fecha';
   document.getElementById('cu-comentarios').value = '';
   updateContractModalUI();
@@ -2392,6 +2394,15 @@ function updateContractModalUI(){
   const motivo = document.getElementById('cu-motivo').value;
   const esFuturo = (motivo==='solo_fecha' || motivo==='ipc' || motivo==='valor');
   document.getElementById('cu-future-fields').style.display = esFuturo ? 'block' : 'none';
+  const montoInput = document.getElementById('cu-monto');
+  const soloFecha = motivo==='solo_fecha';
+  montoInput.readOnly = soloFecha;
+  montoInput.style.background = soloFecha ? 'var(--paper)' : '';
+  montoInput.style.cursor = soloFecha ? 'not-allowed' : '';
+  if(soloFecha){
+    // El arriendo no cambia con este motivo — se muestra el monto vigente, sin poder editarlo.
+    montoInput.value = formatThousandsCLP(rawMoneyValue(document.getElementById('cu-monto-actual').value));
+  }
 }
 
 const CU_MOTIVO_LABELS = {
@@ -2417,16 +2428,17 @@ async function submitContractUpdate(){
 
   if(esFuturo){
     const fecha = document.getElementById('cu-fecha').value;
-    const monto = Number(document.getElementById('cu-monto').value);
+    const monto = Number(rawMoneyValue(document.getElementById('cu-monto').value));
     if(!fecha){ alert('Ingresa una fecha.'); return; }
     if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
-    // Se guarda como decisión PENDIENTE: no se toca fechaFinContrato ni montoArriendoPactado
-    // del contrato vigente — recién se materializa cuando termine el periodo actual.
-    c.proximaDecisionMotivo = motivo;
-    c.proximaDecisionFecha = fecha;
-    c.proximaDecisionMonto = monto;
-    c.proximaDecisionComentarios = comentarios;
-    c.proximaDecisionRegistrada = hoy;
+    // Se aplica de inmediato al contrato vigente.
+    c.fechaFinContrato = fecha;
+    c.montoArriendoPactado = monto;
+    c.proximaDecisionMotivo = '';
+    c.proximaDecisionFecha = '';
+    c.proximaDecisionMonto = '';
+    c.proximaDecisionComentarios = '';
+    c.proximaDecisionRegistrada = '';
   } else if(motivo==='no_renovara'){
     c.proximaDecisionMotivo = motivo;
     c.proximaDecisionFecha = '';
