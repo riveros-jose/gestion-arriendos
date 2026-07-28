@@ -2425,12 +2425,21 @@ async function submitContractUpdate(){
   const hoy = new Date().toISOString().slice(0,10);
   const motivoLabel = CU_MOTIVO_LABELS[motivo] || '';
   const nota = [motivoLabel, comentarios].filter(Boolean).join(' — ');
+  const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
+  let resumen = '';
 
   if(esFuturo){
     const fecha = document.getElementById('cu-fecha').value;
-    const monto = Number(rawMoneyValue(document.getElementById('cu-monto').value));
     if(!fecha){ alert('Ingresa una fecha.'); return; }
-    if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
+    let monto;
+    if(motivo==='solo_fecha'){
+      // El monto no cambia con este motivo — se mantiene el vigente del contrato, sin exigir
+      // que el usuario reingrese nada en ese campo (queda bloqueado en el modal).
+      monto = Number(c.montoArriendoPactado) || 0;
+    } else {
+      monto = Number(rawMoneyValue(document.getElementById('cu-monto').value));
+      if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
+    }
     // Se aplica de inmediato al contrato vigente.
     c.fechaFinContrato = fecha;
     c.montoArriendoPactado = monto;
@@ -2439,14 +2448,15 @@ async function submitContractUpdate(){
     c.proximaDecisionMonto = '';
     c.proximaDecisionComentarios = '';
     c.proximaDecisionRegistrada = '';
+    resumen = `Nueva fecha de fin: ${formatDate(fecha)}\nMonto pactado: ${money(monto)}`;
   } else if(motivo==='no_renovara'){
     c.proximaDecisionMotivo = motivo;
     c.proximaDecisionFecha = '';
     c.proximaDecisionMonto = '';
     c.proximaDecisionComentarios = comentarios;
     c.proximaDecisionRegistrada = hoy;
+    resumen = 'Se marcó como "No se renovará" — queda registrado como decisión pendiente.';
   } else if(esTermino){
-    const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
     if(!confirm(`Vas a finalizar el contrato de:\n${nemo} — ${propAddresses(c)}\n\nPasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas. La deuda pactada queda en $0 (puedes ajustarla luego desde esa pestaña). ¿Continuar?`)) return;
     c.activo = false;
     c.fechaTermino = hoy;
@@ -2456,11 +2466,17 @@ async function submitContractUpdate(){
     c.proximaDecisionMonto = '';
     c.proximaDecisionComentarios = '';
     c.proximaDecisionRegistrada = '';
+    resumen = `Contrato finalizado el ${formatDate(hoy)} — pasó a Arrendatarios Históricos.`;
   }
   if(nota) c.infoGeneral = [c.infoGeneral, `[${formatDate(hoy)}] ${nota}`].filter(Boolean).join(' | ');
 
   contracts = contracts.map(x=> x.id===id ? c : x);
-  await saveKey('contracts',contracts);
+  const ok = await saveKey('contracts',contracts);
+  const persistido = ok || !!driveToken;
+  alert(
+    (persistido ? '✅ Contrato actualizado con éxito\n\n' : '⚠ Hubo un problema al guardar — verifica tu conexión a Google Drive e inténtalo de nuevo.\n\n')
+    + `${nemo} — ${propAddresses(c)}\n\n${resumen}`
+  );
   closeContractUpdateModal();
   renderAll();
   pushToDriveIfConnected();
