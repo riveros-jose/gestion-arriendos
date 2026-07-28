@@ -59,7 +59,8 @@
   .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;}
   .card h2{font-family:'Fraunces',serif;font-size:18px;margin:0 0 18px;font-weight:600;}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-  .field{display:flex;flex-direction:column;gap:5px;}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  input[type="file"]{width:100%;max-width:100%;box-sizing:border-box;}
   .field.full{grid-column:1 / -1;}
   .rep-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
   .rep-row .rep-nombre{flex:2;min-width:0;}
@@ -330,6 +331,7 @@
     input,select,textarea{font-size:16px;padding:11px 12px;}
     .form-compact input,.form-compact select,.form-compact textarea{font-size:16px;padding:9px 10px;}
     #form-lectura.form-compact input,#form-lectura.form-compact select,#form-lectura.form-compact textarea{font-size:16px;padding:8px 9px;}
+    input[type="file"]{font-size:12px;padding:7px 6px;}
     .btn{padding:12px 18px;font-size:14px;min-height:44px;}
     .btn-add-new{padding:15px 16px;font-size:14px;}
     .dropdown-item{padding:13px 14px;font-size:14px;}
@@ -436,6 +438,35 @@
     <div class="btn-row" style="margin-top:16px;">
       <button type="button" class="btn btn-primary" onclick="submitContractUpdate()">Guardar</button>
       <button type="button" class="btn btn-secondary" onclick="closeContractUpdateModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="terminate-contract-overlay" class="drive-gate-overlay" style="display:none">
+  <div class="drive-gate-card" style="max-width:460px;text-align:left;">
+    <h2 style="text-align:left;">🔒 Finalizar contrato</h2>
+    <p id="tc-subtitle" style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 18px;"></p>
+    <input type="hidden" id="tc-contratoId">
+    <div class="field" style="margin-bottom:14px;text-align:left;">
+      <label>Fecha de término</label>
+      <input type="date" id="tc-fechaTermino"><span class="date-hint" id="tc-fechaTermino-hint"></span>
+    </div>
+    <div class="field" style="margin-bottom:14px;text-align:left;">
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;">
+        <input type="checkbox" id="tc-conDeuda"> ¿Queda con deuda pactada al término?
+      </label>
+    </div>
+    <div class="field" id="tc-deuda-field" style="margin-bottom:14px;display:none;text-align:left;">
+      <label>Deuda pactada ($)</label>
+      <input type="text" inputmode="numeric" class="money-mask" id="tc-deuda" value="0">
+    </div>
+    <div class="field" style="margin-bottom:6px;text-align:left;">
+      <label>Comentarios (opcional)</label>
+      <textarea id="tc-comentarios"></textarea>
+    </div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button type="button" class="btn btn-primary" onclick="submitTerminateContract()">Finalizar contrato</button>
+      <button type="button" class="btn btn-secondary" onclick="closeTerminateContractModal()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -744,11 +775,6 @@
               <select id="r-estado"><option selected>Pendiente</option><option>Pagado</option></select>
             </div>
             <div class="field full"><label>Comentarios</label><textarea id="r-comentarios" rows="2"></textarea></div>
-            <div class="field full">
-              <label>📄 Adjuntar boleta (PDF) — opcional</label>
-              <input type="file" id="r-boletaPdf" accept="application/pdf">
-              <div class="status-msg" id="r-boleta-status" style="margin-top:4px;"></div>
-            </div>
           </div>
           <div class="status-msg" id="r-medidor-compartido-hint" style="display:none;background:#FBF1DC;color:#8A6410;border:1px solid var(--gold);border-radius:6px;padding:6px 9px;margin-top:6px;font-size:12px;"></div>
           <div class="btn-row">
@@ -1181,16 +1207,6 @@ async function driveUploadFile(fileBlob, fileName, folderId, mimeType){
     });
   }catch(e){ console.warn('No se pudo hacer público el archivo subido', e); }
   return data; // { id, webViewLink }
-}
-
-// Sube la boleta PDF de una lectura a RentaPro/Servicios y devuelve el link para compartir.
-async function subirBoletaPdf(file, contratoId, servicio, fechaLectura){
-  if(!driveToken) throw new Error('No estás conectado a Google Drive.');
-  const rentaProFolderId = await driveFindOrCreateFolder();
-  if(!driveServiciosFolderId) driveServiciosFolderId = await driveFindOrCreateSubfolder(rentaProFolderId, 'Servicios');
-  const nombreArchivo = `${contractLabel(contratoId)} - ${servicio} - ${fechaLectura}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
-  const resultado = await driveUploadFile(file, nombreArchivo, driveServiciosFolderId, 'application/pdf');
-  return resultado.webViewLink || `https://drive.google.com/file/d/${resultado.id}/view`;
 }
 
 async function driveReadXlsxFile(fileId){
@@ -1641,7 +1657,7 @@ const formatDate = iso => {
 // FORMATO que muestra el navegador dentro del campo depende del idioma/sistema operativo de
 // cada dispositivo (a veces sale MM/DD/AAAA). Este indicador de abajo siempre muestra
 // DD-MM-AAAA, sin importar el navegador.
-const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaFinContrato','pay-fechaPago','r-fechaLectura','cu-fecha'];
+const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaFinContrato','pay-fechaPago','r-fechaLectura','cu-fecha','tc-fechaTermino'];
 function refreshDateHints(){
   DATE_INPUT_IDS.forEach(id=>{
     const input = document.getElementById(id);
@@ -1997,43 +2013,64 @@ async function deleteTenantContract(tenantId, contractId){
   pushToDriveIfConnected();
 }
 
-async function terminateContract(id){
+function terminateContract(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
-  if(!confirm(`Vas a finalizar el contrato de:\n${label}\n\nEl arrendatario pasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas, y ya no aparecerá en los menús para arriendo normal. Sus pagos se conservan y, si queda con deuda pactada, se le podrá seguir abonando desde ahí. ¿Continuar?`)) return;
+  const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
+  document.getElementById('tc-contratoId').value = id;
+  document.getElementById('tc-subtitle').textContent = `${nemo} — ${propAddresses(c)}`;
+  document.getElementById('tc-fechaTermino').value = new Date().toISOString().slice(0,10);
+  document.getElementById('tc-conDeuda').checked = false;
+  document.getElementById('tc-deuda-field').style.display = 'none';
+  document.getElementById('tc-deuda').value = '0';
+  document.getElementById('tc-comentarios').value = '';
+  refreshDateHints();
+  document.getElementById('terminate-contract-overlay').style.display = 'flex';
+}
+function closeTerminateContractModal(){
+  document.getElementById('terminate-contract-overlay').style.display = 'none';
+}
+document.getElementById('tc-conDeuda').addEventListener('change', ()=>{
+  document.getElementById('tc-deuda-field').style.display = document.getElementById('tc-conDeuda').checked ? 'block' : 'none';
+});
+
+async function submitTerminateContract(){
+  const id = document.getElementById('tc-contratoId').value;
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return;
+  const fechaTermino = document.getElementById('tc-fechaTermino').value;
+  if(!fechaTermino){ alert('Ingresa la fecha de término.'); return; }
+  const conDeuda = document.getElementById('tc-conDeuda').checked;
+  let deuda = 0;
+  if(conDeuda){
+    deuda = Number(rawMoneyValue(document.getElementById('tc-deuda').value));
+    if(isNaN(deuda) || deuda<=0){ alert('Ingresa un monto de deuda pactada válido.'); return; }
+  }
+  const comentarios = document.getElementById('tc-comentarios').value.trim();
+  const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
+
+  if(!confirm(`Vas a finalizar el contrato de:\n${nemo} — ${propAddresses(c)}\n\nEl arrendatario pasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas, y ya no aparecerá en los menús para arriendo normal.${conDeuda?` Queda con una deuda pactada de ${money(deuda)}.`:''} ¿Continuar?`)) return;
 
   const hoy = new Date().toISOString().slice(0,10);
-  let fechaTermino = prompt('Fecha de término del contrato (formato AAAA-MM-DD):', hoy);
-  if(fechaTermino===null) return;
-  fechaTermino = fechaTermino.trim();
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(fechaTermino) || isNaN(new Date(fechaTermino+'T00:00:00'))){
-    alert('Fecha inválida. Usa el formato AAAA-MM-DD, por ejemplo: '+hoy);
-    return;
-  }
-
-  let deuda = prompt('Monto de deuda pactada al término (en $, deja 0 si no hay deuda):', '0');
-  if(deuda===null) return;
-  deuda = deuda.replace(/[.$\s]/g,'');
-  if(deuda==='' || isNaN(Number(deuda)) || Number(deuda)<0){
-    alert('Monto inválido. Ingresa solo números, por ejemplo: 500000');
-    return;
-  }
-
   c.activo = false;
   c.fechaTermino = fechaTermino;
-  c.deudaPactada = Number(deuda);
+  c.deudaPactada = deuda;
+  if(comentarios) c.infoGeneral = [c.infoGeneral, `[${formatDate(hoy)}] Finalización: ${comentarios}`].filter(Boolean).join(' | ');
+
   contracts = contracts.map(x=> x.id===id ? c : x);
-  await saveKey('contracts',contracts);
+  const ok = await saveKey('contracts',contracts);
+  closeTerminateContractModal();
   renderAll();
   pushToDriveIfConnected();
-  alert('Contrato finalizado. Lo encontrarás en la pestaña "Arrendatarios Históricos".');
+  alert((ok || driveToken)
+    ? `Contrato finalizado con éxito ✓\n\n${nemo} — ${propAddresses(c)}\nFecha de término: ${formatDate(fechaTermino)}${conDeuda?`\nDeuda pactada: ${money(deuda)}`:''}\n\nLo encontrarás en "Arrendatarios Históricos".`
+    : '⚠ No estás conectado a Google Drive — este cambio no quedará guardado de forma permanente.');
 }
 
 async function reactivateContract(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
-  const label = tenantName(c.tenantId) + ' — ' + propAddresses(c);
+  const label = (tenantNemo(c.tenantId) || tenantName(c.tenantId)) + ' — ' + propAddresses(c);
   if(!confirm(`Vas a reactivar el contrato de:\n${label}\n\nVolverá a "Arrendatarios & Contratos" como Vigente, a la deuda vigente y a las alertas. Se borra la fecha de término y la deuda pactada quedará en $0 (puedes volver a fijarla si finalizas de nuevo). ¿Continuar?`)) return;
   c.activo = true;
   c.fechaTermino = '';
@@ -2684,34 +2721,6 @@ function parseBoletaServicio(text){
     lecturaActual: lecturaActualMatch ? parseNumeroCL(lecturaActualMatch[1]) : null
   };
 }
-function usarDatosBoleta(lecturaActual, valorUnitario){
-  if(lecturaActual!==null && !isNaN(lecturaActual)) document.getElementById('r-lecturaActual').value = lecturaActual;
-  if(valorUnitario!==null && !isNaN(valorUnitario)) document.getElementById('r-valorUnitario').value = valorUnitario;
-  updateReadingEstimate();
-}
-document.getElementById('r-boletaPdf').addEventListener('change', async ()=>{
-  const file = document.getElementById('r-boletaPdf').files[0];
-  const statusEl = document.getElementById('r-boleta-status');
-  if(!file){ statusEl.innerHTML = ''; return; }
-  statusEl.textContent = '🔎 Leyendo boleta…';
-  try{
-    const text = await extractPdfText(file);
-    const datos = parseBoletaServicio(text);
-    if(datos.total && datos.consumo){
-      // El valor unitario se calcula tomando el total de la boleta dividido por los m³ (o kWh).
-      const valorUnitario = Math.round((datos.total / datos.consumo) * 100) / 100;
-      let resumen = `Detectado: consumo ${formatNumber(datos.consumo)}, total ${money(datos.total)} → valor unitario ${money(valorUnitario)}.`;
-      if(datos.lecturaActual!==null) resumen += ` Lectura actual: ${formatNumber(datos.lecturaActual)}.`;
-      statusEl.innerHTML = `<span style="color:var(--teal-dark)">✓ ${esc(resumen)} Revisa antes de guardar.</span><br><button type="button" class="btn btn-secondary" style="margin-top:6px;padding:4px 10px;font-size:11px;" onclick="usarDatosBoleta(${datos.lecturaActual!==null?datos.lecturaActual:'null'}, ${valorUnitario})">Usar estos valores</button>`;
-    } else {
-      statusEl.innerHTML = `<span style="color:#8A6410;">⚠ No se pudo leer automáticamente el consumo/total de esta boleta. Ingresa los valores a mano — el PDF se adjuntará igual al guardar.</span>`;
-    }
-  }catch(err){
-    console.error('Error leyendo PDF', err);
-    statusEl.innerHTML = `<span style="color:var(--brick);">⚠ No se pudo leer el PDF. Ingresa los valores a mano — el PDF se adjuntará igual al guardar.</span>`;
-  }
-});
-
 // ---- Boleta de agua por sector: el agua se factura por sector completo, no por unidad ----
 document.getElementById('bs-mes').value = mesActualKey();
 
@@ -2850,21 +2859,9 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
   readingFields.forEach(f=> obj[f] = document.getElementById('r-'+f).value);
   if(!obj.estado) obj.estado = 'Pendiente';
 
-  const boletaFile = document.getElementById('r-boletaPdf').files[0];
-  if(boletaFile){
-    if(!driveToken){
-      alert('Para adjuntar la boleta primero debes estar conectado a Google Drive.');
-    } else {
-      document.getElementById('r-boleta-status').textContent = 'Subiendo boleta a Drive…';
-      try{
-        obj.boletaUrl = await subirBoletaPdf(boletaFile, obj.contratoId, obj.servicio, obj.fechaLectura);
-      }catch(err){
-        console.error('Error subiendo boleta', err);
-        alert('No se pudo subir la boleta a Drive: '+(err.message||err));
-      }
-    }
-  } else if(editingReading){
-    // Si se está editando y no se adjuntó un PDF nuevo, se conserva el que ya tenía.
+  if(editingReading){
+    // La boleta ya no se adjunta a nivel de lectura (solo por sector) — si esta lectura tenía
+    // una boleta individual de una versión anterior, se conserva tal cual, sin poder cambiarla aquí.
     const prev = readings.find(r=>r.id===editingReading);
     if(prev && prev.boletaUrl) obj.boletaUrl = prev.boletaUrl;
   }
@@ -2885,7 +2882,6 @@ function resetReadingForm(){
   document.getElementById('form-lectura').reset();
   document.getElementById('r-form-title').textContent='🔧 Nueva lectura';
   document.getElementById('r-cancel').style.display='none';
-  document.getElementById('r-boleta-status').innerHTML = '';
   updateMedidorCompartidoHint();
   updateReadingEstimate();
 }
@@ -2895,7 +2891,6 @@ function editReading(id){
   editingReading = id;
   readingFields.forEach(f=> document.getElementById('r-'+f).value = r[f] || '');
   document.getElementById('r-estado').value = r.estado || 'Pendiente';
-  document.getElementById('r-boleta-status').innerHTML = r.boletaUrl ? `<a href="${esc(r.boletaUrl)}" target="_blank" rel="noopener">📄 Ver boleta ya adjuntada</a> (elige otro archivo arriba para reemplazarla)` : '';
   document.getElementById('r-form-title').textContent='🔧 Editar lectura';
   document.getElementById('r-cancel').style.display='inline-block';
   updateMedidorCompartidoHint();
@@ -3009,20 +3004,19 @@ function servicioIcono(s){
 // ---- Sectores de lectura: agrupan las propiedades en dos zonas para facilitar la revisión ----
 // Sector 1: San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088.
 // Sector 2: los locales de San Diego 1946 a San Diego 1954 (1946, 1948, 1950, 1952 y 1954).
-// Cualquier otra propiedad que no calce con ninguno de los dos (por no tener un tercer sector
-// en la interfaz) queda agrupada por defecto en Sector 2 también.
+// Cualquier otra propiedad que no calce con ninguno de los dos NO pertenece a ningún sector
+// (no aparece ni en Sector 1 ni en Sector 2).
 const SECTOR_1_DIRECCIONES = ['san diego 1712','san diego 1708','san diego 1704','sargento aldea 1088'];
 const SECTOR_2_DIRECCIONES = ['san diego 1946','san diego 1948','san diego 1950','san diego 1952','san diego 1954'];
 
 function contratoSector(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
-  if(!c) return 2;
+  if(!c) return null;
   const propiedadesContrato = contractPropertyIds(c).map(pid=> properties.find(x=>x.id===pid)).filter(Boolean);
   const dirs = propiedadesContrato.map(p=> String(p.direccion||'').trim().toLowerCase());
   if(dirs.some(dir=> SECTOR_1_DIRECCIONES.some(needle=> dir.startsWith(needle)))) return 1;
   if(dirs.some(dir=> SECTOR_2_DIRECCIONES.some(needle=> dir.startsWith(needle)))) return 2;
-  // Sin un tercer sector en la interfaz, cualquier otra propiedad se agrupa en Sector 2 también.
-  return 2;
+  return null;
 }
 
 // Normaliza el texto de "unidad" (Local 01 / Local  2 / Local 03...) a "local N" sin ceros ni
@@ -3165,13 +3159,15 @@ function renderWhatsappFotosList(){
   const mesActual = MESES_ES[new Date().getMonth()];
   const porSector = { 1: [], 2: [] };
   pendientesEsteMes.forEach(c=>{
+    const sector = contratoSector(c.id);
+    if(sector!==1 && sector!==2) return; // sin sector asignado: no participa del recordatorio por sector
     const servicios = ['Agua'];
     if(contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.principal) || contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.remarcador)){
       servicios.push('Luz');
     }
     const { nombreContacto, telefono } = waContactoDe(c.id);
     const mensaje = `Hola ${nombreContacto}! Te recordamos enviar la foto de la lectura de este mes (${mesActual}) de: ${servicios.join(' y ')}.\n\nGracias!`;
-    porSector[contratoSector(c.id)].push({ contratoId:c.id, nombreContacto, telefono, servicios, mensaje });
+    porSector[sector].push({ contratoId:c.id, nombreContacto, telefono, servicios, mensaje });
   });
   waFotosItems = [...porSector[1], ...porSector[2]];
 
@@ -3184,17 +3180,19 @@ function renderWhatsappFotosList(){
         ? `<span title="Sin WhatsApp de contacto">⚠️</span>`
         : `<button type="button" class="table-action-btn" title="Enviar por WhatsApp" onclick="enviarRecordatorioFoto('${m.contratoId}')">📲</button>`
       }
+      <button type="button" class="table-action-btn" title="Marcar como enviado" onclick="marcarRecordatorioFotoManual('${m.contratoId}')">✅</button>
     </div>`;
   };
   const seccion = (num, lista)=>{
     if(!lista.length) return '';
     return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num} (${lista.length})</div>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button type="button" class="btn btn-secondary" onclick="enviarTodosRecordatoriosFoto(${num})">📤 Enviar todos — Sector ${num}</button>
+      </div>
       <div class="wa-compact-list">${lista.map(filaCompacta).join('')}</div>`;
   };
 
-  el.innerHTML = `<div class="btn-row" style="margin-bottom:12px;">
-      <button type="button" class="btn btn-primary" onclick="enviarTodosRecordatoriosFoto()">📤 Enviar todos (${waFotosItems.length})</button>
-    </div>` + seccion(1, porSector[1]) + seccion(2, porSector[2]);
+  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2]);
 }
 
 async function marcarRecordatorioLecturaEnviado(contratoIds){
@@ -3204,25 +3202,28 @@ async function marcarRecordatorioLecturaEnviado(contratoIds){
   await saveKey('contracts', contracts);
 }
 
-async function enviarRecordatorioFoto(contratoId){
+// Enviar solo abre el chat de WhatsApp — NO marca como enviado automáticamente. Marcar es una
+// acción manual y separada, uno por uno, para que quede bajo tu control.
+function enviarRecordatorioFoto(contratoId){
   const item = waFotosItems.find(m=>m.contratoId===contratoId);
-  if(!item) return;
-  if(item.telefono) window.open(waLink(item.telefono, item.mensaje), '_blank');
+  if(!item || !item.telefono) return;
+  window.open(waLink(item.telefono, item.mensaje), '_blank');
+}
+
+async function marcarRecordatorioFotoManual(contratoId){
   await marcarRecordatorioLecturaEnviado([contratoId]);
   renderWhatsappFotosList();
   pushToDriveIfConnected();
 }
 
-async function enviarTodosRecordatoriosFoto(){
-  if(!waFotosItems.length) return;
-  if(!confirm(`Se abrirán ${waFotosItems.length} chats de WhatsApp, uno por cada arrendatario. ¿Continuar?`)) return;
-  waFotosItems.forEach((item,i)=>{
+function enviarTodosRecordatoriosFoto(sector){
+  const items = waFotosItems.filter(m=> contratoSector(m.contratoId)===sector);
+  if(!items.length) return;
+  if(!confirm(`Se abrirán ${items.length} chats de WhatsApp del Sector ${sector}. Esto NO los marca como enviados — eso lo haces tú, uno por uno, con el botón ✅. ¿Continuar?`)) return;
+  items.forEach((item,i)=>{
     if(!item.telefono) return;
     setTimeout(()=> window.open(waLink(item.telefono, item.mensaje), '_blank'), i*400);
   });
-  await marcarRecordatorioLecturaEnviado(waFotosItems.map(m=>m.contratoId));
-  renderWhatsappFotosList();
-  pushToDriveIfConnected();
 }
 
 // ---- 2) Aviso de pago pendiente: primero el total, luego el desglose ----
@@ -3300,10 +3301,17 @@ function renderWhatsappPendientesList(){
     return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado };
   }).filter(Boolean);
 
-  // Los pendientes de enviar (amarillo) primero, los ya enviados (verde) al final.
-  items.sort((a,b)=> Number(a.enviado) - Number(b.enviado));
+  // Se agrupan por sector (igual que el recordatorio de fotos); lo que no tenga sector
+  // asignado queda en un grupo aparte, para no perderlo de vista.
+  const porSectorPend = { 1:[], 2:[], 0:[] };
+  items.forEach(m=>{
+    const sector = contratoSector(m.contratoId);
+    porSectorPend[sector===1?1:(sector===2?2:0)].push(m);
+  });
+  Object.values(porSectorPend).forEach(lista=> lista.sort((a,b)=> Number(a.enviado)-Number(b.enviado)));
+  waPendItems = items;
 
-  el.innerHTML = items.map((m,i)=>{
+  const filaPago = (m,i)=>{
     const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
     const urgencyClass = m.enviado ? 'u3' : 'u2';
     const estadoTag = m.enviado ? ' <span class="tag tag-ok">Enviado</span>' : ' <span class="tag tag-pending">Pendiente</span>';
@@ -3322,7 +3330,32 @@ function renderWhatsappPendientesList(){
         <textarea id="pend-${i}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
       </div>
     </div>`;
-  }).join('');
+  };
+
+  const indiceGlobal = m => items.indexOf(m);
+  const seccionPend = (titulo, lista, sectorKey, esPrimera)=>{
+    if(!lista.length) return '';
+    return `<div class="prop-card-section" style="margin-top:${esPrimera?'0':'14px'};padding-top:0;border-top:none">${titulo} (${lista.length})</div>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button type="button" class="btn btn-secondary" onclick="enviarTodosPagosPendientes(${sectorKey})">📤 Enviar todos — ${titulo}</button>
+      </div>
+      ${lista.map(m=> filaPago(m, indiceGlobal(m))).join('')}`;
+  };
+
+  el.innerHTML = seccionPend('🏘️ Sector 1', porSectorPend[1], 1, true)
+    + seccionPend('🏘️ Sector 2', porSectorPend[2], 2, !porSectorPend[1].length)
+    + seccionPend('📍 Sin sector asignado', porSectorPend[0], 0, !porSectorPend[1].length && !porSectorPend[2].length);
+}
+
+let waPendItems = [];
+function enviarTodosPagosPendientes(sectorKey){
+  const items = waPendItems.filter(m=>{
+    const sector = contratoSector(m.contratoId);
+    return sectorKey===0 ? (sector!==1 && sector!==2) : sector===sectorKey;
+  }).filter(m=> m.telefono && m.telefono.replace(/\D/g,''));
+  if(!items.length) return;
+  if(!confirm(`Se abrirán ${items.length} chats de WhatsApp. Esto NO los marca como enviados — eso lo haces tú, uno por uno, con el botón ✅. ¿Continuar?`)) return;
+  items.forEach((item,i)=> setTimeout(()=> window.open(waLink(item.telefono, item.mensaje), '_blank'), i*400));
 }
 
 async function toggleAvisoEnviado(contratoId, estabaEnviado){
@@ -3509,7 +3542,7 @@ function computeCobranzaSaldo(c){
 }
 
 function renderHistoricosSelectOptions(historicos){
-  const optionsHtml = '<option value="">Todos</option>' + historicos.map(c=>`<option value="${c.id}">${esc(tenantName(c.tenantId))} — ${contractPropertyIds(c).length ? esc(propAddresses(c)) : 'Sin identificar'}</option>`).join('');
+  const optionsHtml = '<option value="">Todos</option>' + historicos.map(c=>`<option value="${c.id}">${esc(tenantNemo(c.tenantId) || tenantName(c.tenantId))} — ${contractPropertyIds(c).length ? esc(propAddresses(c)) : 'Sin identificar'}</option>`).join('');
   const sel = document.getElementById('historicos-select');
   const current = sel.value;
   sel.innerHTML = optionsHtml;
@@ -3542,7 +3575,7 @@ function renderHistoricos(){
     return `<div class="prop-card${cardCollapsedClass('historico:'+r.c.id, !!selectedId)}" data-card-key="historico:${r.c.id}">
       <div class="prop-card-header">
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
-          <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span><span class="prop-card-chevron">▸</span>
+          <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(tenantNemo(r.c.tenantId) || tenantName(r.c.tenantId))}</span> <span class="prop-card-unidad">${contractPropertyIds(r.c).length ? esc(propAddresses(r.c)) : 'Sin identificar'}</span><span class="prop-card-chevron">▸</span>
         </div>
         <div class="row-actions">
           ${tieneDeuda && r.saldoRemanente>0 ? `<button onclick="closeDebtManually('${r.c.id}')">Cerrar deuda</button>` : ''}
