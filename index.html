@@ -104,6 +104,14 @@
     cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;
   }
   .cell-stacked-sub{font-size:11px;color:var(--ink-soft);}
+  .date-hint{display:block;font-size:11px;color:var(--ink-soft);margin-top:3px;font-family:'Inter',sans-serif;}
+  .wa-compact-list{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .wa-compact-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);}
+  .wa-compact-row:last-child{border-bottom:none;}
+  .wa-compact-row:nth-child(odd){background:var(--card);}
+  .wa-compact-row:nth-child(even){background:var(--paper);}
+  .wa-compact-name{flex:1;min-width:0;font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .wa-compact-services{font-size:13px;flex-shrink:0;}
   .table-action-btn{
     display:inline-flex;align-items:center;justify-content:center;
     width:27px;height:27px;border-radius:7px;border:1px solid var(--border);
@@ -412,7 +420,7 @@
     <div id="cu-future-fields">
       <div class="field" style="margin-bottom:14px;text-align:left;">
         <label>Nueva fecha de término propuesta</label>
-        <input type="date" id="cu-fecha">
+        <input type="date" id="cu-fecha"><span class="date-hint" id="cu-fecha-hint"></span>
       </div>
       <div class="field" style="margin-bottom:14px;text-align:left;">
         <label>Nuevo monto de arriendo ($)</label>
@@ -598,8 +606,8 @@
               </div>
             </div>
             <div class="line-row" style="margin-top:14px">
-              <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required></div>
-              <div class="field"><label>Fecha fin contrato</label><input id="c-fechaFinContrato" type="date"></div>
+              <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required><span class="date-hint" id="c-fechaInicioContrato-hint"></span></div>
+              <div class="field"><label>Fecha fin contrato</label><input id="c-fechaFinContrato" type="date"><span class="date-hint" id="c-fechaFinContrato-hint"></span></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo de contrato</label><select id="c-tipoContrato"><option>Renovable</option><option>No Renovable</option></select></div>
@@ -643,7 +651,7 @@
           <input type="hidden" id="pay-id">
           <div class="grid">
             <div class="field full"><label>Contrato (Arrendatario — Propiedad)</label><select id="pay-contratoId" required></select></div>
-            <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required></div>
+            <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required><span class="date-hint" id="pay-fechaPago-hint"></span></div>
             <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="text" inputmode="numeric" class="money-mask" required></div>
             <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="text" inputmode="numeric" class="money-mask" value="0"></div>
             <div class="field"><label>Medio de pago</label>
@@ -728,7 +736,7 @@
           <div class="grid">
             <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
             <div class="field"><label>Servicio</label><select id="r-servicio"><option value="Luz">⚡ Luz</option><option value="Agua">💧 Agua</option><option value="Gas">🔥 Gas</option></select></div>
-            <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required></div>
+            <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="date-hint" id="r-fechaLectura-hint"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required></div>
             <div class="field"><label>Estado de pago</label>
@@ -1201,11 +1209,11 @@ function buildWorkbook(){
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
     proximaDecisionMonto: c.proximaDecisionMonto||'', proximaDecisionComentarios: c.proximaDecisionComentarios||'',
-    proximaDecisionRegistrada: c.proximaDecisionRegistrada||''
+    proximaDecisionRegistrada: c.proximaDecisionRegistrada||'', recordatorioLecturaMes: c.recordatorioLecturaMes||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -1538,6 +1546,25 @@ const formatDate = iso => {
   if(!m) return esc(iso);
   return `${m[3]}-${m[2]}-${m[1]}`;
 };
+
+// El selector nativo de fecha (calendario) ya lo da el propio input type="date", pero el
+// FORMATO que muestra el navegador dentro del campo depende del idioma/sistema operativo de
+// cada dispositivo (a veces sale MM/DD/AAAA). Este indicador de abajo siempre muestra
+// DD-MM-AAAA, sin importar el navegador.
+const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaFinContrato','pay-fechaPago','r-fechaLectura','cu-fecha'];
+function refreshDateHints(){
+  DATE_INPUT_IDS.forEach(id=>{
+    const input = document.getElementById(id);
+    const hint = document.getElementById(id+'-hint');
+    if(!input || !hint) return;
+    hint.textContent = input.value ? formatDate(input.value) : '';
+  });
+}
+DATE_INPUT_IDS.forEach(id=>{
+  const input = document.getElementById(id);
+  if(input) input.addEventListener('input', refreshDateHints);
+});
+
 const formatNumber = n => (n===''||n===null||n===undefined||isNaN(Number(n))) ? '' : new Intl.NumberFormat('es-CL').format(Number(n));
 const formatMM = n => {
   if(n===''||n===null||n===undefined||isNaN(Number(n))) return '';
@@ -1592,6 +1619,7 @@ function renderAll(){
   renderWhatsappPendientesList();
   renderHistorial();
   renderHistoricos();
+  refreshDateHints();
 }
 
 // ---------- NAV ----------
@@ -1858,6 +1886,7 @@ function editTenantContract(tenantId, contractId){
   document.getElementById('tc-form-title').textContent='🏢 Editar arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='inline-block';
   showTenantForm();
+  refreshDateHints();
   scrollAppToTop();
 }
 
@@ -2122,6 +2151,7 @@ function editPayment(id){
   document.getElementById('pay-form-title').textContent='💵 Editar pago';
   document.getElementById('pay-cancel').style.display='inline-block';
   updateValorArriendoClpPreview();
+  refreshDateHints();
   scrollAppToTop();
 }
 async function deletePayment(id){
@@ -2401,6 +2431,7 @@ function openUpdateContractModal(id){
   document.getElementById('cu-motivo').value = 'solo_fecha';
   document.getElementById('cu-comentarios').value = '';
   updateContractModalUI();
+  refreshDateHints();
   document.getElementById('contract-update-overlay').style.display = 'flex';
 }
 
@@ -2620,6 +2651,7 @@ function editReading(id){
   document.getElementById('r-cancel').style.display='inline-block';
   updateMedidorCompartidoHint();
   updateReadingEstimate();
+  refreshDateHints();
   scrollAppToTop();
 }
 async function deleteReading(id){
@@ -2838,7 +2870,11 @@ function waLink(telefono, mensaje){
   const digitos = String(telefono||'').replace(/\D/g,'');
   return `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
 }
+// Los emoji (💧⚡) se usan solo en la vista de la app — algunos dispositivos no los renderizan
+// bien al llegar por WhatsApp (aparecen como "?"), así que el mensaje que se ENVÍA usa texto
+// plano en vez de íconos.
 const SERVICIO_ICONS_WA = {Luz:'⚡',Agua:'💧',Gas:'🔥'};
+const mesActualKey = ()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
 
 function waContactoDe(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
@@ -2848,28 +2884,6 @@ function waContactoDe(contratoId){
     nombreContacto: (t && t.whatsappNombreContacto) || tenantNemo(c.tenantId) || tenantName(c.tenantId),
     telefono: (t && t.whatsappContacto) || ''
   };
-}
-
-// Tarjeta compacta y de fácil lectura, reutilizada tanto para fotos de lectura como para pago
-// pendiente. `resumenHtml` es lo que se ve de un vistazo; `mensaje` es el texto real que se
-// manda por WhatsApp (con más detalle) — el textarea para editarlo queda oculto por defecto.
-function buildWaCardHtml(key, idx, { titulo, resumenHtml, mensaje, telefono, estadoTag, urgencyClass, extraBotones }){
-  const sinTelefono = !telefono || !telefono.replace(/\D/g,'');
-  return `<div class="alert-card ${urgencyClass}" style="margin-bottom:8px;">
-    <div class="title">${titulo}${estadoTag||''}</div>
-    <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${resumenHtml}</div>
-    <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
-      ${sinTelefono
-        ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto — agrégalo en la ficha del arrendatario.</span>`
-        : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(telefono)}','${key}-${idx}')">📲 Enviar por WhatsApp</button>`
-      }
-      <button type="button" class="btn btn-secondary" onclick="toggleWaEdit('${key}-${idx}-wrap')">✏️ Editar</button>
-      ${extraBotones||''}
-    </div>
-    <div id="${key}-${idx}-wrap" style="display:none;margin-top:8px;">
-      <textarea id="${key}-${idx}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(mensaje)}</textarea>
-    </div>
-  </div>`;
 }
 
 function toggleWaEdit(wrapId){
@@ -2883,43 +2897,85 @@ function enviarWhatsapp(telefono, textareaId){
 }
 
 // ---- 1) Recordatorio de envío de fotos de lectura, agrupado por sector ----
-// Agua se pide en ambos sectores. Luz solo se pide a San Diego 1708 y San Diego 1712 (los
-// únicos con medidor propio de luz relevante para el remarcador compartido).
+// Agua se pide en ambos sectores. Luz además se pide a San Diego 1708 y San Diego 1712.
+// Se envía una vez al mes: apenas se marca enviado (o se usa "Enviar todos"), ese arrendatario
+// deja de aparecer en la lista hasta el mes siguiente.
+let waFotosItems = [];
 function renderWhatsappFotosList(){
   const el = document.getElementById('whatsapp-fotos-list');
   if(!el) return;
-  const activos = contracts.filter(isActiveContract);
-  if(!activos.length){ el.innerHTML = '<div class="empty">No hay contratos activos.</div>'; return; }
+  const mesKey = mesActualKey();
+  const pendientesEsteMes = contracts.filter(c=> isActiveContract(c) && c.recordatorioLecturaMes !== mesKey);
+  if(!pendientesEsteMes.length){
+    waFotosItems = [];
+    el.innerHTML = '<div class="empty">Ya se envió el recordatorio de este mes a todos los arrendatarios. 🎉</div>';
+    return;
+  }
 
   const mesActual = MESES_ES[new Date().getMonth()];
   const porSector = { 1: [], 2: [] };
-  activos.forEach(c=>{
+  pendientesEsteMes.forEach(c=>{
     const servicios = ['Agua'];
     if(contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.principal) || contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.remarcador)){
       servicios.push('Luz');
     }
     const { nombreContacto, telefono } = waContactoDe(c.id);
-    const listaServicios = servicios.map(s=>`${SERVICIO_ICONS_WA[s]} ${s}`).join(' y ');
-    const mensaje = `Hola ${nombreContacto}! 👋 Te recordamos enviar la foto de la lectura de este mes (${mesActual}) de: ${listaServicios}.\n\n¡Muchas gracias!`;
+    const mensaje = `Hola ${nombreContacto}! Te recordamos enviar la foto de la lectura de este mes (${mesActual}) de: ${servicios.join(' y ')}.\n\nGracias!`;
     porSector[contratoSector(c.id)].push({ contratoId:c.id, nombreContacto, telefono, servicios, mensaje });
   });
+  waFotosItems = [...porSector[1], ...porSector[2]];
 
+  const filaCompacta = m=>{
+    const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
+    return `<div class="wa-compact-row">
+      <span class="wa-compact-name" title="${esc(m.nombreContacto)}">${esc(m.nombreContacto)}</span>
+      <span class="wa-compact-services">${m.servicios.map(s=>SERVICIO_ICONS_WA[s]).join(' ')}</span>
+      ${sinTelefono
+        ? `<span title="Sin WhatsApp de contacto">⚠️</span>`
+        : `<button type="button" class="table-action-btn" title="Enviar por WhatsApp" onclick="enviarRecordatorioFoto('${m.contratoId}')">📲</button>`
+      }
+    </div>`;
+  };
   const seccion = (num, lista)=>{
     if(!lista.length) return '';
-    const filas = lista.map((m,i)=> buildWaCardHtml(`foto-s${num}`, i, {
-      titulo: `${esc(m.nombreContacto)} <span class="cell-stacked-sub" style="font-weight:400;">(${m.servicios.join(' + ')})</span>`,
-      resumenHtml: `<span>${m.servicios.map(s=>SERVICIO_ICONS_WA[s]).join(' ')} Recordatorio de foto de lectura — ${mesActual}</span>`,
-      mensaje: m.mensaje,
-      telefono: m.telefono,
-      urgencyClass: 'u3'
-    })).join('');
-    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'18px'};padding-top:0;border-top:none">🏘️ Sector ${num}</div>${filas}`;
+    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num} (${lista.length})</div>
+      <div class="wa-compact-list">${lista.map(filaCompacta).join('')}</div>`;
   };
 
-  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2]);
+  el.innerHTML = `<div class="btn-row" style="margin-bottom:12px;">
+      <button type="button" class="btn btn-primary" onclick="enviarTodosRecordatoriosFoto()">📤 Enviar todos (${waFotosItems.length})</button>
+    </div>` + seccion(1, porSector[1]) + seccion(2, porSector[2]);
 }
 
-// ---- 2) Aviso de pago pendiente, con el detalle de fecha/lectura/consumo/total ----
+async function marcarRecordatorioLecturaEnviado(contratoIds){
+  const mesKey = mesActualKey();
+  const set = new Set(contratoIds);
+  contracts = contracts.map(c=> set.has(c.id) ? {...c, recordatorioLecturaMes: mesKey} : c);
+  await saveKey('contracts', contracts);
+}
+
+async function enviarRecordatorioFoto(contratoId){
+  const item = waFotosItems.find(m=>m.contratoId===contratoId);
+  if(!item) return;
+  if(item.telefono) window.open(waLink(item.telefono, item.mensaje), '_blank');
+  await marcarRecordatorioLecturaEnviado([contratoId]);
+  renderWhatsappFotosList();
+  pushToDriveIfConnected();
+}
+
+async function enviarTodosRecordatoriosFoto(){
+  if(!waFotosItems.length) return;
+  if(!confirm(`Se abrirán ${waFotosItems.length} chats de WhatsApp, uno por cada arrendatario. ¿Continuar?`)) return;
+  waFotosItems.forEach((item,i)=>{
+    if(!item.telefono) return;
+    setTimeout(()=> window.open(waLink(item.telefono, item.mensaje), '_blank'), i*400);
+  });
+  await marcarRecordatorioLecturaEnviado(waFotosItems.map(m=>m.contratoId));
+  renderWhatsappFotosList();
+  pushToDriveIfConnected();
+}
+
+// ---- 2) Aviso de pago pendiente: primero el total, luego el desglose ----
 function renderWhatsappPendientesList(){
   const el = document.getElementById('whatsapp-pendientes-list');
   if(!el) return;
@@ -2939,9 +2995,8 @@ function renderWhatsappPendientesList(){
   const idPS2 = findPropertyContractId('san diego 1950', 'piso 2');
   let luzLocal3Info = null;
   if(idLocal3 && idPS2){
-    const luzLocal3 = todas.filter(r=> r.contratoId===idLocal3 && r.servicio==='Luz')
-      .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''))[0];
-    if(luzLocal3) luzLocal3Info = luzLocal3;
+    luzLocal3Info = todas.filter(r=> r.contratoId===idLocal3 && r.servicio==='Luz')
+      .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''))[0] || null;
   }
 
   const items = Object.keys(porContrato).map(contratoId=>{
@@ -2950,26 +3005,26 @@ function renderWhatsappPendientesList(){
     const { nombreContacto, telefono } = waContactoDe(contratoId);
     const list = porContrato[contratoId];
 
-    const lineaServicio = r=>{
+    // Texto plano (sin emoji) para el mensaje que se ENVÍA — más compatible entre dispositivos.
+    const lineaServicioTexto = r=>{
       const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
       const consumoTxt = r.consumo===null ? 'primera lectura' : `${formatNumber(r.consumo)} ${unidad}`;
-      return `${SERVICIO_ICONS_WA[r.servicio]||''} ${r.servicio}\nFecha de lectura: ${formatDate(r.fechaLectura)}\nLectura: ${formatNumber(r.lecturaActual)}\nConsumo: ${consumoTxt}\nTotal: ${money(r.monto)}`;
+      return `${r.servicio}\nFecha de lectura: ${formatDate(r.fechaLectura)}\nLectura: ${formatNumber(r.lecturaActual)}\nConsumo: ${consumoTxt}\nTotal: ${money(r.monto)}`;
     };
-    let detalle = list.map(lineaServicio).join('\n\n');
-    let total = list.reduce((s,r)=>s+Number(r.monto||0),0);
-
+    let detalle = list.map(lineaServicioTexto).join('\n\n');
+    const total = list.reduce((s,r)=>s+Number(r.monto||0),0);
     if(contratoId===idPS2 && luzLocal3Info){
-      detalle += `\n\nℹ️ Referencia — Luz San Diego 1950 Local 3 (se descuenta de este pago):\n${lineaServicio(luzLocal3Info)}`;
+      detalle += `\n\nNota — Luz San Diego 1950 Local 3 (se descuenta de este pago):\n${lineaServicioTexto(luzLocal3Info)}`;
     }
-
-    const mensaje = `Hola ${nombreContacto}! Este es el pago pendiente de servicios:\n\n${detalle}\n\nTotal a pagar: *${money(total)}*\n\n¡Gracias!`;
+    const mensaje = `Hola ${nombreContacto}! Este es el pago pendiente de servicios.\n\nTotal a pagar: *${money(total)}*\n\nDetalle:\n${detalle}\n\nGracias!`;
     const enviado = list.every(r=> r.avisoEnviado===true);
 
-    const resumenHtml = list.map(r=>{
+    // Resumen en pantalla (con íconos, sí funcionan bien en el navegador): total primero.
+    const resumenHtml = `<div>Total a pagar: <strong>${money(total)}</strong></div>` + list.map(r=>{
       const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
       const consumoTxt = r.consumo===null ? 'primera lectura' : `${formatNumber(r.consumo)} ${unidad}`;
-      return `<div>${SERVICIO_ICONS_WA[r.servicio]||''} ${r.servicio} — ${formatDate(r.fechaLectura)} · Lectura ${formatNumber(r.lecturaActual)} · Consumo ${consumoTxt} · <strong>${money(r.monto)}</strong></div>`;
-    }).join('') + `<div style="margin-top:2px;">Total a pagar: <strong>${money(total)}</strong></div>`;
+      return `<div class="cell-stacked-sub">${SERVICIO_ICONS_WA[r.servicio]||''} ${r.servicio} — ${formatDate(r.fechaLectura)} · Lectura ${formatNumber(r.lecturaActual)} · Consumo ${consumoTxt} · ${money(r.monto)}</div>`;
+    }).join('');
 
     return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado };
   }).filter(Boolean);
@@ -2977,15 +3032,26 @@ function renderWhatsappPendientesList(){
   // Los pendientes de enviar (amarillo) primero, los ya enviados (verde) al final.
   items.sort((a,b)=> Number(a.enviado) - Number(b.enviado));
 
-  el.innerHTML = items.map((m,i)=> buildWaCardHtml('pend', i, {
-    titulo: esc(m.nombreContacto),
-    resumenHtml: m.resumenHtml,
-    mensaje: m.mensaje,
-    telefono: m.telefono,
-    urgencyClass: m.enviado ? 'u3' : 'u2',
-    estadoTag: m.enviado ? ' <span class="tag tag-ok">Enviado</span>' : ' <span class="tag tag-pending">Pendiente</span>',
-    extraBotones: `<button type="button" class="btn btn-secondary" onclick="toggleAvisoEnviado('${m.contratoId}', ${m.enviado})">${m.enviado ? '↩️ Marcar como pendiente' : '✅ Marcar como enviado'}</button>`
-  })).join('');
+  el.innerHTML = items.map((m,i)=>{
+    const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
+    const urgencyClass = m.enviado ? 'u3' : 'u2';
+    const estadoTag = m.enviado ? ' <span class="tag tag-ok">Enviado</span>' : ' <span class="tag tag-pending">Pendiente</span>';
+    return `<div class="alert-card ${urgencyClass}" style="margin-bottom:8px;">
+      <div class="title">${esc(m.nombreContacto)}${estadoTag}</div>
+      <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}</div>
+      <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
+        ${sinTelefono
+          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto — agrégalo en la ficha del arrendatario.</span>`
+          : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(m.telefono)}','pend-${i}')">📲 Enviar por WhatsApp</button>`
+        }
+        <button type="button" class="btn btn-secondary" onclick="toggleWaEdit('pend-${i}-wrap')">✏️ Editar</button>
+        <button type="button" class="btn btn-secondary" onclick="toggleAvisoEnviado('${m.contratoId}', ${m.enviado})">${m.enviado ? '↩️ Marcar como pendiente' : '✅ Marcar como enviado'}</button>
+      </div>
+      <div id="pend-${i}-wrap" style="display:none;margin-top:8px;">
+        <textarea id="pend-${i}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 async function toggleAvisoEnviado(contratoId, estabaEnviado){
