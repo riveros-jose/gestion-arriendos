@@ -584,6 +584,10 @@
               <div class="field"><label>Correo</label><input id="t-correo" type="email"></div>
               <div class="field"><label>Teléfono</label><input id="t-telefono"></div>
             </div>
+            <div class="line-row" style="margin-top:14px">
+              <div class="field"><label>Nombre contacto WhatsApp</label><input id="t-whatsappNombreContacto" placeholder="Quién recibe los avisos"></div>
+              <div class="field"><label>WhatsApp de contacto</label><input id="t-whatsappContacto" placeholder="+56 9 1234 5678"></div>
+            </div>
           </div>
           <div class="line-group">
             <h3>📝 Información del Contrato</h3>
@@ -742,33 +746,9 @@
         </form>
       </div>
       <div class="card">
-        <h2>📱 Recordatorios por WhatsApp</h2>
-        <div class="subtitle" style="margin-bottom:14px">Define a qué número avisar y por cuáles servicios (Luz/Agua/Gas) para cada contrato. WhatsApp no permite enviar mensajes 100% automáticos desde una web — se abre el chat con el mensaje ya listo, y solo falta tocar "Enviar" dentro de WhatsApp.</div>
-        <form id="form-reminder" class="form-compact">
-          <input type="hidden" id="rem-id">
-          <div class="grid">
-            <div class="field full"><label>Arrendatario (Contrato)</label><select id="rem-contratoId" required></select></div>
-            <div class="field"><label>Número de WhatsApp</label><input id="rem-telefono" placeholder="+56 9 1234 5678" required></div>
-            <div class="field">
-              <label>Servicios a recordar</label>
-              <div class="checkbox-list" style="display:flex;gap:14px;padding:8px 0;">
-                <label style="display:flex;align-items:center;gap:5px;font-weight:400;"><input type="checkbox" id="rem-luz" value="Luz"> ⚡ Luz</label>
-                <label style="display:flex;align-items:center;gap:5px;font-weight:400;"><input type="checkbox" id="rem-agua" value="Agua"> 💧 Agua</label>
-                <label style="display:flex;align-items:center;gap:5px;font-weight:400;"><input type="checkbox" id="rem-gas" value="Gas"> 🔥 Gas</label>
-              </div>
-            </div>
-          </div>
-          <div class="btn-row">
-            <button type="submit" class="btn btn-primary">Guardar recordatorio</button>
-            <button type="button" class="btn btn-secondary" id="rem-cancel" style="display:none">Cancelar edición</button>
-          </div>
-        </form>
-        <div id="reminder-list" style="margin-top:16px"></div>
-        <div class="btn-row" style="margin-top:18px;flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary" onclick="prepararRecordatorioLecturas()">📋 Preparar recordatorio de lecturas (fin de mes)</button>
-          <button type="button" class="btn btn-primary" onclick="prepararAvisoPagosPendientes()">💰 Preparar aviso de pagos pendientes</button>
-        </div>
-        <div id="whatsapp-preview" style="margin-top:16px"></div>
+        <h2>💰 Avisos de pago pendiente por WhatsApp</h2>
+        <div class="subtitle" style="margin-bottom:14px">Un mensaje listo por cada arrendatario con lecturas sin pagar. WhatsApp no permite enviar mensajes 100% automáticos desde una web — se abre el chat con el mensaje ya escrito, y solo falta tocar "Enviar" dentro de WhatsApp. Usa el WhatsApp de contacto definido en la ficha del arrendatario.</div>
+        <div id="whatsapp-pendientes-list"></div>
       </div>
       <div class="card">
         <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
@@ -1200,10 +1180,11 @@ function buildWorkbook(){
 
   const tenantRows = tenants.length ? tenants.map(t=>({
     id: t.id, nemoArrendatario: t.nemoArrendatario, nombreSociedad: t.nombreSociedad, rutSociedad: t.rutSociedad,
-    nombreRepresentante: t.nombreRepresentante, rutRepresentante: t.rutRepresentante, correo: t.correo, telefono: t.telefono
+    nombreRepresentante: t.nombreRepresentante, rutRepresentante: t.rutRepresentante, correo: t.correo, telefono: t.telefono,
+    whatsappNombreContacto: t.whatsappNombreContacto, whatsappContacto: t.whatsappContacto
   })) : [{}];
   const wsTen = XLSX.utils.json_to_sheet(tenantRows);
-  styleWorksheet(wsTen, [10,22,30,16,24,16,28,16]);
+  styleWorksheet(wsTen, [10,22,30,16,24,16,28,16,22,18]);
   XLSX.utils.book_append_sheet(wb, wsTen, 'Arrendatarios');
 
   const contractRows = contracts.length ? contracts.map(c=>({
@@ -1240,20 +1221,12 @@ function buildWorkbook(){
     arrendatario: contractLabel(r.contratoId),
     servicio: r.servicio, fechaLectura: r.fechaLectura, lecturaAnterior: r.lecturaAnterior, lecturaActual: r.lecturaActual,
     consumo: r.consumo, valorUnitario: r.valorUnitario, monto: r.monto, estado: r.estado, estadoEfectivo: r.estadoEfectivo,
-    comentarios: r.comentarios, contratoId: r.contratoId
+    comentarios: r.comentarios, contratoId: r.contratoId, avisoEnviado: r.avisoEnviado || false
   })) : [{}];
   const wsRead = XLSX.utils.json_to_sheet(readingRows);
-  applyColumnFormats(wsRead, ['id','arrendatario','servicio','fechaLectura','lecturaAnterior','lecturaActual','consumo','valorUnitario','monto','estado','estadoEfectivo','comentarios','contratoId']);
-  styleWorksheet(wsRead, [10,32,8,12,10,10,10,12,12,10,10,28,10]);
+  applyColumnFormats(wsRead, ['id','arrendatario','servicio','fechaLectura','lecturaAnterior','lecturaActual','consumo','valorUnitario','monto','estado','estadoEfectivo','comentarios','contratoId','avisoEnviado']);
+  styleWorksheet(wsRead, [10,32,8,12,10,10,10,12,12,10,10,28,10,12]);
   XLSX.utils.book_append_sheet(wb, wsRead, 'Servicios');
-
-  const reminderRows = readingReminders.length ? readingReminders.map(r=>({
-    id: r.id, arrendatario: contractLabel(r.contratoId), contratoId: r.contratoId, telefono: r.telefono, servicios: r.servicios
-  })) : [{}];
-  const wsRem = XLSX.utils.json_to_sheet(reminderRows);
-  applyColumnFormats(wsRem, ['id','arrendatario','contratoId','telefono','servicios']);
-  styleWorksheet(wsRem, [10,32,10,16,20]);
-  XLSX.utils.book_append_sheet(wb, wsRem, 'Recordatorios');
 
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
@@ -1307,14 +1280,12 @@ function loadFromWorkbook(arrayBuffer){
   const contractSheet = wb.Sheets['Contratos'];
   const paySheet = wb.Sheets['Pagos'];
   const readingSheet = wb.Sheets['Servicios'];
-  const reminderSheet = wb.Sheets['Recordatorios'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
 
   const rawContracts = contractSheet ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id) : [];
   const rawPayments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
   const rawReadings = readingSheet ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id) : [];
-  const rawReminders = reminderSheet ? XLSX.utils.sheet_to_json(reminderSheet).filter(r=>r.id) : [];
   lastDateCorruptionCount = countDateTimeCorruption(rawContracts) + countDateTimeCorruption(rawPayments) + countDateTimeCorruption(rawReadings);
 
   contracts = rawContracts.map(c=> normalizeDates({
@@ -1324,10 +1295,8 @@ function loadFromWorkbook(arrayBuffer){
   payments = rawPayments.map(normalizeDates);
   readings = rawReadings.map(r=> normalizeDates({
     id:r.id, contratoId:r.contratoId, servicio:r.servicio, fechaLectura:r.fechaLectura,
-    lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios
-  }));
-  readingReminders = rawReminders.map(r=> ({
-    id:r.id, contratoId:r.contratoId, telefono:r.telefono, servicios:r.servicios || ''
+    lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios,
+    avisoEnviado: (r.avisoEnviado===true || r.avisoEnviado==='TRUE' || r.avisoEnviado==='true')
   }));
 }
 
@@ -1451,7 +1420,7 @@ async function exportWorkbookToDrive(wb, filenamePrefix){
 }
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
-let properties = [], tenants = [], contracts = [], payments = [], readings = [], readingReminders = [];
+let properties = [], tenants = [], contracts = [], payments = [], readings = [];
 const collapseState = { tenants:true, contracts:false };
 // Sube al inicio: en desktop scrollea la ventana; en mobile scrollea el contenedor .main
 // (que es donde ocurre el scroll para evitar el botón flotante nativo del navegador).
@@ -1603,7 +1572,6 @@ async function init(){
   contracts = await loadKey('contracts');
   payments = await loadKey('payments');
   readings = await loadKey('readings');
-  readingReminders = await loadKey('readingReminders');
   renderAll();
 }
 
@@ -1617,8 +1585,7 @@ function renderAll(){
   renderAlertas();
   renderReadingSelects();
   renderReadings();
-  renderReminderSelect();
-  renderReminderList();
+  renderWhatsappPendientesList();
   renderHistorial();
   renderHistoricos();
 }
@@ -1799,7 +1766,7 @@ document.getElementById('prop-subtabs').addEventListener('click', e=>{
 });
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
-const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono'];
+const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','whatsappNombreContacto','whatsappContacto'];
 const contractFields = ['fechaInicioContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
@@ -2034,10 +2001,15 @@ function renderTenantsContracts(){
     if(t.correo) repRight.push(`<div>📧 ${esc(t.correo)}</div>`);
     if(t.telefono) repRight.push(`<div>📞 ${esc(t.telefono)}</div>`);
 
-    const contactoLine = (socCol.length || repLeft.length || repRight.length) ? `<div class="prop-card-contact">
+    const waCol = [];
+    if(t.whatsappNombreContacto) waCol.push(`<div>💬 ${esc(t.whatsappNombreContacto)}</div>`);
+    if(t.whatsappContacto) waCol.push(`<div class="prop-card-contact-rut">${esc(t.whatsappContacto)}</div>`);
+
+    const contactoLine = (socCol.length || repLeft.length || repRight.length || waCol.length) ? `<div class="prop-card-contact">
       ${socCol.length ? `<div class="contact-col">${socCol.join('')}</div>` : ''}
       ${repLeft.length ? `<div class="contact-col">${repLeft.join('')}</div>` : ''}
       ${repRight.length ? `<div class="contact-col">${repRight.join('')}</div>` : ''}
+      ${waCol.length ? `<div class="contact-col">${waCol.join('')}</div>` : ''}
     </div>` : '';
 
     return `<div class="prop-card${cardCollapsedClass('tenant:'+c.id, !!selectedId)}" data-card-key="tenant:${c.id}">
@@ -2831,7 +2803,7 @@ function renderReadings(){
   el2.innerHTML = mostrar2.length ? (buildReadingsTableHtml(mostrar2) + readingsToggleHtml(2, sector2.length)) : '<div class="empty">No hay lecturas registradas en este sector.</div>';
 }
 
-// ---------- RECORDATORIOS POR WHATSAPP ----------
+// ---------- AVISOS DE PAGO PENDIENTE POR WHATSAPP ----------
 // WhatsApp no permite que una página web envíe mensajes de forma 100% automática: solo se
 // puede abrir el chat con el mensaje ya redactado (wa.me), y la persona debe tocar "Enviar"
 // dentro de la propia app de WhatsApp. Es una restricción de la plataforma, no de esta app.
@@ -2841,105 +2813,57 @@ function waLink(telefono, mensaje){
 }
 const SERVICIO_ICONS_WA = {Luz:'⚡',Agua:'💧',Gas:'🔥'};
 
-let editingReminder = null;
+function renderWhatsappPendientesList(){
+  const el = document.getElementById('whatsapp-pendientes-list');
+  if(!el) return;
+  const todas = computeReadingsWithConsumption();
+  const pendientes = todas.filter(r=> r.estadoEfectivo !== 'Pagado');
+  if(!pendientes.length){ el.innerHTML = '<div class="empty">No hay lecturas con pago pendiente en este momento. 🎉</div>'; return; }
 
-function renderReminderSelect(){
-  const activos = contracts.filter(isActiveContract);
-  const sel = document.getElementById('rem-contratoId');
-  const current = sel.value;
-  sel.innerHTML = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  if(activos.some(c=>c.id===current)) sel.value = current;
-}
-document.getElementById('rem-contratoId').addEventListener('change', ()=>{
-  const cid = document.getElementById('rem-contratoId').value;
-  const c = contracts.find(x=>x.id===cid);
-  const telInput = document.getElementById('rem-telefono');
-  if(c && !telInput.value){
+  const porContrato = {};
+  pendientes.forEach(r=>{
+    if(!porContrato[r.contratoId]) porContrato[r.contratoId] = [];
+    porContrato[r.contratoId].push(r);
+  });
+
+  const items = Object.keys(porContrato).map(contratoId=>{
+    const c = contracts.find(x=>x.id===contratoId);
+    if(!c) return null;
     const t = tenants.find(x=>x.id===c.tenantId);
-    if(t && t.telefono) telInput.value = t.telefono;
-  }
-});
+    const nombreContacto = (t && t.whatsappNombreContacto) || tenantNemo(c.tenantId) || tenantName(c.tenantId);
+    const telefono = (t && t.whatsappContacto) || '';
+    const direccion = propAddresses(c);
+    const list = porContrato[contratoId];
+    const detalle = list.map(r=>{
+      const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
+      const consumoTxt = r.consumo===null ? 'primera lectura' : `${formatNumber(r.consumo)} ${unidad}`;
+      return `${SERVICIO_ICONS_WA[r.servicio]||''} ${r.servicio}\nFecha de lectura: ${formatDate(r.fechaLectura)}\nLectura: ${formatNumber(r.lecturaActual)}\nConsumo: ${consumoTxt}\nTotal: ${money(r.monto)}`;
+    }).join('\n\n');
+    const total = list.reduce((s,r)=>s+Number(r.monto||0),0);
+    const mensaje = `Hola ${nombreContacto}! Este es el pago pendiente de servicios:\n\n${detalle}\n\nTotal a pagar: *${money(total)}*\n\n¡Gracias!`;
+    const enviado = list.every(r=> r.avisoEnviado===true);
+    return { contratoId, nombreContacto, telefono, direccion, mensaje, enviado };
+  }).filter(Boolean);
 
-document.getElementById('form-reminder').addEventListener('submit', async e=>{
-  e.preventDefault();
-  const contratoId = document.getElementById('rem-contratoId').value;
-  const telefono = document.getElementById('rem-telefono').value.trim();
-  const servicios = ['rem-luz','rem-agua','rem-gas'].map(id=>document.getElementById(id)).filter(cb=>cb.checked).map(cb=>cb.value);
-  if(!contratoId){ alert('Selecciona un arrendatario.'); return; }
-  if(!telefono){ alert('Ingresa un número de WhatsApp.'); return; }
-  if(!servicios.length){ alert('Selecciona al menos un servicio a recordar.'); return; }
-  const obj = { id: editingReminder || uid(), contratoId, telefono, servicios: servicios.join(',') };
-  if(editingReminder){ readingReminders = readingReminders.map(r=> r.id===editingReminder ? obj : r); }
-  else { readingReminders.push(obj); }
-  const ok = await saveKey('readingReminders', readingReminders);
-  alert((ok || driveToken) ? 'Recordatorio guardado ✓' : '⚠ No estás conectado a Google Drive — este cambio no quedará guardado de forma permanente.');
-  resetReminderForm();
-  renderReminderList();
-  pushToDriveIfConnected();
-});
+  // Los pendientes de enviar (amarillo) primero, los ya enviados (verde) al final.
+  items.sort((a,b)=> Number(a.enviado) - Number(b.enviado));
 
-function resetReminderForm(){
-  editingReminder = null;
-  document.getElementById('form-reminder').reset();
-  document.getElementById('rem-cancel').style.display = 'none';
-}
-document.getElementById('rem-cancel').addEventListener('click', resetReminderForm);
-
-function editReminder(id){
-  const r = readingReminders.find(x=>x.id===id);
-  if(!r) return;
-  editingReminder = id;
-  document.getElementById('rem-contratoId').value = r.contratoId;
-  document.getElementById('rem-telefono').value = r.telefono;
-  const servicios = (r.servicios||'').split(',');
-  document.getElementById('rem-luz').checked = servicios.includes('Luz');
-  document.getElementById('rem-agua').checked = servicios.includes('Agua');
-  document.getElementById('rem-gas').checked = servicios.includes('Gas');
-  document.getElementById('rem-cancel').style.display = 'inline-block';
-  scrollAppToTop();
-}
-
-async function deleteReminder(id){
-  if(!confirm('¿Eliminar este recordatorio?')) return;
-  readingReminders = readingReminders.filter(r=>r.id!==id);
-  await saveKey('readingReminders', readingReminders);
-  renderReminderList();
-  pushToDriveIfConnected();
-}
-
-function renderReminderList(){
-  const el = document.getElementById('reminder-list');
-  if(!readingReminders.length){ el.innerHTML = '<div class="empty">No hay recordatorios configurados todavía — agrega uno arriba.</div>'; return; }
-  el.innerHTML = readingReminders.map(r=>{
-    const label = contractLabel(r.contratoId);
-    const servicios = (r.servicios||'').split(',').filter(Boolean).map(s=>`${SERVICIO_ICONS_WA[s]||''} ${s}`).join(' · ');
-    return `<div class="alert-card u3" style="margin-bottom:8px;">
-      <div class="title">${esc(label)}</div>
-      <div class="alert-line"><span class="alert-line-label">📱</span> ${esc(r.telefono)}</div>
-      <div class="alert-line"><span class="alert-line-label">Servicios:</span> ${servicios || '—'}</div>
-      <div class="row-actions">
-        <button onclick="editReminder('${r.id}')">Editar</button>
-        <button onclick="deleteReminder('${r.id}')">Eliminar</button>
+  el.innerHTML = items.map((m,i)=>{
+    const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
+    const urgencyClass = m.enviado ? 'u3' : 'u2';
+    const estadoTag = m.enviado ? '<span class="tag tag-ok">Enviado</span>' : '<span class="tag tag-pending">Pendiente</span>';
+    return `<div class="alert-card ${urgencyClass}" style="margin-bottom:10px;">
+      <div class="title">${esc(m.nombreContacto)}${m.direccion?` — ${esc(m.direccion)}`:''} ${estadoTag}</div>
+      <textarea id="wa-pend-${i}" rows="4" style="width:100%;font-size:12.5px;margin:8px 0;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
+      <div class="row-actions" style="gap:8px;flex-wrap:wrap;">
+        ${sinTelefono
+          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto — agrégalo en la ficha del arrendatario.</span>`
+          : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(m.telefono)}','wa-pend-${i}')">📲 Abrir WhatsApp y enviar</button>`
+        }
+        <button type="button" class="btn btn-secondary" onclick="toggleAvisoEnviado('${m.contratoId}', ${m.enviado})">${m.enviado ? '↩️ Marcar como pendiente' : '✅ Marcar como enviado'}</button>
       </div>
     </div>`;
   }).join('');
-}
-
-function renderWhatsappPreview(titulo, mensajes){
-  const el = document.getElementById('whatsapp-preview');
-  if(!mensajes.length){ el.innerHTML = '<div class="empty">No hay mensajes para preparar en este momento.</div>'; return; }
-  el.innerHTML = `<div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">${esc(titulo)} — ${mensajes.length} mensaje${mensajes.length>1?'s':''}</div>` +
-    mensajes.map((m,i)=>{
-      const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
-      return `<div class="alert-card u3" style="margin-bottom:10px;">
-        <div class="title">${esc(m.nemo)}${m.direccion?` — ${esc(m.direccion)}`:''}</div>
-        <textarea id="wa-msg-${i}" rows="4" style="width:100%;font-size:12.5px;margin:8px 0;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
-        ${sinTelefono
-          ? `<div class="status-msg" style="color:var(--brick)">⚠ Sin número de WhatsApp configurado para este arrendatario — agrégalo arriba.</div>`
-          : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(m.telefono)}','wa-msg-${i}')">📲 Abrir WhatsApp y enviar</button>`
-        }
-      </div>`;
-    }).join('');
 }
 
 function enviarWhatsapp(telefono, textareaId){
@@ -2947,52 +2871,14 @@ function enviarWhatsapp(telefono, textareaId){
   window.open(waLink(telefono, texto), '_blank');
 }
 
-function prepararRecordatorioLecturas(){
-  if(!readingReminders.length){ alert('Primero configura al menos un recordatorio arriba (arrendatario, número y servicios).'); return; }
-  const mesActual = MESES_ES[new Date().getMonth()];
-  const mensajes = readingReminders.map(r=>{
-    const c = contracts.find(x=>x.id===r.contratoId);
-    if(!c) return null;
-    const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
-    const direccion = propAddresses(c);
-    const servicios = (r.servicios||'').split(',').filter(Boolean);
-    if(!servicios.length) return null;
-    const listaServicios = servicios.map(s=>`${SERVICIO_ICONS_WA[s]||''} ${s}`).join(', ');
-    const mensaje = `Hola ${nemo}! 👋 Te recordamos enviar la foto de la lectura de este mes (${mesActual}) de: ${listaServicios}, correspondiente a ${direccion}.\n\n¡Muchas gracias!`;
-    return { nemo, telefono: r.telefono, direccion, mensaje };
-  }).filter(Boolean);
-  renderWhatsappPreview('📋 Recordatorio de lecturas', mensajes);
-  document.getElementById('whatsapp-preview').scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-function prepararAvisoPagosPendientes(){
+async function toggleAvisoEnviado(contratoId, estabaEnviado){
+  const nuevoEstado = !estabaEnviado;
   const todas = computeReadingsWithConsumption();
-  const pendientes = todas.filter(r=> r.estadoEfectivo !== 'Pagado');
-  if(!pendientes.length){ alert('No hay lecturas con pago pendiente en este momento. 🎉'); return; }
-  const porContrato = {};
-  pendientes.forEach(r=>{
-    if(!porContrato[r.contratoId]) porContrato[r.contratoId] = [];
-    porContrato[r.contratoId].push(r);
-  });
-  const mensajes = Object.keys(porContrato).map(contratoId=>{
-    const c = contracts.find(x=>x.id===contratoId);
-    if(!c) return null;
-    const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
-    const direccion = propAddresses(c);
-    const reminder = readingReminders.find(r=>r.contratoId===contratoId);
-    const tenant = tenants.find(t=>t.id===c.tenantId);
-    const telefono = (reminder && reminder.telefono) || (tenant && tenant.telefono) || '';
-    const lista = porContrato[contratoId].map(r=>{
-      const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
-      const consumoTxt = r.consumo===null ? 'primera lectura' : `${formatNumber(r.consumo)} ${unidad}`;
-      return `${SERVICIO_ICONS_WA[r.servicio]||''} ${r.servicio} (${formatDate(r.fechaLectura)}): ${consumoTxt} — ${money(r.monto)}`;
-    }).join('\n');
-    const total = porContrato[contratoId].reduce((s,r)=>s+Number(r.monto||0),0);
-    const mensaje = `Hola ${nemo}! Estos son los pagos de servicios pendientes de ${direccion}:\n\n${lista}\n\nTotal pendiente: ${money(total)}\n\n¡Gracias!`;
-    return { nemo, telefono, direccion, mensaje };
-  }).filter(Boolean);
-  renderWhatsappPreview('💰 Aviso de pagos pendientes', mensajes);
-  document.getElementById('whatsapp-preview').scrollIntoView({behavior:'smooth', block:'start'});
+  const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado').map(r=>r.id));
+  readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, avisoEnviado: nuevoEstado} : r);
+  await saveKey('readings', readings);
+  renderWhatsappPendientesList();
+  pushToDriveIfConnected();
 }
 
 // ---------- HISTORIAL MENSUAL ----------
@@ -3901,7 +3787,7 @@ function makeSearchable(selectId){
   new MutationObserver(()=>{ syncFromSelect(); if(dropdown.style.display!=='none') buildList(input.value); }).observe(select, { childList:true });
 }
 
-['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select','matrix-tenant-filter','rem-contratoId']
+['pay-contratoId','h-contratoId-activo','h-contratoId-historico','resumen-filter','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select','matrix-tenant-filter']
   .forEach(makeSearchable);
 
 function esc(s){
