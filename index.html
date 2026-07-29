@@ -784,7 +784,7 @@
           <div class="grid">
             <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
             <div class="field"><label>Servicio</label><select id="r-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select></div>
-            <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="date-hint" id="r-fechaLectura-hint"></span><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
+            <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required><span class="status-msg" id="r-lecturaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required></div>
             <div class="field"><label>Estado de pago</label>
@@ -1673,7 +1673,7 @@ const formatDate = iso => {
 // FORMATO que muestra el navegador dentro del campo depende del idioma/sistema operativo de
 // cada dispositivo (a veces sale MM/DD/AAAA). Este indicador de abajo siempre muestra
 // DD-MM-AAAA, sin importar el navegador.
-const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaFinContrato','pay-fechaPago','r-fechaLectura','cu-fecha','tc-fechaTermino'];
+const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaFinContrato','pay-fechaPago','cu-fecha','tc-fechaTermino'];
 function refreshDateHints(){
   DATE_INPUT_IDS.forEach(id=>{
     const input = document.getElementById(id);
@@ -2787,7 +2787,12 @@ function updateLecturaAnteriorHints(){
     lecturaHint.textContent = '';
     return;
   }
-  fechaHint.textContent = `📅 Lectura anterior: ${formatDate(referencia.fechaLectura)}`;
+  const idxReferencia = propias.indexOf(referencia);
+  const anteAnterior = idxReferencia>0 ? propias[idxReferencia-1] : null;
+  const consumoAnteriorTxt = anteAnterior
+    ? ` · Consumo anterior: ${formatNumber(Math.max(Number(referencia.lecturaActual||0) - Number(anteAnterior.lecturaActual||0), 0))}`
+    : '';
+  fechaHint.textContent = `📅 Lectura anterior: ${formatDate(referencia.fechaLectura)}${consumoAnteriorTxt}`;
 
   const nueva = Number(document.getElementById('r-lecturaActual').value);
   let consumoTxt = '';
@@ -2821,25 +2826,59 @@ function parseNumeroCL(str){
   return isNaN(n) ? null : n;
 }
 // Busca el total a pagar, el consumo total y la lectura actual dentro del texto de la boleta.
+const MES_ABR_ES = {ENE:'01',FEB:'02',MAR:'03',ABR:'04',MAY:'05',JUN:'06',JUL:'07',AGO:'08',SEP:'09',OCT:'10',NOV:'11',DIC:'12'};
+function parseFechaBoletaDDMMMAAAA(str){
+  const m = str.match(/(\d{1,2})-([A-Z]{3})-(\d{4})/i);
+  if(!m) return null;
+  const mesNum = MES_ABR_ES[m[2].toUpperCase()];
+  if(!mesNum) return null;
+  return `${m[3]}-${mesNum}-${String(m[1]).padStart(2,'0')}`;
+}
 function parseBoletaServicio(text){
+  // El monto usado para calcular el $/m³ (o $/kWh) NO debe incluir intereses por mora — esos son
+  // un cargo aparte, no parte del costo real del servicio consumido. Se prioriza "SUBTOTAL
+  // SERVICIO" (antes de intereses); si no aparece, se resta "INTERÉS DEUDA" del total a pagar.
+  const subtotalMatch = text.match(/SUBTOTAL SERVICIO\s*\$?\s*([\d.,]+)/i);
   const totalMatch = text.match(/TOTAL A PAGAR\s*\$?\s*([\d.,]+)/i);
+  const interesMatch = text.match(/INTER[ÉE]S DEUDA\s*\$?\s*([\d.,]+)/i);
   const consumoMatch = text.match(/CONSUMO TOTAL\s*([\d.,]+)\s*m/i);
+  const fechaLecturaMatch = text.match(/LECTURA ACTUAL\s+(\d{1,2}-[A-Z]{3}-\d{4})/i);
   const lecturaActualMatch = text.match(/LECTURA ACTUAL\s+\d{1,2}-[A-Z]{3}-\d{4}\s+([\d.,]+)\s*m/i)
     || text.match(/LECTURA ACTUAL[^0-9]*([\d.,]+)\s*m/i);
+
+  let total = null;
+  if(subtotalMatch){
+    total = parseNumeroCL(subtotalMatch[1]);
+  } else if(totalMatch){
+    total = parseNumeroCL(totalMatch[1]);
+    if(interesMatch && total!==null) total -= (parseNumeroCL(interesMatch[1]) || 0);
+  }
+
   return {
-    total: totalMatch ? parseNumeroCL(totalMatch[1]) : null,
+    total,
     consumo: consumoMatch ? parseNumeroCL(consumoMatch[1]) : null,
+    fechaLectura: fechaLecturaMatch ? parseFechaBoletaDDMMMAAAA(fechaLecturaMatch[1]) : null,
     lecturaActual: lecturaActualMatch ? parseNumeroCL(lecturaActualMatch[1]) : null
   };
 }
 // ---- Boleta de agua por sector: el agua se factura por sector completo, no por unidad ----
 document.getElementById('bs-mes').value = mesActualKey();
 
-async function subirBoletaSector(file, sector, mes){
+async function subirBoletaSector(file, sector, mes, datos){
   if(!driveToken) throw new Error('No estás conectado a Google Drive.');
   const rentaProFolderId = await driveFindOrCreateFolder();
   if(!driveServiciosFolderId) driveServiciosFolderId = await driveFindOrCreateSubfolder(rentaProFolderId, 'Servicios');
-  const nombreArchivo = `Agua - Sector ${sector} - ${mes}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
+  const [anio, mesNum] = mes.split('-');
+  // Formato "Servicio_Año_Mes_SectorN" + los datos extraídos de la boleta (Subtotal_Consumo_
+  // FechaLectura_LecturaActual), para poder ubicarla y referenciarla fácilmente después en Drive.
+  const partes = ['Agua', anio, mesNum, `Sector${sector}`];
+  if(datos){
+    partes.push(datos.total!==null && datos.total!==undefined ? Math.round(datos.total) : 'SD');
+    partes.push(datos.consumo!==null && datos.consumo!==undefined ? datos.consumo : 'SD');
+    partes.push(datos.fechaLectura || 'SD');
+    partes.push(datos.lecturaActual!==null && datos.lecturaActual!==undefined ? datos.lecturaActual : 'SD');
+  }
+  const nombreArchivo = (partes.join('_') + '.pdf').replace(/[\\/:*?"<>|]/g,'-');
   const resultado = await driveUploadFile(file, nombreArchivo, driveServiciosFolderId, 'application/pdf');
   return resultado.webViewLink || `https://drive.google.com/file/d/${resultado.id}/view`;
 }
@@ -2863,7 +2902,7 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   statusEl.textContent = 'Subiendo boleta a Drive…';
   let boletaUrl;
   try{
-    boletaUrl = await subirBoletaSector(file, sector, mes);
+    boletaUrl = await subirBoletaSector(file, sector, mes, datos);
   }catch(err){
     console.error('Error subiendo boleta de sector', err);
     alert('No se pudo subir la boleta a Drive: '+(err.message||err));
