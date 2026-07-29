@@ -693,6 +693,10 @@
             <div class="field"><label>Medio de pago</label>
               <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
             </div>
+            <div class="field full" id="pay-valorArriendo-edit-field" style="display:none;">
+              <label>Valor arriendo vigente en ese mes ($) — corrige solo si quedó mal</label>
+              <input id="pay-valorArriendo" type="text" inputmode="numeric" class="money-mask">
+            </div>
             <div class="field full"><label>Comentarios</label><textarea id="pay-comentarios" rows="2"></textarea></div>
           </div>
           <div class="btn-row">
@@ -700,7 +704,7 @@
             <button type="button" class="btn btn-secondary" id="pay-cancel" style="display:none">Cancelar edición</button>
           </div>
           <div class="btn-row" style="margin-top:10px;">
-            <button type="button" class="btn" style="background:#2B6CB0;color:#fff;" id="pay-open-contract-update-btn">🔄 Actualizar valores/información de contrato</button>
+            <button type="button" class="btn" style="background:#2B6CB0;color:#fff;" id="pay-open-contract-update-btn">Actualizar contrato</button>
           </div>
           <div class="status-msg" id="pay-status"></div>
         </form>
@@ -2206,7 +2210,7 @@ function renderTenantsContracts(){
 document.getElementById('tenant-select').addEventListener('change', renderTenantsContracts);
 
 // ---------- PAGOS ----------
-const payFields = ['contratoId','fechaPago','montoPagado','descuentos','medioPago','comentarios'];
+const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
 
 function contratosConCobranza(){
   return contracts.filter(c => !isActiveContract(c) && computeCobranzaSaldo(c) > 0);
@@ -2253,16 +2257,19 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
     return;
   }
 
-  // Se guarda automáticamente el arriendo vigente del contrato al momento de este pago (para
-  // que el historial refleje correctamente lo que se cobraba en ese momento) — ya no se pide
-  // ni se puede editar a mano aquí, evitando que un segundo pago del mismo mes se malinterprete
-  // como un cobro adicional del arriendo.
+  // Para un pago NUEVO, el arriendo se calcula solo (el campo queda oculto): se usa el que
+  // correspondía en el MES de la fecha ingresada, no el valor actual del contrato — así un pago
+  // con fecha antigua no queda inflado retroactivamente si el arriendo subió después.
+  // Al EDITAR un pago existente, el campo queda visible y editable — se respeta lo que se haya
+  // dejado ahí (ya viene leído por el bucle genérico de arriba), por si hay que corregirlo a mano.
   const c = contracts.find(x=>x.id===obj.contratoId);
-  if(editingPay){
-    const prev = payments.find(p=>p.id===editingPay);
-    obj.valorArriendo = (prev && prev.valorArriendo) ? prev.valorArriendo : (c ? (c.montoArriendoPactado||'') : '');
-  } else {
-    obj.valorArriendo = c ? (c.montoArriendoPactado||'') : '';
+  if(!editingPay){
+    if(c && obj.fechaPago){
+      const [y,m] = obj.fechaPago.split('-');
+      obj.valorArriendo = historicalValorArriendo(obj.contratoId, Number(y), Number(m)-1, Number(c.montoArriendoPactado||0));
+    } else {
+      obj.valorArriendo = c ? (c.montoArriendoPactado||'') : '';
+    }
   }
 
   if(editingPay){ payments = payments.map(p=> p.id===editingPay ? obj : p); }
@@ -2282,6 +2289,7 @@ function resetPayForm(){
   document.getElementById('pay-form-title').textContent='💵 Nuevo pago';
   document.getElementById('pay-cancel').style.display='none';
   document.getElementById('pay-valorArriendo-actual').textContent = '';
+  document.getElementById('pay-valorArriendo-edit-field').style.display = 'none';
 }
 function editPayment(id){
   const p = payments.find(x=>x.id===id);
@@ -2290,6 +2298,8 @@ function editPayment(id){
   payFields.forEach(f=> document.getElementById('pay-'+f).value = (MONEY_COLUMNS.includes(f) && p[f]) ? formatThousandsCLP(rawMoneyValue(p[f])) : (p[f] || ''));
   document.getElementById('pay-form-title').textContent='💵 Editar pago';
   document.getElementById('pay-cancel').style.display='inline-block';
+  document.getElementById('pay-valorArriendo-edit-field').style.display = 'block';
+  document.getElementById('pay-valorArriendo').value = p.valorArriendo ? formatThousandsCLP(rawMoneyValue(p.valorArriendo)) : '';
   actualizarValorArriendoInformativo();
   refreshDateHints();
   scrollAppToTop();
