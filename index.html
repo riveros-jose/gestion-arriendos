@@ -803,13 +803,12 @@
       </div>
       <div class="card">
         <h2>📄 Boleta de agua por sector</h2>
-        <div class="subtitle" style="margin-bottom:14px">El agua se factura por sector (una boleta cubre a todos los locales de ese sector), no por lectura individual. Súbela una vez al mes por cada sector y quedará disponible para incluirse en los mensajes de pago de esos arrendatarios.</div>
+        <div class="subtitle" style="margin-bottom:14px">El agua se factura por sector (una boleta cubre a todos los locales de ese sector), no por lectura individual. El mes se detecta automáticamente desde el vencimiento de la boleta. Aplica a los consumos más recientes hasta que subas una boleta más nueva que la reemplace.</div>
         <form id="form-boleta-sector" class="form-compact">
           <div class="grid">
             <div class="field"><label>Sector</label>
               <select id="bs-sector"><option value="1">Sector 1</option><option value="2">Sector 2</option></select>
             </div>
-            <div class="field"><label>Mes de la boleta</label><input type="month" id="bs-mes" required></div>
             <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
           </div>
           <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
@@ -2742,10 +2741,10 @@ function prefillValorUnitario(){
   if(servicio==='Agua'){
     const sector = contratoSector(contratoId);
     if(sector===1 || sector===2){
-      const boleta = sectorBoletas
-        .filter(b=> b.sector===sector && Number(b.total)>0 && Number(b.consumo)>0)
-        .sort((a,b)=> b.mes.localeCompare(a.mes))[0];
-      if(boleta) valor = Math.round((Number(boleta.total)/Number(boleta.consumo))*100)/100;
+      const boleta = getBoletaSectorVigente(sector);
+      if(boleta && Number(boleta.total)>0 && Number(boleta.consumo)>0){
+        valor = Math.round((Number(boleta.total)/Number(boleta.consumo))*100)/100;
+      }
     }
   }
   if(valor===null){
@@ -2845,6 +2844,7 @@ function parseBoletaServicio(text){
   const fechaLecturaMatch = text.match(/LECTURA ACTUAL\s+(\d{1,2}-[A-Z]{3}-\d{4})/i);
   const lecturaActualMatch = text.match(/LECTURA ACTUAL\s+\d{1,2}-[A-Z]{3}-\d{4}\s+([\d.,]+)\s*m/i)
     || text.match(/LECTURA ACTUAL[^0-9]*([\d.,]+)\s*m/i);
+  const vencimientoMatch = text.match(/VENCIMIENTO\s+(\d{1,2}-[A-Z]{3}-\d{4})/i);
 
   let total = null;
   if(subtotalMatch){
@@ -2854,15 +2854,18 @@ function parseBoletaServicio(text){
     if(interesMatch && total!==null) total -= (parseNumeroCL(interesMatch[1]) || 0);
   }
 
+  const vencimiento = vencimientoMatch ? parseFechaBoletaDDMMMAAAA(vencimientoMatch[1]) : null;
+
   return {
     total,
     consumo: consumoMatch ? parseNumeroCL(consumoMatch[1]) : null,
     fechaLectura: fechaLecturaMatch ? parseFechaBoletaDDMMMAAAA(fechaLecturaMatch[1]) : null,
-    lecturaActual: lecturaActualMatch ? parseNumeroCL(lecturaActualMatch[1]) : null
+    lecturaActual: lecturaActualMatch ? parseNumeroCL(lecturaActualMatch[1]) : null,
+    vencimiento,
+    mes: vencimiento ? vencimiento.slice(0,7) : null // el mes de la boleta = mes de su vencimiento
   };
 }
 // ---- Boleta de agua por sector: el agua se factura por sector completo, no por unidad ----
-document.getElementById('bs-mes').value = mesActualKey();
 
 async function subirBoletaSector(file, sector, mes, datos){
   if(!driveToken) throw new Error('No estás conectado a Google Drive.');
@@ -2886,18 +2889,21 @@ async function subirBoletaSector(file, sector, mes, datos){
 document.getElementById('form-boleta-sector').addEventListener('submit', async e=>{
   e.preventDefault();
   const sector = Number(document.getElementById('bs-sector').value);
-  const mes = document.getElementById('bs-mes').value;
   const file = document.getElementById('bs-pdf').files[0];
   const statusEl = document.getElementById('bs-status');
   if(!file){ alert('Elige el archivo PDF de la boleta.'); return; }
   if(!driveToken){ alert('Para subir la boleta primero debes estar conectado a Google Drive.'); return; }
 
   statusEl.textContent = '🔎 Leyendo boleta…';
-  let datos = { total:null, consumo:null };
+  let datos = { total:null, consumo:null, mes:null };
   try{
     const text = await extractPdfText(file);
     datos = parseBoletaServicio(text);
   }catch(err){ console.error('Error leyendo PDF', err); }
+
+  // El mes de la boleta se obtiene automáticamente de su fecha de vencimiento. Si por algún
+  // motivo no se pudo leer, se usa el mes actual como respaldo.
+  const mes = datos.mes || mesActualKey();
 
   statusEl.textContent = 'Subiendo boleta a Drive…';
   let boletaUrl;
@@ -2914,9 +2920,8 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   const obj = { id: existente ? existente.id : uid(), sector, mes, total: datos.total||'', consumo: datos.consumo||'', boletaUrl };
   sectorBoletas = existente ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
-  statusEl.innerHTML = `<span style="color:var(--teal-dark)">✓ Boleta guardada${datos.total?` — total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.</span>`;
+  statusEl.innerHTML = `<span style="color:var(--teal-dark)">✓ Boleta guardada — mes detectado: ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.</span>`;
   document.getElementById('form-boleta-sector').reset();
-  document.getElementById('bs-mes').value = mesActualKey();
   renderSectorBoletasList();
   renderWhatsappPendientesList();
   pushToDriveIfConnected();
@@ -2936,17 +2941,33 @@ async function deleteSectorBoleta(id){
   pushToDriveIfConnected();
 }
 
+// La boleta de un sector aplica a los consumos más recientes hasta que se suba una boleta más
+// nueva que la reemplace — por eso siempre se usa la última cargada para ese sector, sin exigir
+// que coincida exactamente con el mes de la lectura.
+function getBoletaSectorVigente(sector){
+  return [...sectorBoletas].filter(b=> b.sector===sector).sort((a,b)=> b.mes.localeCompare(a.mes))[0] || null;
+}
+
+let sectorBoletasVerTodas = false;
 function renderSectorBoletasList(){
   const el = document.getElementById('sector-boletas-list');
   if(!el) return;
   if(!sectorBoletas.length){ el.innerHTML = '<div class="empty">Aún no hay boletas de agua cargadas.</div>'; return; }
   const ordenadas = [...sectorBoletas].sort((a,b)=> b.mes.localeCompare(a.mes) || a.sector-b.sector);
-  el.innerHTML = `<div class="wa-compact-list">` + ordenadas.map(b=>`
+  const mostrar = sectorBoletasVerTodas ? ordenadas : ordenadas.slice(0,2);
+  const filas = mostrar.map(b=>`
     <div class="wa-compact-row">
       <span class="wa-compact-name">Sector ${b.sector} — ${b.mes}${b.total?` · ${money(b.total)}`:''}${b.consumo?` · ${formatNumber(b.consumo)} m³`:''}</span>
       <a href="${esc(b.boletaUrl)}" target="_blank" rel="noopener" class="table-action-btn" title="Ver boleta">📄</a>
       <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteSectorBoleta('${b.id}')">🗑️</button>
-    </div>`).join('') + `</div>`;
+    </div>`).join('');
+  const toggle = ordenadas.length>2
+    ? `<div style="text-align:center;margin-top:10px">
+        <button type="button" class="btn btn-secondary" onclick="sectorBoletasVerTodas=!sectorBoletasVerTodas;renderSectorBoletasList();">
+          ${sectorBoletasVerTodas ? 'Ver solo las últimas 2' : `Ver todas (${ordenadas.length})`}
+        </button>
+      </div>` : '';
+  el.innerHTML = `<div class="wa-compact-list">${filas}</div>${toggle}`;
 }
 
 // ---- Conciliación: si la boleta se sube DESPUÉS de ya haber ingresado lecturas de Agua de ese
@@ -3503,13 +3524,11 @@ function renderWhatsappPendientesList(){
         : `${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)})`;
       let linea = `${r.servicio}\nFecha de lectura: ${formatDate(r.fechaLectura)}\nLectura: ${formatNumber(r.lecturaActual)}\nConsumo: ${consumoTxt}\nValor por ${unidad}: ${money(r.valorUnitario)}\nTotal: ${money(r.monto)}`;
       // El agua se factura por sector completo (no por unidad) — si esta lectura no tiene su
-      // propia boleta adjunta, se usa la boleta del sector correspondiente a ese mes.
+      // propia boleta adjunta, se usa la boleta vigente del sector (la más reciente cargada).
       let boletaUrl = r.boletaUrl;
       if(!boletaUrl && r.servicio==='Agua'){
         const sector = contratoSector(r.contratoId);
-        const mesLectura = (r.fechaLectura||'').slice(0,7);
-        const boletaSector = sectorBoletas.find(b=> b.sector===sector && b.mes===mesLectura)
-          || [...sectorBoletas].filter(b=> b.sector===sector).sort((a,b)=> b.mes.localeCompare(a.mes))[0];
+        const boletaSector = getBoletaSectorVigente(sector);
         if(boletaSector) boletaUrl = boletaSector.boletaUrl;
       }
       if(boletaUrl) linea += `\nBoleta: ${boletaUrl}`;
@@ -3532,9 +3551,7 @@ function renderWhatsappPendientesList(){
       let boletaUrlVista = r.boletaUrl;
       if(!boletaUrlVista && r.servicio==='Agua'){
         const sector = contratoSector(r.contratoId);
-        const mesLectura = (r.fechaLectura||'').slice(0,7);
-        const boletaSector = sectorBoletas.find(b=> b.sector===sector && b.mes===mesLectura)
-          || [...sectorBoletas].filter(b=> b.sector===sector).sort((a,b)=> b.mes.localeCompare(a.mes))[0];
+        const boletaSector = getBoletaSectorVigente(sector);
         if(boletaSector) boletaUrlVista = boletaSector.boletaUrl;
       }
       const boletaTag = boletaUrlVista ? ` · <a href="${esc(boletaUrlVista)}" target="_blank" rel="noopener">📄 boleta</a>` : '';
