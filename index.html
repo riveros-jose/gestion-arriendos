@@ -2867,19 +2867,21 @@ function parseBoletaServicio(text){
 }
 // ---- Boleta de agua por sector: el agua se factura por sector completo, no por unidad ----
 
+const SECTOR_NOMBRES = { 1: 'Sector1-SargentoAldea1088', 2: 'Sector2-SanDiego1946-1954' };
 async function subirBoletaSector(file, sector, mes, datos){
   if(!driveToken) throw new Error('No estás conectado a Google Drive.');
   const rentaProFolderId = await driveFindOrCreateFolder();
   if(!driveServiciosFolderId) driveServiciosFolderId = await driveFindOrCreateSubfolder(rentaProFolderId, 'Servicios');
   const [anio, mesNum] = mes.split('-');
-  // Formato "Servicio_Año_Mes_SectorN" + los datos extraídos de la boleta (Subtotal_Consumo_
-  // FechaLectura_LecturaActual), para poder ubicarla y referenciarla fácilmente después en Drive.
-  const partes = ['Agua', anio, mesNum, `Sector${sector}`];
+  // Formato "Servicio_Año_Mes_Sector-Dirección" + los datos extraídos de la boleta, cada uno con
+  // su etiqueta (FechaLectura_X_Lectura_Y_Consumo_Z_Subtotal_W) para que se entienda de un
+  // vistazo qué es cada número, sin tener que adivinar el orden.
+  const partes = ['Agua', anio, mesNum, SECTOR_NOMBRES[sector] || `Sector${sector}`];
   if(datos){
-    partes.push(datos.total!==null && datos.total!==undefined ? Math.round(datos.total) : 'SD');
-    partes.push(datos.consumo!==null && datos.consumo!==undefined ? datos.consumo : 'SD');
-    partes.push(datos.fechaLectura || 'SD');
-    partes.push(datos.lecturaActual!==null && datos.lecturaActual!==undefined ? datos.lecturaActual : 'SD');
+    partes.push('FechaLectura', datos.fechaLectura || 'SD');
+    partes.push('Lectura', datos.lecturaActual!==null && datos.lecturaActual!==undefined ? datos.lecturaActual : 'SD');
+    partes.push('Consumo', datos.consumo!==null && datos.consumo!==undefined ? datos.consumo : 'SD');
+    partes.push('Subtotal', datos.total!==null && datos.total!==undefined ? Math.round(datos.total) : 'SD');
   }
   const nombreArchivo = (partes.join('_') + '.pdf').replace(/[\\/:*?"<>|]/g,'-');
   const resultado = await driveUploadFile(file, nombreArchivo, driveServiciosFolderId, 'application/pdf');
