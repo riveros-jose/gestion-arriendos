@@ -684,7 +684,11 @@
           <div class="grid">
             <div class="field full"><label>Contrato (Arrendatario — Propiedad)</label><select id="pay-contratoId" required></select></div>
             <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required><span class="date-hint" id="pay-fechaPago-hint"></span></div>
-            <div class="field"><label>Monto pagado ($)</label><input id="pay-montoPagado" type="text" inputmode="numeric" class="money-mask" required></div>
+            <div class="field">
+              <label>Monto pagado ($)</label>
+              <input id="pay-montoPagado" type="text" inputmode="numeric" class="money-mask" placeholder="0">
+              <span class="status-msg" id="pay-valorArriendo-actual" style="margin-top:2px;"></span>
+            </div>
             <div class="field"><label>Descuentos aplicados ($)</label><input id="pay-descuentos" type="text" inputmode="numeric" class="money-mask" value="0"></div>
             <div class="field"><label>Medio de pago</label>
               <select id="pay-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
@@ -695,12 +699,8 @@
             <button type="submit" class="btn btn-primary">Registrar pago</button>
             <button type="button" class="btn btn-secondary" id="pay-cancel" style="display:none">Cancelar edición</button>
           </div>
-          <div class="line-group">
-            <div class="field" style="max-width:320px">
-              <label>Actualizar valor arriendo contrato ($) — opcional</label>
-              <input id="pay-valorArriendo" type="text" inputmode="numeric" class="money-mask" placeholder="Se autocompleta con el valor actual del contrato">
-              <span class="status-msg" id="pay-valorArriendo-clp"></span>
-            </div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button type="button" class="btn" style="background:#2B6CB0;color:#fff;" id="pay-open-contract-update-btn">🔄 Actualizar valores/información de contrato</button>
           </div>
           <div class="status-msg" id="pay-status"></div>
         </form>
@@ -2206,7 +2206,7 @@ function renderTenantsContracts(){
 document.getElementById('tenant-select').addEventListener('change', renderTenantsContracts);
 
 // ---------- PAGOS ----------
-const payFields = ['contratoId','fechaPago','montoPagado','descuentos','valorArriendo','medioPago','comentarios'];
+const payFields = ['contratoId','fechaPago','montoPagado','descuentos','medioPago','comentarios'];
 
 function contratosConCobranza(){
   return contracts.filter(c => !isActiveContract(c) && computeCobranzaSaldo(c) > 0);
@@ -2221,38 +2221,48 @@ function renderPaySelects(){
   document.getElementById('pay-contratoId').innerHTML = opts;
 }
 
-document.getElementById('pay-contratoId').addEventListener('change', ()=>{
-  if(editingPay) return;
+// El "valor arriendo" del contrato ya no se ingresa a mano en el formulario de pago — así se
+// evita que, al registrar un segundo pago del mismo mes, se confunda con un cobro adicional.
+// Solo se muestra de forma informativa (no editable) el valor vigente del contrato; si de
+// verdad cambió, se actualiza desde el botón "Actualizar valores/información de contrato".
+function actualizarValorArriendoInformativo(){
   const c = contracts.find(x=>x.id===document.getElementById('pay-contratoId').value);
-  document.getElementById('pay-valorArriendo').value = (c && isActiveContract(c)) ? (c.montoArriendoPactado||'') : '';
-  updateValorArriendoClpPreview();
-});
-function updateValorArriendoClpPreview(){
-  const v = document.getElementById('pay-valorArriendo').value;
-  document.getElementById('pay-valorArriendo-clp').textContent = (v!=='' && !isNaN(Number(v)) && Number(v)>0) ? money(v) : '';
+  const el = document.getElementById('pay-valorArriendo-actual');
+  el.textContent = (c && isActiveContract(c) && c.montoArriendoPactado)
+    ? `Arriendo vigente del contrato: ${money(c.montoArriendoPactado)}`
+    : '';
 }
-document.getElementById('pay-valorArriendo').addEventListener('input', updateValorArriendoClpPreview);
+document.getElementById('pay-contratoId').addEventListener('change', actualizarValorArriendoInformativo);
+
+document.getElementById('pay-open-contract-update-btn').addEventListener('click', ()=>{
+  const contratoId = document.getElementById('pay-contratoId').value;
+  if(!contratoId){ alert('Primero selecciona un contrato arriba.'); return; }
+  openUpdateContractModal(contratoId);
+});
 
 document.getElementById('form-pago').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingPay || uid() };
   payFields.forEach(f=> obj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('pay-'+f).value) : document.getElementById('pay-'+f).value);
 
+  // El monto pagado ya no es obligatorio — se puede registrar solo un descuento (por ejemplo,
+  // un ajuste o condonación) sin que exista un pago en efectivo/transferencia asociado. Pero
+  // al menos uno de los dos (monto o descuento) tiene que ser mayor a $0.
+  if(Number(obj.montoPagado||0)<=0 && Number(obj.descuentos||0)<=0){
+    alert('Ingresa un monto pagado o un descuento — al menos uno de los dos debe ser mayor a $0.');
+    return;
+  }
+
+  // Se guarda automáticamente el arriendo vigente del contrato al momento de este pago (para
+  // que el historial refleje correctamente lo que se cobraba en ese momento) — ya no se pide
+  // ni se puede editar a mano aquí, evitando que un segundo pago del mismo mes se malinterprete
+  // como un cobro adicional del arriendo.
   const c = contracts.find(x=>x.id===obj.contratoId);
-  if(c && isActiveContract(c) && obj.valorArriendo!=='' && Number(obj.valorArriendo)!==Number(c.montoArriendoPactado||0)){
-    const confirmado = confirm(
-      `El valor de arriendo que ingresaste (${money(obj.valorArriendo)}) es distinto al valor actual del contrato (${money(c.montoArriendoPactado)}).\n\n`+
-      `Si continúas, el contrato de "${contractLabel(c.id)}" quedará actualizado a ${money(obj.valorArriendo)} — este será el nuevo valor pactado para los próximos pagos y para el cálculo de deuda de aquí en adelante.\n\n`+
-      `¿Confirmas el cambio?`
-    );
-    if(!confirmado){
-      document.getElementById('pay-status').textContent = 'Guardado cancelado — ajusta el valor arriendo o el monto no se modifica.';
-      setTimeout(()=>document.getElementById('pay-status').textContent='',4000);
-      return;
-    }
-    c.montoArriendoPactado = obj.valorArriendo;
-    contracts = contracts.map(x=> x.id===c.id ? c : x);
-    await saveKey('contracts',contracts);
+  if(editingPay){
+    const prev = payments.find(p=>p.id===editingPay);
+    obj.valorArriendo = (prev && prev.valorArriendo) ? prev.valorArriendo : (c ? (c.montoArriendoPactado||'') : '');
+  } else {
+    obj.valorArriendo = c ? (c.montoArriendoPactado||'') : '';
   }
 
   if(editingPay){ payments = payments.map(p=> p.id===editingPay ? obj : p); }
@@ -2271,7 +2281,7 @@ function resetPayForm(){
   document.getElementById('form-pago').reset();
   document.getElementById('pay-form-title').textContent='💵 Nuevo pago';
   document.getElementById('pay-cancel').style.display='none';
-  updateValorArriendoClpPreview();
+  document.getElementById('pay-valorArriendo-actual').textContent = '';
 }
 function editPayment(id){
   const p = payments.find(x=>x.id===id);
@@ -2280,7 +2290,7 @@ function editPayment(id){
   payFields.forEach(f=> document.getElementById('pay-'+f).value = (MONEY_COLUMNS.includes(f) && p[f]) ? formatThousandsCLP(rawMoneyValue(p[f])) : (p[f] || ''));
   document.getElementById('pay-form-title').textContent='💵 Editar pago';
   document.getElementById('pay-cancel').style.display='inline-block';
-  updateValorArriendoClpPreview();
+  actualizarValorArriendoInformativo();
   refreshDateHints();
   scrollAppToTop();
 }
