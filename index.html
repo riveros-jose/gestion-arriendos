@@ -3047,10 +3047,15 @@ function computeReadingsWithConsumption(){
   });
 }
 
+// Íconos propios en SVG (no dependen de la fuente de emoji del sistema, que puede verse distinto
+// o "desconfigurada" según el dispositivo/navegador — ya vimos este mismo problema en WhatsApp).
+const SERVICIO_SVG = {
+  Luz: '<svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:4px;" aria-hidden="true"><path fill="#E3A72E" d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>',
+  Agua: '<svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:4px;" aria-hidden="true"><path fill="#3F8FC9" d="M12 2C8.5 7 5 11.5 5 15a7 7 0 0 0 14 0c0-3.5-3.5-8-7-13z"/></svg>',
+  Gas: '<svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:4px;" aria-hidden="true"><path fill="#C2582C" d="M12 2c1.3 4.2-2.8 5.4-2.8 9.2a2.8 2.8 0 0 0 5.6 0c0-.9-.5-1.7-.9-2.5 2 1 3.6 3 3.6 5.3a5.5 5.5 0 0 1-11 0C6.5 8.2 10.7 7 12 2z"/></svg>'
+};
 function servicioIcono(s){
-  if(s==='Luz') return '⚡ Luz';
-  if(s==='Agua') return '💧 Agua';
-  if(s==='Gas') return '🔥 Gas';
+  if(SERVICIO_SVG[s]) return `${SERVICIO_SVG[s]}${esc(s)}`;
   return esc(s);
 }
 
@@ -3171,7 +3176,6 @@ function waLink(telefono, mensaje){
 // Los emoji (💧⚡) se usan solo en la vista de la app — algunos dispositivos no los renderizan
 // bien al llegar por WhatsApp (aparecen como "?"), así que el mensaje que se ENVÍA usa texto
 // plano en vez de íconos.
-const SERVICIO_ICONS_WA = {Luz:'⚡',Agua:'💧',Gas:'🔥'};
 
 function waContactoDe(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
@@ -3228,7 +3232,7 @@ function renderWhatsappFotosList(){
     const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
     return `<div class="wa-compact-row">
       <span class="wa-compact-name" title="${esc(m.nombreContacto)}">${esc(m.nombreContacto)}</span>
-      <span class="wa-compact-services">${m.servicios.map(s=>SERVICIO_ICONS_WA[s]).join(' ')}</span>
+      <span class="wa-compact-services">${m.servicios.map(s=>SERVICIO_SVG[s]||'').join('')}</span>
       ${sinTelefono
         ? `<span title="Sin WhatsApp de contacto">⚠️</span>`
         : `<button type="button" class="table-action-btn" title="Enviar por WhatsApp" onclick="enviarRecordatorioFoto('${m.contratoId}')">📲</button>`
@@ -3352,7 +3356,7 @@ function renderWhatsappPendientesList(){
         if(boletaSector) boletaUrlVista = boletaSector.boletaUrl;
       }
       const boletaTag = boletaUrlVista ? ` · <a href="${esc(boletaUrlVista)}" target="_blank" rel="noopener">📄 boleta</a>` : '';
-      return `<div class="cell-stacked-sub">${SERVICIO_ICONS_WA[r.servicio]||''} ${r.servicio} — ${formatDate(r.fechaLectura)} · Lectura ${formatNumber(r.lecturaActual)} · Consumo ${consumoTxt} · ${money(r.monto)}${boletaTag}</div>`;
+      return `<div class="cell-stacked-sub">${SERVICIO_SVG[r.servicio]||''} ${r.servicio} — ${formatDate(r.fechaLectura)} · Lectura ${formatNumber(r.lecturaActual)} · Consumo ${consumoTxt} · ${money(r.monto)}${boletaTag}</div>`;
     }).join('');
 
     return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado };
