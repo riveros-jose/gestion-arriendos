@@ -3974,7 +3974,13 @@ function computeGlobalMonthlySeries(){
     todos.forEach(c=>{
       // Solo se suman los clientes que tuvieron algún registro de pago ese mes (aunque sea $0) —
       // no todos los contratos desde su fecha de inicio hasta hoy.
-      const pagosMes = payments.filter(p=>p.contratoId===c.id && sameYearMonth(p.fechaPago,year,month));
+      let pagosMes = payments.filter(p=>p.contratoId===c.id && sameYearMonth(p.fechaPago,year,month));
+      // Para un contrato YA FINALIZADO, solo cuentan los pagos anteriores a su término (cuando
+      // todavía era un arriendo activo) — los pagos posteriores son cobranza de la deuda pactada,
+      // no arriendo del mes, y no deben sumarse al "arriendo pactado" ni al pagado de este gráfico.
+      if(!isActiveContract(c) && c.fechaTermino){
+        pagosMes = pagosMes.filter(p=> p.fechaPago && p.fechaPago < c.fechaTermino);
+      }
       if(!pagosMes.length) return;
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
       const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
