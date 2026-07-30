@@ -3343,6 +3343,22 @@ async function setReadingEstado(id, estado){
   pushToDriveIfConnected();
 }
 
+// El pago se marca a nivel de LECTURA individual (no por card completa) — un contrato puede
+// tener Agua y Luz con estados de pago distintos entre sí. Al cambiar el dropdown de estado en
+// la tabla de lecturas, se pide confirmación antes de aplicar el cambio.
+async function confirmarCambioEstadoLectura(selectEl, id){
+  const nuevoEstado = selectEl.value;
+  const r = readings.find(x=>x.id===id);
+  if(!r){ return; }
+  if(r.estado===nuevoEstado) return;
+  const nombre = contractLabel(r.contratoId);
+  if(!confirm(`¿Confirmas cambiar el estado de esta lectura de ${r.servicio} (${nombre}) a "${nuevoEstado}"?`)){
+    selectEl.value = r.estado || 'Pendiente';
+    return;
+  }
+  await setReadingEstado(id, nuevoEstado);
+}
+
 const DIAS_PARA_ATRASO = 15;
 
 function diasDesde(fechaStr){
@@ -3521,7 +3537,6 @@ function buildReadingsTableHtml(list){
     ${th('readings','contrato','Arrendatario')}${th('readings','servicio','Servicio')}${th('readings','monto','Monto a pagar')}${th('readings','estadoEfectivo','Estado')}${th('readings','consumo','Consumo')}${th('readings','fechaLectura','Fecha lectura')}<th></th>
   </tr></thead><tbody>
   ${list.map(r=>{
-    const tagClass = r.estadoEfectivo==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
     const contratoFull = contractLabel(r.contratoId);
     return `<tr>
     <td class="cell-tap-full" title="${esc(contratoFull)}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${esc(contratoFull)}</span></td>
@@ -3531,7 +3546,10 @@ function buildReadingsTableHtml(list){
       <div class="cell-stacked-sub">$${formatNumber(r.valorUnitario)} c/u</div>
     </td>
     <td>
-      <span class="tag ${tagClass}">${esc(r.estadoEfectivo)}</span>
+      <select class="mini-select" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--border);" title="Cambiar estado de esta lectura" onchange="confirmarCambioEstadoLectura(this,'${r.id}')">
+        <option value="Pendiente" ${r.estado!=='Pagado'?'selected':''}>${r.estadoEfectivo==='Atrasado'?'Atrasado':'Pendiente'}</option>
+        <option value="Pagado" ${r.estado==='Pagado'?'selected':''}>Pagado</option>
+      </select>
     </td>
     <td class="mono cell-stacked">
       <div>${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</div>
@@ -3540,7 +3558,6 @@ function buildReadingsTableHtml(list){
     <td class="mono">${formatDate(r.fechaLectura)}</td>
     <td class="table-actions-group">
       <button class="table-action-btn" onclick="editReading('${r.id}')" title="Editar">✏️</button>
-      ${r.estadoEfectivo!=='Pagado' ? `<button class="table-action-btn" onclick="setReadingEstado('${r.id}','Pagado')" title="Marcar pagado">✅</button>` : ''}
       <button class="table-action-btn danger" onclick="deleteReading('${r.id}')" title="Eliminar">🗑️</button>
     </td>
   </tr>`;
@@ -3715,9 +3732,8 @@ function renderFlujoCobro(){
             : `<button type="button" class="table-action-btn" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
           }
           <button type="button" class="table-action-btn" title="Editar mensaje" onclick="toggleWaEdit('flujo-pend-${idx}-wrap')">✏️</button>
-          <button type="button" class="table-action-btn" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '📤'}</button>
-          <button type="button" class="table-action-btn" title="Marcar como pagado" onclick="marcarComoPagadoDesdeFlujo('${item.contratoId}')">✅</button>
-          <span class="status-msg" style="margin:0;">Aviso de pago</span>
+          <button type="button" class="table-action-btn" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>
+          <span class="status-msg" style="margin:0;">Aviso de pago — el pago se marca por lectura en "Lecturas registradas" abajo</span>
         </div>
         <div id="flujo-pend-${idx}-wrap" style="display:none;margin-top:8px;">
           <textarea id="flujo-pend-${idx}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
@@ -3895,16 +3911,6 @@ async function toggleAvisoEnviado(contratoId, estabaEnviado){
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, avisoEnviado: nuevoEstado} : r);
   await saveKey('readings', readings);
   renderFlujoCobro();
-  pushToDriveIfConnected();
-}
-
-async function marcarComoPagadoDesdeFlujo(contratoId){
-  const todas = computeReadingsWithConsumption();
-  const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado').map(r=>r.id));
-  if(!idsDelContrato.size) return;
-  readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, estado:'Pagado'} : r);
-  await saveKey('readings', readings);
-  renderAll();
   pushToDriveIfConnected();
 }
 
