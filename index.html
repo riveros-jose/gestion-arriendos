@@ -3407,7 +3407,7 @@ function computeReadingsWithConsumption(){
 
   // Paso 2: a las lecturas de luz de San Diego 1708 se les resta lo que San Diego 1712
   // consumió (según su propio remarcador) durante el mismo periodo.
-  return brutas.map(r=>{
+  const resultado = brutas.map(r=>{
     let consumo = r.consumoBruto;
     let descuentoCompartido = 0;
     if(r.servicio==='Luz' && esPrincipal[r.contratoId] && consumo!==null){
@@ -3421,6 +3421,27 @@ function computeReadingsWithConsumption(){
     const monto = consumo===null ? 0 : consumo * Number(r.valorUnitario||0);
     return { ...r, consumo, monto, medidorCompartidoDescuento: descuentoCompartido, estadoEfectivo: estadoEfectivo(r) };
   });
+
+  // Paso 3: Agua de Sargento Aldea 1088 — ahí está el medidor real; San Diego 1704, 1708 y 1712
+  // solo tienen remarcador (comparten el mismo medidor real de Sargento Aldea). Como no siempre
+  // hay una lectura confiable de Sargento Aldea, su monto a pagar NO se calcula por consumo, sino
+  // como: (subtotal de la boleta del sector ese mes) − (lo que cobran los otros tres según sus
+  // propias lecturas). Si no hay boleta de ese mes, se deja el cálculo normal por consumo.
+  const AGUA_REMARCADORES_S1 = ['san diego 1704','san diego 1708','san diego 1712'];
+  resultado.forEach(r=>{
+    if(r.servicio!=='Agua' || !contractMatchesAddress(r.contratoId, 'sargento aldea 1088')) return;
+    const mes = (r.fechaLectura||'').slice(0,7);
+    if(!mes) return;
+    const boleta = sectorBoletas.find(b=> b.servicio==='Agua' && b.sector===1 && b.mes===mes);
+    if(!boleta || !(Number(boleta.total)>0)) return;
+    const montoOtros = resultado
+      .filter(x=> x.servicio==='Agua' && (x.fechaLectura||'').slice(0,7)===mes && AGUA_REMARCADORES_S1.some(dir=> contractMatchesAddress(x.contratoId, dir)))
+      .reduce((s,x)=> s + Number(x.monto||0), 0);
+    r.monto = Math.max(Math.round(Number(boleta.total) - montoOtros), 0);
+    r.montoPorBoletaSectorial = true;
+  });
+
+  return resultado;
 }
 
 // Íconos propios en SVG (no dependen de la fuente de emoji del sistema, que puede verse distinto
