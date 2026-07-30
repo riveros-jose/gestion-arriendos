@@ -2741,7 +2741,9 @@ async function submitContractUpdate(){
 const readingFields = ['contratoId','servicio','fechaLectura','lecturaActual','valorUnitario','estado','comentarios'];
 
 function renderReadingSelects(){
-  const activos = contracts.filter(isActiveContract);
+  // Solo tiene sentido registrar lecturas para arrendatarios que pertenecen a un sector (1 o 2)
+  // — las demás propiedades no participan del sistema de lecturas por sector.
+  const activos = contracts.filter(c=> isActiveContract(c) && (contratoSector(c.id)===1 || contratoSector(c.id)===2));
   const opts = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
   document.getElementById('r-contratoId').innerHTML = opts;
   document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
@@ -2778,25 +2780,21 @@ function prefillValorUnitario(){
   if(!contratoId || !servicio) return;
 
   let valor = null;
-  let origen = '';
   const sector = contratoSector(contratoId);
   if(sector===1 || sector===2){
     const boleta = getBoletaSectorVigente(servicio, sector);
     if(boleta && Number(boleta.total)>0 && Number(boleta.consumo)>0){
-      valor = Math.round((Number(boleta.total)/Number(boleta.consumo))*100)/100;
-      origen = 'boleta vigente del sector';
+      valor = Math.round(Number(boleta.total)/Number(boleta.consumo));
     }
   }
   if(valor===null){
     const previas = readings
       .filter(r=> r.contratoId===contratoId && r.servicio===servicio && Number(r.valorUnitario)>0)
       .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
-    if(previas.length){ valor = Number(previas[0].valorUnitario); origen = 'último valor cobrado a este arrendatario'; }
+    if(previas.length){ valor = Math.round(Number(previas[0].valorUnitario)); }
   }
   if(valor!==null){
     input.value = valor;
-    const unidad = servicio==='Luz' ? 'kWh' : 'm³';
-    if(hint) hint.textContent = `💲 ${money(valor)}/${unidad} — tomado de: ${origen} (solo referencial, no editable aquí).`;
   } else if(hint){
     // Sin boleta ni historial previo — no se puede autocompletar. Se habilita para no bloquear
     // el guardado (caso poco común: primera lectura de este servicio, sin boleta cargada aún).
@@ -3065,7 +3063,7 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   pushToDriveIfConnected();
 
   if(datos.total && datos.consumo){
-    const valorBoleta = Math.round((datos.total / datos.consumo) * 100) / 100;
+    const valorBoleta = Math.round(datos.total / datos.consumo);
     verificarDesajusteBoletaSector(servicio, sector, mes, valorBoleta);
   }
 });
@@ -3096,7 +3094,7 @@ function boletaUrlAplicadaA(r){
   if(sector!==1 && sector!==2) return null;
   const boleta = getBoletaSectorVigente(r.servicio, sector);
   if(!boleta || !(Number(boleta.total)>0) || !(Number(boleta.consumo)>0)) return null;
-  const valorBoleta = Math.round((Number(boleta.total)/Number(boleta.consumo))*100)/100;
+  const valorBoleta = Math.round(Number(boleta.total)/Number(boleta.consumo));
   // Tolerancia de $1 (no de centavos) para no perder la coincidencia por un redondeo menor.
   if(Math.abs(Number(r.valorUnitario||0) - valorBoleta) > 1) return null;
   return { url: boleta.boletaUrl, servicio: boleta.servicio, mes: boleta.mes };
