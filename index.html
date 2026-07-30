@@ -3615,13 +3615,16 @@ function enviarWhatsapp(telefono, textareaId){
 // se está estancando el proceso. Las acciones (enviar, marcar pagado, editar mensaje) se hacen
 // desde los paneles de detalle de abajo — esta vista es principalmente de estado.
 const ETAPAS_FLUJO = {
-  0: { label:'Sin recordatorio', clase:'' },
-  1: { label:'Esperando lectura', clase:'tag-pending' },
-  2: { label:'Falta enviar aviso', clase:'tag-debt' },
-  3: { label:'Esperando pago', clase:'tag-pending' },
-  4: { label:'Pagado', clase:'tag-ok' },
-  5: { label:'Acumulando (boleta sin lectura real este mes)', clase:'' },
+  0: { label:'Sin recordatorio', clase:'', icono:'⚪', color:'#4B5951' },
+  1: { label:'Esperando lectura', clase:'tag-pending', icono:'🟡', color:'#B98B2A' },
+  2: { label:'Falta enviar aviso', clase:'tag-debt', icono:'🔴', color:'#B4432E' },
+  3: { label:'Esperando pago', clase:'tag-pending', icono:'🟠', color:'#B98B2A' },
+  4: { label:'Pagado', clase:'tag-ok', icono:'🟢', color:'#2B6F5C' },
+  5: { label:'Acumulando (boleta sin lectura real este mes)', clase:'', icono:'⏳', color:'#4B5951' },
 };
+// Orden de exhibición del flujo: los pendientes de acción primero, "acumulando" antes que
+// "pagado" (sigue en curso, aunque no requiera acción todavía), y "pagado" al final.
+const ORDEN_ETAPAS_FLUJO = [0,1,2,3,5,4];
 function etapaFlujoServicio(c, servicio, mesKey, todasLecturas){
   const recordatorioEnviado = c.recordatorioLecturaMes === mesKey;
   const lectura = todasLecturas.find(r=> r.contratoId===c.id && r.servicio===servicio && (r.fechaLectura||'').slice(0,7)===mesKey);
@@ -3651,15 +3654,14 @@ function renderFlujoCobro(){
     if(contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.principal) || contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.remarcador)) servicios.push('Luz');
     const { nombreContacto } = waContactoDe(c.id);
     const detalle = servicios.map(s=> ({ servicio:s, ...etapaFlujoServicio(c, s, mesKey, todasLecturas) }));
-    // Para ordenar (más estancados primero): "acumulando" no cuenta como atraso, se trata como al día.
-    const peorEtapa = Math.min(...detalle.map(d=> d.etapa===5 ? 4 : d.etapa));
+    // Etapa que define en qué grupo cae la tarjeta: la más atrasada de sus servicios.
+    const grupoEtapa = Math.min(...detalle.map(d=> d.etapa));
     porSector[contratoSector(c.id)].push({
-      contratoId:c.id, nombreContacto, detalle, peorEtapa,
+      contratoId:c.id, nombreContacto, detalle, grupoEtapa,
       fotoItem: fotosPorContrato[c.id] || null,
       pendItem: pendPorContrato[c.id] || null
     });
   });
-  [1,2].forEach(s=> porSector[s].sort((a,b)=> a.peorEtapa - b.peorEtapa));
 
   const badgeServicio = d=>{
     const info = ETAPAS_FLUJO[d.etapa];
@@ -3667,16 +3669,27 @@ function renderFlujoCobro(){
   };
 
   let globalIdx = 0;
-  const filaContrato = item=>{
+  const filaContrato = (item, etapaGrupo)=>{
     const idx = globalIdx++;
+    const info = ETAPAS_FLUJO[etapaGrupo];
     const partes = [];
-    partes.push(`<div class="title">${esc(item.nombreContacto)}</div>`);
-    partes.push(`<div style="margin:4px 0;">${item.detalle.map(badgeServicio).join('')}</div>`);
+    // Etapa principal destacada, bien visible arriba de la tarjeta.
+    partes.push(`<div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;line-height:1;">${info.icono}</span>
+      <div>
+        <div class="title" style="margin:0;">${esc(item.nombreContacto)}</div>
+        <div style="font-size:12px;font-weight:700;color:${info.color};">${esc(info.label)}</div>
+      </div>
+    </div>`);
+    // Detalle por servicio (útil cuando tiene más de uno, o cuando difieren entre sí).
+    if(item.detalle.length>1 || item.detalle[0].etapa!==etapaGrupo){
+      partes.push(`<div style="margin:6px 0 0;">${item.detalle.map(badgeServicio).join('')}</div>`);
+    }
 
     // Recordatorio de fotos: solo aparece si aún no se marca enviado este mes.
     if(item.fotoItem){
       const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
-      partes.push(`<div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:4px;">
+      partes.push(`<div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
         ${sinTel
           ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto</span>`
           : `<button type="button" class="btn btn-secondary" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲 Enviar recordatorio de fotos</button>`
@@ -3707,23 +3720,32 @@ function renderFlujoCobro(){
       </div>`);
     }
 
-    const urgencyClass = item.pendItem ? (item.pendItem.enviado ? 'u3' : 'u2') : (item.fotoItem ? 'u2' : 'u3');
-    return `<div class="alert-card ${urgencyClass}" style="margin-bottom:8px;">${partes.join('')}</div>`;
+    return `<div class="alert-card" style="margin-bottom:8px;border-left-color:${info.color};background:${info.color}12;">${partes.join('')}</div>`;
   };
 
-  const seccion = (num, lista)=>{
+  // Dentro de cada sector, las tarjetas se agrupan por etapa (siguiendo el orden del flujo), y
+  // cada grupo de etapa trae su propio botón de "enviar a todos" cuando corresponde.
+  const grupoEtapaHtml = (num, etapa, lista)=>{
     if(!lista.length) return '';
-    const necesitanRecordatorio = lista.filter(i=>i.fotoItem);
-    const necesitanAviso = lista.filter(i=> i.pendItem && !i.pendItem.enviado);
-    const botonesGlobales = [];
-    if(necesitanRecordatorio.length) botonesGlobales.push(`<button type="button" class="btn btn-secondary" onclick="enviarTodosRecordatoriosFoto(${num})">📤 Enviar todos los recordatorios (${necesitanRecordatorio.length})</button>`);
-    if(necesitanAviso.length) botonesGlobales.push(`<button type="button" class="btn btn-secondary" onclick="enviarTodosPagosPendientes(${num})">📤 Enviar todos los avisos de pago (${necesitanAviso.length})</button>`);
-    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num}</div>
-      ${botonesGlobales.length ? `<div class="btn-row" style="margin-bottom:8px;flex-wrap:wrap;">${botonesGlobales.join('')}</div>` : ''}
-      ${lista.map(filaContrato).join('')}`;
+    const info = ETAPAS_FLUJO[etapa];
+    let boton = '';
+    if(etapa===0) boton = `<button type="button" class="btn btn-secondary" onclick="enviarTodosRecordatoriosFoto(${num})">📤 Enviar todos los recordatorios (${lista.length})</button>`;
+    if(etapa===2) boton = `<button type="button" class="btn btn-secondary" onclick="enviarTodosPagosPendientes(${num})">📤 Enviar todos los avisos de pago (${lista.length})</button>`;
+    return `<div style="margin:12px 0 8px;padding:6px 10px;border-radius:8px;background:${info.color}18;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span style="font-weight:700;color:${info.color};font-size:13px;">${info.icono} ${esc(info.label)} (${lista.length})</span>
+        ${boton}
+      </div>
+      ${lista.map(item=> filaContrato(item, etapa)).join('')}`;
   };
 
-  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2]);
+  const seccionSector = num=>{
+    const lista = porSector[num];
+    if(!lista.length) return '';
+    const grupos = ORDEN_ETAPAS_FLUJO.map(etapa=> grupoEtapaHtml(num, etapa, lista.filter(i=>i.grupoEtapa===etapa))).join('');
+    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'18px'};padding-top:0;border-top:none">🏘️ Sector ${num}</div>${grupos}`;
+  };
+
+  el.innerHTML = seccionSector(1) + seccionSector(2);
 }
 
 // ---- Recordatorio de envío de fotos de lectura, agrupado por sector ----
