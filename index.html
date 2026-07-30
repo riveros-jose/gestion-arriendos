@@ -3085,14 +3085,23 @@ function getBoletaSectorVigente(servicio, sector){
 // guardó con otro valor (uno anterior, o uno ingresado a mano), mostrar la boleta sería
 // engañoso, ya que no fue la base real de ese cálculo.
 function boletaUrlAplicadaA(r){
-  if(r.boletaUrl) return r.boletaUrl; // boleta propia de la lectura (si alguna vez se usó así)
+  if(r.boletaUrl) return { url: r.boletaUrl, servicio: r.servicio, mes: (r.fechaLectura||'').slice(0,7) };
   const sector = contratoSector(r.contratoId);
   if(sector!==1 && sector!==2) return null;
   const boleta = getBoletaSectorVigente(r.servicio, sector);
   if(!boleta || !(Number(boleta.total)>0) || !(Number(boleta.consumo)>0)) return null;
   const valorBoleta = Math.round((Number(boleta.total)/Number(boleta.consumo))*100)/100;
   if(Math.abs(Number(r.valorUnitario||0) - valorBoleta) > 0.01) return null;
-  return boleta.boletaUrl;
+  return { url: boleta.boletaUrl, servicio: boleta.servicio, mes: boleta.mes };
+}
+
+// Arma la etiqueta legible "Servicio_Mes_Año" (ej: "Agua_Julio_2026") a partir del servicio y
+// el mes (AAAA-MM) de la boleta.
+function etiquetaBoleta(servicio, mes){
+  if(!mes) return servicio || 'Boleta';
+  const [anio, m] = mes.split('-');
+  const nombreMes = MESES_ES[Number(m)-1] || m;
+  return `${servicio}_${nombreMes}_${anio}`;
 }
 
 let sectorBoletasVerTodas = false;
@@ -3686,8 +3695,8 @@ function renderWhatsappPendientesList(){
         linea = `${r.servicio} (${formatDate(r.fechaLectura)}): ${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) x ${money(r.valorUnitario)} = ${money(r.monto)}`;
       }
       // El link de la boleta solo se incluye si realmente se usó para calcular esta lectura.
-      const boletaUrl = boletaUrlAplicadaA(r);
-      if(boletaUrl) linea += `\nBoleta: ${boletaUrl}`;
+      const boleta = boletaUrlAplicadaA(r);
+      if(boleta) linea += `\nBoleta ${etiquetaBoleta(boleta.servicio, boleta.mes)}: ${boleta.url}`;
       return linea;
     };
     let detalle = list.map(lineaServicioTexto).join('\n\n');
@@ -3704,8 +3713,8 @@ function renderWhatsappPendientesList(){
       const calculoTxt = r.consumo===null
         ? 'primera lectura'
         : `${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) × ${money(r.valorUnitario)} = <strong>${money(r.monto)}</strong>`;
-      const boletaUrlVista = boletaUrlAplicadaA(r);
-      const boletaTag = boletaUrlVista ? ` · <a href="${esc(boletaUrlVista)}" target="_blank" rel="noopener">📄 boleta</a>` : '';
+      const boletaInfo = boletaUrlAplicadaA(r);
+      const boletaTag = boletaInfo ? ` · <a href="${esc(boletaInfo.url)}" target="_blank" rel="noopener">📄 ${esc(etiquetaBoleta(boletaInfo.servicio, boletaInfo.mes))}</a>` : '';
       return `<div class="cell-stacked-sub">${SERVICIO_SVG[r.servicio]||''} ${r.servicio} (${formatDate(r.fechaLectura)}): ${calculoTxt}${boletaTag}</div>`;
     }).join('');
 
