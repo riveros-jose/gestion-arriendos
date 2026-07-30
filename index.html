@@ -842,26 +842,8 @@
       </div>
       <div class="card">
         <h2>🔄 Flujo de cobro de servicios</h2>
-        <div class="subtitle" style="margin-bottom:14px">Recordatorio → Lectura → Aviso de pago → Pagado. Un vistazo de en qué etapa está cada arrendatario este mes, con la acción que corresponde hacer.</div>
+        <div class="subtitle" style="margin-bottom:14px">Recordatorio → Lectura → Aviso de pago → Pagado. Un vistazo de en qué etapa está cada arrendatario este mes, con la acción que corresponde en cada caso.</div>
         <div id="flujo-cobro-list"></div>
-      </div>
-      <div class="card">
-        <div class="toggle-form">
-          <h2>📸 Mensajes de recordatorio de fotos</h2>
-          <button type="button" class="btn btn-secondary" id="toggle-fotos-detalle-btn">Ver detalle</button>
-        </div>
-        <div id="whatsapp-fotos-panel" style="display:none;">
-          <div id="whatsapp-fotos-list"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="toggle-form">
-          <h2>💰 Mensajes de aviso de pago</h2>
-          <button type="button" class="btn btn-secondary" id="toggle-pendientes-detalle-btn">Ver detalle</button>
-        </div>
-        <div id="whatsapp-pendientes-panel" style="display:none;">
-          <div id="whatsapp-pendientes-list"></div>
-        </div>
       </div>
       <div class="card">
         <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
@@ -1792,8 +1774,6 @@ function renderAll(){
   renderReadings();
   renderSectorBoletasList();
   renderFlujoCobro();
-  renderWhatsappFotosList();
-  renderWhatsappPendientesList();
   renderHistorial();
   renderHistoricos();
   refreshDateHints();
@@ -2938,21 +2918,6 @@ document.getElementById('toggle-boleta-btn').addEventListener('click', ()=>{
   panel.style.display = panel.style.display==='none' ? 'block' : 'none';
 });
 
-document.getElementById('toggle-fotos-detalle-btn').addEventListener('click', ()=>{
-  const panel = document.getElementById('whatsapp-fotos-panel');
-  const btn = document.getElementById('toggle-fotos-detalle-btn');
-  const abierto = panel.style.display!=='none';
-  panel.style.display = abierto ? 'none' : 'block';
-  btn.textContent = abierto ? 'Ver detalle' : 'Ocultar detalle';
-});
-document.getElementById('toggle-pendientes-detalle-btn').addEventListener('click', ()=>{
-  const panel = document.getElementById('whatsapp-pendientes-panel');
-  const btn = document.getElementById('toggle-pendientes-detalle-btn');
-  const abierto = panel.style.display!=='none';
-  panel.style.display = abierto ? 'none' : 'block';
-  btn.textContent = abierto ? 'Ver detalle' : 'Ocultar detalle';
-});
-
 // La Luz siempre corresponde al Sector 1, sin importar la dirección — se fija y se bloquea el
 // combobox de sector para que no se pueda elegir otro por error.
 document.getElementById('bs-servicio').addEventListener('change', ()=>{
@@ -3091,7 +3056,6 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   document.getElementById('bs-sector').disabled = false;
   renderSectorBoletasList();
   renderFlujoCobro();
-  renderWhatsappPendientesList();
   pushToDriveIfConnected();
 
   if(datos.total && datos.consumo){
@@ -3106,7 +3070,6 @@ async function deleteSectorBoleta(id){
   await saveKey('sectorBoletas', sectorBoletas);
   renderSectorBoletasList();
   renderFlujoCobro();
-  renderWhatsappPendientesList();
   pushToDriveIfConnected();
 }
 
@@ -3677,6 +3640,11 @@ function renderFlujoCobro(){
   const activos = contracts.filter(c=> isActiveContract(c) && (contratoSector(c.id)===1 || contratoSector(c.id)===2));
   if(!activos.length){ el.innerHTML = '<div class="empty">No hay arrendatarios en Sector 1 o 2.</div>'; return; }
 
+  computeFotosItemsPorSector(); // llena waFotosItems
+  const pendItems = computePendientesItems(); // llena waPendItems
+  const fotosPorContrato = {}; waFotosItems.forEach(m=> fotosPorContrato[m.contratoId]=m);
+  const pendPorContrato = {}; pendItems.forEach(m=> pendPorContrato[m.contratoId]=m);
+
   const porSector = { 1:[], 2:[] };
   activos.forEach(c=>{
     const servicios = ['Agua'];
@@ -3685,7 +3653,11 @@ function renderFlujoCobro(){
     const detalle = servicios.map(s=> ({ servicio:s, ...etapaFlujoServicio(c, s, mesKey, todasLecturas) }));
     // Para ordenar (más estancados primero): "acumulando" no cuenta como atraso, se trata como al día.
     const peorEtapa = Math.min(...detalle.map(d=> d.etapa===5 ? 4 : d.etapa));
-    porSector[contratoSector(c.id)].push({ nombreContacto, detalle, peorEtapa });
+    porSector[contratoSector(c.id)].push({
+      contratoId:c.id, nombreContacto, detalle, peorEtapa,
+      fotoItem: fotosPorContrato[c.id] || null,
+      pendItem: pendPorContrato[c.id] || null
+    });
   });
   [1,2].forEach(s=> porSector[s].sort((a,b)=> a.peorEtapa - b.peorEtapa));
 
@@ -3693,37 +3665,76 @@ function renderFlujoCobro(){
     const info = ETAPAS_FLUJO[d.etapa];
     return `<span class="tag ${info.clase}" style="margin:2px 4px 2px 0;white-space:nowrap;">${SERVICIO_SVG[d.servicio]||''}${d.servicio}: ${esc(info.label)}</span>`;
   };
-  const seccion = (num, lista)=>{
-    if(!lista.length) return '';
-    const filas = lista.map(item=> `<div class="wa-compact-row" style="align-items:flex-start;padding:8px 10px;flex-wrap:wrap;">
-      <span class="wa-compact-name" style="flex:1 1 140px;">${esc(item.nombreContacto)}</span>
-      <span style="flex:2 1 260px;">${item.detalle.map(badgeServicio).join('')}</span>
-    </div>`).join('');
-    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num}</div>
-      <div class="wa-compact-list">${filas}</div>`;
+
+  let globalIdx = 0;
+  const filaContrato = item=>{
+    const idx = globalIdx++;
+    const partes = [];
+    partes.push(`<div class="title">${esc(item.nombreContacto)}</div>`);
+    partes.push(`<div style="margin:4px 0;">${item.detalle.map(badgeServicio).join('')}</div>`);
+
+    // Recordatorio de fotos: solo aparece si aún no se marca enviado este mes.
+    if(item.fotoItem){
+      const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
+      partes.push(`<div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:4px;">
+        ${sinTel
+          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto</span>`
+          : `<button type="button" class="btn btn-secondary" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲 Enviar recordatorio de fotos</button>`
+        }
+        <button type="button" class="btn btn-secondary" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅ Marcar recordatorio enviado</button>
+      </div>`);
+    }
+
+    // Aviso de pago: aparece cuando hay una lectura ya lista con monto pendiente de cobrar.
+    if(item.pendItem){
+      const m = item.pendItem;
+      const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
+      const estadoTag = m.enviado ? ' <span class="tag tag-ok">Aviso enviado</span>' : ' <span class="tag tag-debt">Falta enviar aviso</span>';
+      partes.push(`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+        <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}${estadoTag}</div>
+        <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:6px;">
+          ${sinTel
+            ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto</span>`
+            : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲 Enviar aviso de pago</button>`
+          }
+          <button type="button" class="btn btn-secondary" onclick="toggleWaEdit('flujo-pend-${idx}-wrap')">✏️ Editar</button>
+          <button type="button" class="btn btn-secondary" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️ Marcar como pendiente' : '✅ Marcar aviso enviado'}</button>
+          <button type="button" class="btn btn-secondary" onclick="marcarComoPagadoDesdeFlujo('${item.contratoId}')">✅ Marcar pagado</button>
+        </div>
+        <div id="flujo-pend-${idx}-wrap" style="display:none;margin-top:8px;">
+          <textarea id="flujo-pend-${idx}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
+        </div>
+      </div>`);
+    }
+
+    const urgencyClass = item.pendItem ? (item.pendItem.enviado ? 'u3' : 'u2') : (item.fotoItem ? 'u2' : 'u3');
+    return `<div class="alert-card ${urgencyClass}" style="margin-bottom:8px;">${partes.join('')}</div>`;
   };
 
-  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2])
-    + `<div class="status-msg" style="margin-top:10px;">Para enviar mensajes o marcar como pagado, usa "Ver detalle" en las tarjetas de abajo.</div>`;
+  const seccion = (num, lista)=>{
+    if(!lista.length) return '';
+    const necesitanRecordatorio = lista.filter(i=>i.fotoItem);
+    const necesitanAviso = lista.filter(i=> i.pendItem && !i.pendItem.enviado);
+    const botonesGlobales = [];
+    if(necesitanRecordatorio.length) botonesGlobales.push(`<button type="button" class="btn btn-secondary" onclick="enviarTodosRecordatoriosFoto(${num})">📤 Enviar todos los recordatorios (${necesitanRecordatorio.length})</button>`);
+    if(necesitanAviso.length) botonesGlobales.push(`<button type="button" class="btn btn-secondary" onclick="enviarTodosPagosPendientes(${num})">📤 Enviar todos los avisos de pago (${necesitanAviso.length})</button>`);
+    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num}</div>
+      ${botonesGlobales.length ? `<div class="btn-row" style="margin-bottom:8px;flex-wrap:wrap;">${botonesGlobales.join('')}</div>` : ''}
+      ${lista.map(filaContrato).join('')}`;
+  };
+
+  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2]);
 }
 
-// ---- 1) Recordatorio de envío de fotos de lectura, agrupado por sector ----
+// ---- Recordatorio de envío de fotos de lectura, agrupado por sector ----
 // Agua se pide en ambos sectores. Luz además se pide a San Diego 1708 y San Diego 1712.
 // Se envía una vez al mes: apenas se marca enviado (o se usa "Enviar todos"), ese arrendatario
-// deja de aparecer en la lista hasta el mes siguiente.
+// deja de aparecer hasta el mes siguiente.
 let waFotosItems = [];
-function renderWhatsappFotosList(){
-  const el = document.getElementById('whatsapp-fotos-list');
-  if(!el) return;
+function computeFotosItemsPorSector(){
   const mesKey = mesActualKey();
-  const pendientesEsteMes = contracts.filter(c=> isActiveContract(c) && c.recordatorioLecturaMes !== mesKey);
-  if(!pendientesEsteMes.length){
-    waFotosItems = [];
-    el.innerHTML = '<div class="empty">Ya se envió el recordatorio de este mes a todos los arrendatarios. 🎉</div>';
-    return;
-  }
-
   const mesActual = MESES_ES[new Date().getMonth()];
+  const pendientesEsteMes = contracts.filter(c=> isActiveContract(c) && c.recordatorioLecturaMes !== mesKey);
   const porSector = { 1: [], 2: [] };
   pendientesEsteMes.forEach(c=>{
     const sector = contratoSector(c.id);
@@ -3737,29 +3748,7 @@ function renderWhatsappFotosList(){
     porSector[sector].push({ contratoId:c.id, nombreContacto, telefono, servicios, mensaje });
   });
   waFotosItems = [...porSector[1], ...porSector[2]];
-
-  const filaCompacta = m=>{
-    const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
-    return `<div class="wa-compact-row">
-      <span class="wa-compact-name" title="${esc(m.nombreContacto)}">${esc(m.nombreContacto)}</span>
-      <span class="wa-compact-services">${m.servicios.map(s=>SERVICIO_SVG[s]||'').join('')}</span>
-      ${sinTelefono
-        ? `<span title="Sin WhatsApp de contacto">⚠️</span>`
-        : `<button type="button" class="table-action-btn" title="Enviar por WhatsApp" onclick="enviarRecordatorioFoto('${m.contratoId}')">📲</button>`
-      }
-      <button type="button" class="table-action-btn" title="Marcar como enviado" onclick="marcarRecordatorioFotoManual('${m.contratoId}')">✅</button>
-    </div>`;
-  };
-  const seccion = (num, lista)=>{
-    if(!lista.length) return '';
-    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num} (${lista.length})</div>
-      <div class="btn-row" style="margin-bottom:8px;">
-        <button type="button" class="btn btn-secondary" onclick="enviarTodosRecordatoriosFoto(${num})">📤 Enviar todos — Sector ${num}</button>
-      </div>
-      <div class="wa-compact-list">${lista.map(filaCompacta).join('')}</div>`;
-  };
-
-  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2]);
+  return porSector;
 }
 
 async function marcarRecordatorioLecturaEnviado(contratoIds){
@@ -3779,7 +3768,6 @@ function enviarRecordatorioFoto(contratoId){
 
 async function marcarRecordatorioFotoManual(contratoId){
   await marcarRecordatorioLecturaEnviado([contratoId]);
-  renderWhatsappFotosList();
   renderFlujoCobro();
   pushToDriveIfConnected();
 }
@@ -3794,13 +3782,11 @@ function enviarTodosRecordatoriosFoto(sector){
   });
 }
 
-// ---- 2) Aviso de pago pendiente: primero el total, luego el desglose ----
-function renderWhatsappPendientesList(){
-  const el = document.getElementById('whatsapp-pendientes-list');
-  if(!el) return;
+// ---- Aviso de pago pendiente: primero el total, luego el desglose ----
+let waPendItems = [];
+function computePendientesItems(){
   const todas = computeReadingsWithConsumption();
   const pendientes = todas.filter(r=> r.estadoEfectivo !== 'Pagado' && !r.montoAcumuladoPendiente);
-  if(!pendientes.length){ el.innerHTML = '<div class="empty">No hay lecturas con pago pendiente en este momento. 🎉</div>'; return; }
 
   const porContrato = {};
   pendientes.forEach(r=>{
@@ -3861,53 +3847,10 @@ function renderWhatsappPendientesList(){
     return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado };
   }).filter(Boolean);
 
-  // Se agrupan por sector (igual que el recordatorio de fotos); lo que no tenga sector
-  // asignado queda en un grupo aparte, para no perderlo de vista.
-  const porSectorPend = { 1:[], 2:[], 0:[] };
-  items.forEach(m=>{
-    const sector = contratoSector(m.contratoId);
-    porSectorPend[sector===1?1:(sector===2?2:0)].push(m);
-  });
-  Object.values(porSectorPend).forEach(lista=> lista.sort((a,b)=> Number(a.enviado)-Number(b.enviado)));
   waPendItems = items;
-
-  const filaPago = (m,i)=>{
-    const sinTelefono = !m.telefono || !m.telefono.replace(/\D/g,'');
-    const urgencyClass = m.enviado ? 'u3' : 'u2';
-    const estadoTag = m.enviado ? ' <span class="tag tag-ok">Enviado</span>' : ' <span class="tag tag-pending">Pendiente</span>';
-    return `<div class="alert-card ${urgencyClass}" style="margin-bottom:8px;">
-      <div class="title">${esc(m.nombreContacto)}${estadoTag}</div>
-      <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}</div>
-      <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
-        ${sinTelefono
-          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto — agrégalo en la ficha del arrendatario.</span>`
-          : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(m.telefono)}','pend-${i}')">📲 Enviar por WhatsApp</button>`
-        }
-        <button type="button" class="btn btn-secondary" onclick="toggleWaEdit('pend-${i}-wrap')">✏️ Editar</button>
-        <button type="button" class="btn btn-secondary" onclick="toggleAvisoEnviado('${m.contratoId}', ${m.enviado})">${m.enviado ? '↩️ Marcar como pendiente' : '✅ Marcar como enviado'}</button>
-      </div>
-      <div id="pend-${i}-wrap" style="display:none;margin-top:8px;">
-        <textarea id="pend-${i}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
-      </div>
-    </div>`;
-  };
-
-  const indiceGlobal = m => items.indexOf(m);
-  const seccionPend = (titulo, lista, sectorKey, esPrimera)=>{
-    if(!lista.length) return '';
-    return `<div class="prop-card-section" style="margin-top:${esPrimera?'0':'14px'};padding-top:0;border-top:none">${titulo} (${lista.length})</div>
-      <div class="btn-row" style="margin-bottom:8px;">
-        <button type="button" class="btn btn-secondary" onclick="enviarTodosPagosPendientes(${sectorKey})">📤 Enviar todos — ${titulo}</button>
-      </div>
-      ${lista.map(m=> filaPago(m, indiceGlobal(m))).join('')}`;
-  };
-
-  el.innerHTML = seccionPend('🏘️ Sector 1', porSectorPend[1], 1, true)
-    + seccionPend('🏘️ Sector 2', porSectorPend[2], 2, !porSectorPend[1].length)
-    + seccionPend('📍 Sin sector asignado', porSectorPend[0], 0, !porSectorPend[1].length && !porSectorPend[2].length);
+  return items;
 }
 
-let waPendItems = [];
 function enviarTodosPagosPendientes(sectorKey){
   const items = waPendItems.filter(m=>{
     const sector = contratoSector(m.contratoId);
@@ -3924,8 +3867,17 @@ async function toggleAvisoEnviado(contratoId, estabaEnviado){
   const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado').map(r=>r.id));
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, avisoEnviado: nuevoEstado} : r);
   await saveKey('readings', readings);
-  renderWhatsappPendientesList();
   renderFlujoCobro();
+  pushToDriveIfConnected();
+}
+
+async function marcarComoPagadoDesdeFlujo(contratoId){
+  const todas = computeReadingsWithConsumption();
+  const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado').map(r=>r.id));
+  if(!idsDelContrato.size) return;
+  readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, estado:'Pagado'} : r);
+  await saveKey('readings', readings);
+  renderAll();
   pushToDriveIfConnected();
 }
 
