@@ -72,7 +72,7 @@
   /* Al crear una lectura, el valor $/unidad es solo referencial: se ve como texto, no como un
      campo editable. Al editar una lectura existente se le quita "readonly" y vuelve a verse
      como un input normal. */
-  #r-valorUnitario[readonly]{border:none;background:transparent;padding:4px 0;font-weight:700;color:var(--teal-dark);font-size:15px;}
+  #r-valorUnitario[readonly]{border:none;background:transparent;padding:2px 0;font-weight:400;color:var(--ink-soft);font-size:12px;}
   #r-valorUnitario[readonly]::-webkit-outer-spin-button,#r-valorUnitario[readonly]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   #r-valorUnitario[readonly]{-moz-appearance:textfield;}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal);}
@@ -841,12 +841,27 @@
         </div>
       </div>
       <div class="card">
-        <h2>📸 Recordatorio de envío de fotos de lectura</h2>
-        <div id="whatsapp-fotos-list"></div>
+        <h2>🔄 Flujo de cobro de servicios</h2>
+        <div class="subtitle" style="margin-bottom:14px">Recordatorio → Lectura → Aviso de pago → Pagado. Un vistazo de en qué etapa está cada arrendatario este mes, con la acción que corresponde hacer.</div>
+        <div id="flujo-cobro-list"></div>
       </div>
       <div class="card">
-        <h2>💰 Avisos de pago pendiente por WhatsApp</h2>
-        <div id="whatsapp-pendientes-list"></div>
+        <div class="toggle-form">
+          <h2>📸 Mensajes de recordatorio de fotos</h2>
+          <button type="button" class="btn btn-secondary" id="toggle-fotos-detalle-btn">Ver detalle</button>
+        </div>
+        <div id="whatsapp-fotos-panel" style="display:none;">
+          <div id="whatsapp-fotos-list"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="toggle-form">
+          <h2>💰 Mensajes de aviso de pago</h2>
+          <button type="button" class="btn btn-secondary" id="toggle-pendientes-detalle-btn">Ver detalle</button>
+        </div>
+        <div id="whatsapp-pendientes-panel" style="display:none;">
+          <div id="whatsapp-pendientes-list"></div>
+        </div>
       </div>
       <div class="card">
         <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
@@ -1371,11 +1386,11 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsRead, 'Servicios');
 
   const boletaRows = sectorBoletas.length ? sectorBoletas.map(b=>({
-    id: b.id, servicio: b.servicio||'Agua', sector: b.sector, mes: b.mes, total: b.total||'', consumo: b.consumo||'', boletaUrl: b.boletaUrl||''
+    id: b.id, servicio: b.servicio||'Agua', sector: b.sector, mes: b.mes, total: b.total||'', consumo: b.consumo||'', lecturaActual: b.lecturaActual||'', boletaUrl: b.boletaUrl||''
   })) : [{}];
   const wsBol = XLSX.utils.json_to_sheet(boletaRows);
-  applyColumnFormats(wsBol, ['id','servicio','sector','mes','total','consumo','boletaUrl']);
-  styleWorksheet(wsBol, [10,10,8,10,12,10,32]);
+  applyColumnFormats(wsBol, ['id','servicio','sector','mes','total','consumo','lecturaActual','boletaUrl']);
+  styleWorksheet(wsBol, [10,10,8,10,12,10,12,32]);
   XLSX.utils.book_append_sheet(wb, wsBol, 'BoletasSector');
 
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
@@ -1452,7 +1467,7 @@ function loadFromWorkbook(arrayBuffer){
     boletaUrl: r.boletaUrl || ''
   }));
   sectorBoletas = rawBoletas.map(b=>({
-    id:b.id, servicio:b.servicio||'Agua', sector:Number(b.sector)||1, mes:b.mes||'', total:b.total||'', consumo:b.consumo||'', boletaUrl:b.boletaUrl||''
+    id:b.id, servicio:b.servicio||'Agua', sector:Number(b.sector)||1, mes:b.mes||'', total:b.total||'', consumo:b.consumo||'', lecturaActual:b.lecturaActual||'', boletaUrl:b.boletaUrl||''
   }));
 }
 
@@ -1776,6 +1791,7 @@ function renderAll(){
   renderReadingSelects();
   renderReadings();
   renderSectorBoletasList();
+  renderFlujoCobro();
   renderWhatsappFotosList();
   renderWhatsappPendientesList();
   renderHistorial();
@@ -2922,6 +2938,21 @@ document.getElementById('toggle-boleta-btn').addEventListener('click', ()=>{
   panel.style.display = panel.style.display==='none' ? 'block' : 'none';
 });
 
+document.getElementById('toggle-fotos-detalle-btn').addEventListener('click', ()=>{
+  const panel = document.getElementById('whatsapp-fotos-panel');
+  const btn = document.getElementById('toggle-fotos-detalle-btn');
+  const abierto = panel.style.display!=='none';
+  panel.style.display = abierto ? 'none' : 'block';
+  btn.textContent = abierto ? 'Ver detalle' : 'Ocultar detalle';
+});
+document.getElementById('toggle-pendientes-detalle-btn').addEventListener('click', ()=>{
+  const panel = document.getElementById('whatsapp-pendientes-panel');
+  const btn = document.getElementById('toggle-pendientes-detalle-btn');
+  const abierto = panel.style.display!=='none';
+  panel.style.display = abierto ? 'none' : 'block';
+  btn.textContent = abierto ? 'Ver detalle' : 'Ocultar detalle';
+});
+
 // La Luz siempre corresponde al Sector 1, sin importar la dirección — se fija y se bloquea el
 // combobox de sector para que no se pueda elegir otro por error.
 document.getElementById('bs-servicio').addEventListener('change', ()=>{
@@ -3052,13 +3083,14 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   }
 
   const existente = sectorBoletas.find(b=> b.servicio===servicio && b.sector===sector && b.mes===mes);
-  const obj = { id: existente ? existente.id : uid(), servicio, sector, mes, total: datos.total||'', consumo: datos.consumo||'', boletaUrl };
+  const obj = { id: existente ? existente.id : uid(), servicio, sector, mes, total: datos.total||'', consumo: datos.consumo||'', lecturaActual: (datos.lecturaActual!==null && datos.lecturaActual!==undefined) ? datos.lecturaActual : '', boletaUrl };
   sectorBoletas = existente ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
   statusEl.innerHTML = `<span style="color:var(--teal-dark)">✓ Boleta de ${servicio} guardada — Sector ${sector}${datos.sector?' (detectado automáticamente)':' (elegido manualmente, no se detectó en la boleta)'}, mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.</span>`;
   document.getElementById('form-boleta-sector').reset();
   document.getElementById('bs-sector').disabled = false;
   renderSectorBoletasList();
+  renderFlujoCobro();
   renderWhatsappPendientesList();
   pushToDriveIfConnected();
 
@@ -3073,6 +3105,7 @@ async function deleteSectorBoleta(id){
   sectorBoletas = sectorBoletas.filter(b=>b.id!==id);
   await saveKey('sectorBoletas', sectorBoletas);
   renderSectorBoletasList();
+  renderFlujoCobro();
   renderWhatsappPendientesList();
   pushToDriveIfConnected();
 }
@@ -3426,19 +3459,39 @@ function computeReadingsWithConsumption(){
   // solo tienen remarcador (comparten el mismo medidor real de Sargento Aldea). Como no siempre
   // hay una lectura confiable de Sargento Aldea, su monto a pagar NO se calcula por consumo, sino
   // como: (subtotal de la boleta del sector ese mes) − (lo que cobran los otros tres según sus
-  // propias lecturas). Si no hay boleta de ese mes, se deja el cálculo normal por consumo.
+  // propias lecturas). Si la boleta de un mes viene SIN lectura real (estimada por la sanitaria),
+  // ese mes no se cobra — el monto queda pendiente y se acumula hasta el próximo mes en que la
+  // boleta sí traiga una lectura real, momento en el que se cobra todo junto. Si no hay boleta
+  // de ese mes, se deja el cálculo normal por consumo.
   const AGUA_REMARCADORES_S1 = ['san diego 1704','san diego 1708','san diego 1712'];
-  resultado.forEach(r=>{
-    if(r.servicio!=='Agua' || !contractMatchesAddress(r.contratoId, 'sargento aldea 1088')) return;
+  const lecturasSargentoAldeaAgua = resultado
+    .filter(r=> r.servicio==='Agua' && contractMatchesAddress(r.contratoId, 'sargento aldea 1088'))
+    .sort((a,b)=> (a.fechaLectura||'').localeCompare(b.fechaLectura||''));
+
+  let saldoAcumuladoSA = 0;
+  lecturasSargentoAldeaAgua.forEach(r=>{
     const mes = (r.fechaLectura||'').slice(0,7);
     if(!mes) return;
     const boleta = sectorBoletas.find(b=> b.servicio==='Agua' && b.sector===1 && b.mes===mes);
-    if(!boleta || !(Number(boleta.total)>0)) return;
+    if(!boleta || !(Number(boleta.total)>0)) return; // sin boleta de ese mes: se deja el cálculo normal
+
     const montoOtros = resultado
       .filter(x=> x.servicio==='Agua' && (x.fechaLectura||'').slice(0,7)===mes && AGUA_REMARCADORES_S1.some(dir=> contractMatchesAddress(x.contratoId, dir)))
       .reduce((s,x)=> s + Number(x.monto||0), 0);
-    r.monto = Math.max(Math.round(Number(boleta.total) - montoOtros), 0);
-    r.montoPorBoletaSectorial = true;
+    const montoMes = Math.max(Math.round(Number(boleta.total) - montoOtros), 0);
+
+    const boletaConLectura = boleta.lecturaActual!==null && boleta.lecturaActual!==undefined && boleta.lecturaActual!=='';
+    if(!boletaConLectura){
+      // Boleta estimada (sin lectura real ese mes): no se cobra todavía, se acumula.
+      saldoAcumuladoSA += montoMes;
+      r.monto = 0;
+      r.montoAcumuladoPendiente = true;
+    } else {
+      // Boleta con lectura real: se cobra este mes más todo lo acumulado de meses anteriores.
+      r.monto = montoMes + saldoAcumuladoSA;
+      saldoAcumuladoSA = 0;
+      r.montoPorBoletaSectorial = true;
+    }
   });
 
   return resultado;
@@ -3508,7 +3561,7 @@ function buildReadingsTableHtml(list){
     <td class="cell-tap-full" title="${esc(contratoFull)}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${esc(contratoFull)}</span></td>
     <td>${servicioIcono(r.servicio)}</td>
     <td class="mono cell-stacked">
-      <div>${money(r.monto)}</div>
+      <div>${money(r.monto)}${r.montoAcumuladoPendiente ? ` <span class="tag tag-pending" title="La boleta de este mes no trae lectura real (viene estimada) — este monto no se cobra todavía, se acumula hasta el próximo mes con boleta con lectura real.">⏳ acumulando</span>` : ''}${r.montoPorBoletaSectorial ? ` <span class="tag tag-ok" title="Calculado por diferencia contra la boleta del sector (incluye lo acumulado de meses anteriores sin lectura real, si corresponde).">📄 según boleta</span>` : ''}</div>
       <div class="cell-stacked-sub">$${formatNumber(r.valorUnitario)} c/u</div>
     </td>
     <td>
@@ -3594,6 +3647,66 @@ function enviarWhatsapp(telefono, textareaId){
   window.open(waLink(telefono, texto), '_blank');
 }
 
+// ---- Flujo de cobro unificado: Recordatorio → Lectura → Aviso de pago → Pagado ----
+// Da visibilidad de en qué etapa está cada arrendatario este mes, para detectar rápido dónde
+// se está estancando el proceso. Las acciones (enviar, marcar pagado, editar mensaje) se hacen
+// desde los paneles de detalle de abajo — esta vista es principalmente de estado.
+const ETAPAS_FLUJO = {
+  0: { label:'Sin recordatorio', clase:'' },
+  1: { label:'Esperando lectura', clase:'tag-pending' },
+  2: { label:'Falta enviar aviso', clase:'tag-debt' },
+  3: { label:'Esperando pago', clase:'tag-pending' },
+  4: { label:'Pagado', clase:'tag-ok' },
+  5: { label:'Acumulando (boleta sin lectura real este mes)', clase:'' },
+};
+function etapaFlujoServicio(c, servicio, mesKey, todasLecturas){
+  const recordatorioEnviado = c.recordatorioLecturaMes === mesKey;
+  const lectura = todasLecturas.find(r=> r.contratoId===c.id && r.servicio===servicio && (r.fechaLectura||'').slice(0,7)===mesKey);
+  if(!lectura) return { etapa: recordatorioEnviado?1:0, lectura:null };
+  if(lectura.montoAcumuladoPendiente) return { etapa:5, lectura };
+  if(lectura.estadoEfectivo==='Pagado') return { etapa:4, lectura };
+  if(lectura.avisoEnviado) return { etapa:3, lectura };
+  return { etapa:2, lectura };
+}
+
+function renderFlujoCobro(){
+  const el = document.getElementById('flujo-cobro-list');
+  if(!el) return;
+  const mesKey = mesActualKey();
+  const todasLecturas = computeReadingsWithConsumption();
+  const activos = contracts.filter(c=> isActiveContract(c) && (contratoSector(c.id)===1 || contratoSector(c.id)===2));
+  if(!activos.length){ el.innerHTML = '<div class="empty">No hay arrendatarios en Sector 1 o 2.</div>'; return; }
+
+  const porSector = { 1:[], 2:[] };
+  activos.forEach(c=>{
+    const servicios = ['Agua'];
+    if(contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.principal) || contractMatchesAddress(c.id, MEDIDOR_COMPARTIDO_LUZ.remarcador)) servicios.push('Luz');
+    const { nombreContacto } = waContactoDe(c.id);
+    const detalle = servicios.map(s=> ({ servicio:s, ...etapaFlujoServicio(c, s, mesKey, todasLecturas) }));
+    // Para ordenar (más estancados primero): "acumulando" no cuenta como atraso, se trata como al día.
+    const peorEtapa = Math.min(...detalle.map(d=> d.etapa===5 ? 4 : d.etapa));
+    porSector[contratoSector(c.id)].push({ nombreContacto, detalle, peorEtapa });
+  });
+  [1,2].forEach(s=> porSector[s].sort((a,b)=> a.peorEtapa - b.peorEtapa));
+
+  const badgeServicio = d=>{
+    const info = ETAPAS_FLUJO[d.etapa];
+    return `<span class="tag ${info.clase}" style="margin:2px 4px 2px 0;white-space:nowrap;">${SERVICIO_SVG[d.servicio]||''}${d.servicio}: ${esc(info.label)}</span>`;
+  };
+  const seccion = (num, lista)=>{
+    if(!lista.length) return '';
+    const filas = lista.map(item=> `<div class="wa-compact-row" style="align-items:flex-start;padding:8px 10px;flex-wrap:wrap;">
+      <span class="wa-compact-name" style="flex:1 1 140px;">${esc(item.nombreContacto)}</span>
+      <span style="flex:2 1 260px;">${item.detalle.map(badgeServicio).join('')}</span>
+    </div>`).join('');
+    return `<div class="prop-card-section" style="margin-top:${num===1?'0':'14px'};padding-top:0;border-top:none">🏘️ Sector ${num}</div>
+      <div class="wa-compact-list">${filas}</div>`;
+  };
+
+  el.innerHTML = seccion(1, porSector[1]) + seccion(2, porSector[2])
+    + `<div class="status-msg" style="margin-top:10px;">Para enviar mensajes o marcar como pagado, usa "Ver detalle" en las tarjetas de abajo.</div>`;
+}
+
 // ---- 1) Recordatorio de envío de fotos de lectura, agrupado por sector ----
 // Agua se pide en ambos sectores. Luz además se pide a San Diego 1708 y San Diego 1712.
 // Se envía una vez al mes: apenas se marca enviado (o se usa "Enviar todos"), ese arrendatario
@@ -3667,6 +3780,7 @@ function enviarRecordatorioFoto(contratoId){
 async function marcarRecordatorioFotoManual(contratoId){
   await marcarRecordatorioLecturaEnviado([contratoId]);
   renderWhatsappFotosList();
+  renderFlujoCobro();
   pushToDriveIfConnected();
 }
 
@@ -3685,7 +3799,7 @@ function renderWhatsappPendientesList(){
   const el = document.getElementById('whatsapp-pendientes-list');
   if(!el) return;
   const todas = computeReadingsWithConsumption();
-  const pendientes = todas.filter(r=> r.estadoEfectivo !== 'Pagado');
+  const pendientes = todas.filter(r=> r.estadoEfectivo !== 'Pagado' && !r.montoAcumuladoPendiente);
   if(!pendientes.length){ el.innerHTML = '<div class="empty">No hay lecturas con pago pendiente en este momento. 🎉</div>'; return; }
 
   const porContrato = {};
@@ -3811,6 +3925,7 @@ async function toggleAvisoEnviado(contratoId, estabaEnviado){
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, avisoEnviado: nuevoEstado} : r);
   await saveKey('readings', readings);
   renderWhatsappPendientesList();
+  renderFlujoCobro();
   pushToDriveIfConnected();
 }
 
