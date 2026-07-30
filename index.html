@@ -69,6 +69,12 @@
   #rep-rows + button{width:100%;justify-content:center;display:flex;}
   label{font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;}
   input,select,textarea{font-family:'Inter',sans-serif;font-size:14px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:#fdfdfc;color:var(--ink);}
+  /* Al crear una lectura, el valor $/unidad es solo referencial: se ve como texto, no como un
+     campo editable. Al editar una lectura existente se le quita "readonly" y vuelve a verse
+     como un input normal. */
+  #r-valorUnitario[readonly]{border:none;background:transparent;padding:4px 0;font-weight:700;color:var(--teal-dark);font-size:15px;}
+  #r-valorUnitario[readonly]::-webkit-outer-spin-button,#r-valorUnitario[readonly]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  #r-valorUnitario[readonly]{-moz-appearance:textfield;}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal);}
   textarea{resize:vertical;min-height:60px;}
   .btn{font-family:'Inter',sans-serif;font-weight:600;font-size:13px;padding:10px 18px;border-radius:6px;border:none;cursor:pointer;transition:opacity .15s;}
@@ -3091,7 +3097,8 @@ function boletaUrlAplicadaA(r){
   const boleta = getBoletaSectorVigente(r.servicio, sector);
   if(!boleta || !(Number(boleta.total)>0) || !(Number(boleta.consumo)>0)) return null;
   const valorBoleta = Math.round((Number(boleta.total)/Number(boleta.consumo))*100)/100;
-  if(Math.abs(Number(r.valorUnitario||0) - valorBoleta) > 0.01) return null;
+  // Tolerancia de $1 (no de centavos) para no perder la coincidencia por un redondeo menor.
+  if(Math.abs(Number(r.valorUnitario||0) - valorBoleta) > 1) return null;
   return { url: boleta.boletaUrl, servicio: boleta.servicio, mes: boleta.mes };
 }
 
