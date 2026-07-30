@@ -778,7 +778,10 @@
     <div class="tab-section" id="tab-servicios">
       <h1>🔧 Servicios</h1>
       <div class="card">
-        <h2 id="r-form-title">🔧 Nueva lectura</h2>
+        <div class="toggle-form">
+          <h2 id="r-form-title">🔧 Ingresar lectura o boleta</h2>
+          <button type="button" class="btn btn-secondary" id="toggle-boleta-btn">📄 Cargar boleta</button>
+        </div>
         <form id="form-lectura" class="form-compact">
           <input type="hidden" id="r-id">
           <div class="grid">
@@ -800,21 +803,19 @@
           <div class="status-msg" id="r-estimate-box" style="display:none;background:var(--teal-soft);color:var(--teal-dark);border:1px solid var(--teal);border-radius:6px;padding:6px 9px;margin-top:8px;font-weight:600;font-size:12px;"></div>
           <div class="status-msg" id="r-status"></div>
         </form>
-      </div>
-      <div class="card">
-        <h2>📄 Boleta de agua por sector</h2>
-        <div class="subtitle" style="margin-bottom:14px">El agua se factura por sector (una boleta cubre a todos los locales de ese sector), no por lectura individual. El mes se detecta automáticamente desde el vencimiento de la boleta. Aplica a los consumos más recientes hasta que subas una boleta más nueva que la reemplace.</div>
-        <form id="form-boleta-sector" class="form-compact">
-          <div class="grid">
-            <div class="field"><label>Sector</label>
-              <select id="bs-sector"><option value="1">Sector 1</option><option value="2">Sector 2</option></select>
+        <div id="boleta-sector-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <form id="form-boleta-sector" class="form-compact">
+            <div class="grid">
+              <div class="field"><label>Sector</label>
+                <select id="bs-sector"><option value="1">Sector 1</option><option value="2">Sector 2</option></select>
+              </div>
+              <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
             </div>
-            <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
-          </div>
-          <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
-          <div class="btn-row"><button type="submit" class="btn btn-primary">Guardar boleta del sector</button></div>
-        </form>
-        <div id="sector-boletas-list" style="margin-top:14px"></div>
+            <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
+            <div class="btn-row"><button type="submit" class="btn btn-primary">Guardar boleta del sector</button></div>
+          </form>
+          <div id="sector-boletas-list" style="margin-top:14px"></div>
+        </div>
       </div>
       <div class="card">
         <h2>📸 Recordatorio de envío de fotos de lectura</h2>
@@ -1472,8 +1473,18 @@ async function driveSync(isInitialLoad){
       checkDateCorruptionBanner();
       ok = true;
     } else if(isInitialLoad && !driveFileId){
-      const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = crear un archivo NUEVO (vacío).');
+      // IMPORTANTE: "Cancelar" en este primer diálogo NUNCA debe crear un archivo — eso es
+      // justamente lo que causó que alguien, sin querer, generara un archivo nuevo y vacío al
+      // presionar lo que parecía ser la opción "segura". Ahora "Cancelar" también lleva al
+      // selector; crear un archivo vacío requiere una segunda confirmación explícita aparte.
+      const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = ver más opciones.');
       if(usarPicker){
+        driveSyncBusy = false;
+        openFilePicker();
+        return false;
+      }
+      const confirmarCreacion = confirm('⚠️ Estás a punto de crear un archivo NUEVO y VACÍO — no tus datos existentes.\n\nEsto solo tiene sentido si es la primera vez que usas RentaPro y todavía no existe ningún archivo de datos.\n\nSi ya tienes datos guardados en otro lado, presiona Cancelar ahora y usa el selector de Google Drive para encontrarlos.\n\n¿Confirmas que quieres crear un archivo vacío nuevo?');
+      if(!confirmarCreacion){
         driveSyncBusy = false;
         openFilePicker();
         return false;
@@ -1485,8 +1496,11 @@ async function driveSync(isInitialLoad){
     } else {
       const buf = buildWorkbook();
       if(!driveFileId){
-        driveFileId = await driveCreateXlsxFile(buf, driveFolderId);
-        rememberFileId(driveFileId);
+        // Este caso es anormal (ya se había cargado un archivo antes en esta sesión) — mejor
+        // avisar y detenerse que crear en silencio un archivo nuevo que no es el real.
+        alert('⚠️ Se perdió la referencia al archivo de datos en esta sesión. Para evitar crear uno nuevo por error, recarga la página y vuelve a conectar con Google Drive antes de seguir guardando cambios.');
+        driveSyncBusy = false;
+        return false;
       } else {
         await driveUpdateXlsxFile(driveFileId, buf);
       }
@@ -2856,16 +2870,27 @@ function parseBoletaServicio(text){
 
   const vencimiento = vencimientoMatch ? parseFechaBoletaDDMMMAAAA(vencimientoMatch[1]) : null;
 
+  // Detecta el sector a partir de la dirección que figura en la boleta.
+  const textoNormalizado = text.toLowerCase().replace(/\s+/g,' ');
+  let sector = null;
+  if(textoNormalizado.includes('sargento aldea 1088')) sector = 1;
+  else if(textoNormalizado.includes('san diego 1950')) sector = 2;
+
   return {
     total,
     consumo: consumoMatch ? parseNumeroCL(consumoMatch[1]) : null,
     fechaLectura: fechaLecturaMatch ? parseFechaBoletaDDMMMAAAA(fechaLecturaMatch[1]) : null,
     lecturaActual: lecturaActualMatch ? parseNumeroCL(lecturaActualMatch[1]) : null,
     vencimiento,
+    sector,
     mes: vencimiento ? vencimiento.slice(0,7) : null // el mes de la boleta = mes de su vencimiento
   };
 }
 // ---- Boleta de agua por sector: el agua se factura por sector completo, no por unidad ----
+document.getElementById('toggle-boleta-btn').addEventListener('click', ()=>{
+  const panel = document.getElementById('boleta-sector-panel');
+  panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+});
 
 const SECTOR_NOMBRES = { 1: 'Sector1-SargentoAldea1088', 2: 'Sector2-SanDiego1946-1954' };
 async function subirBoletaSector(file, sector, mes, datos){
@@ -2890,18 +2915,23 @@ async function subirBoletaSector(file, sector, mes, datos){
 
 document.getElementById('form-boleta-sector').addEventListener('submit', async e=>{
   e.preventDefault();
-  const sector = Number(document.getElementById('bs-sector').value);
   const file = document.getElementById('bs-pdf').files[0];
   const statusEl = document.getElementById('bs-status');
   if(!file){ alert('Elige el archivo PDF de la boleta.'); return; }
   if(!driveToken){ alert('Para subir la boleta primero debes estar conectado a Google Drive.'); return; }
 
   statusEl.textContent = '🔎 Leyendo boleta…';
-  let datos = { total:null, consumo:null, mes:null };
+  let datos = { total:null, consumo:null, mes:null, sector:null };
   try{
     const text = await extractPdfText(file);
     datos = parseBoletaServicio(text);
   }catch(err){ console.error('Error leyendo PDF', err); }
+
+  // El sector se detecta automáticamente según la dirección que figura en la boleta (Sargento
+  // Aldea 1088 = Sector 1, San Diego 1950 = Sector 2). Si no se logra detectar, se usa lo que
+  // esté elegido manualmente en el combobox como respaldo.
+  const sector = datos.sector || Number(document.getElementById('bs-sector').value);
+  document.getElementById('bs-sector').value = sector;
 
   // El mes de la boleta se obtiene automáticamente de su fecha de vencimiento. Si por algún
   // motivo no se pudo leer, se usa el mes actual como respaldo.
@@ -2922,7 +2952,7 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   const obj = { id: existente ? existente.id : uid(), sector, mes, total: datos.total||'', consumo: datos.consumo||'', boletaUrl };
   sectorBoletas = existente ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
-  statusEl.innerHTML = `<span style="color:var(--teal-dark)">✓ Boleta guardada — mes detectado: ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.</span>`;
+  statusEl.innerHTML = `<span style="color:var(--teal-dark)">✓ Boleta guardada — Sector ${sector}${datos.sector?' (detectado automáticamente)':' (elegido manualmente, no se detectó en la boleta)'}, mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.</span>`;
   document.getElementById('form-boleta-sector').reset();
   renderSectorBoletasList();
   renderWhatsappPendientesList();
@@ -3136,7 +3166,7 @@ function resetReadingForm(){
   editingReading = null;
   valorUnitarioEditadoManual = false;
   document.getElementById('form-lectura').reset();
-  document.getElementById('r-form-title').textContent='🔧 Nueva lectura';
+  document.getElementById('r-form-title').textContent='🔧 Ingresar lectura o boleta';
   document.getElementById('r-cancel').style.display='none';
   updateMedidorCompartidoHint();
   updateReadingEstimate();
