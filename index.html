@@ -327,6 +327,9 @@
     .card{padding:16px 14px;margin-bottom:18px;border-radius:12px;}
     .subtabs-sticky{margin:0 -14px 16px;padding:10px 14px;}
     .grid{grid-template-columns:1fr;}
+    /* El formulario de "Ingresar lectura" usa 2 columnas incluso en mobile (los campos que no
+       son "full" son cortos), para que el formulario entero quepa en menos alto de pantalla. */
+    #form-lectura .grid{grid-template-columns:repeat(2,1fr);gap:10px;}
     .line-row{grid-template-columns:1fr;}
     .summary-cards{grid-template-columns:repeat(2,1fr);}
     .page-header-row h1{font-size:19px;}
@@ -3689,12 +3692,13 @@ function renderFlujoCobro(){
     // Recordatorio de fotos: solo aparece si aún no se marca enviado este mes.
     if(item.fotoItem){
       const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
-      partes.push(`<div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
+      partes.push(`<div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">
         ${sinTel
-          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto</span>`
-          : `<button type="button" class="btn btn-secondary" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲 Enviar recordatorio de fotos</button>`
+          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
+          : `<button type="button" class="table-action-btn" title="Enviar recordatorio de fotos por WhatsApp" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲</button>`
         }
-        <button type="button" class="btn btn-secondary" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅ Marcar recordatorio enviado</button>
+        <button type="button" class="table-action-btn" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅</button>
+        <span class="status-msg" style="margin:0;">Recordatorio de fotos</span>
       </div>`);
     }
 
@@ -3705,14 +3709,15 @@ function renderFlujoCobro(){
       const estadoTag = m.enviado ? ' <span class="tag tag-ok">Aviso enviado</span>' : ' <span class="tag tag-debt">Falta enviar aviso</span>';
       partes.push(`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
         <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}${estadoTag}</div>
-        <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:6px;">
+        <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;">
           ${sinTel
-            ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp de contacto</span>`
-            : `<button type="button" class="btn btn-primary" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲 Enviar aviso de pago</button>`
+            ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
+            : `<button type="button" class="table-action-btn" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
           }
-          <button type="button" class="btn btn-secondary" onclick="toggleWaEdit('flujo-pend-${idx}-wrap')">✏️ Editar</button>
-          <button type="button" class="btn btn-secondary" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️ Marcar como pendiente' : '✅ Marcar aviso enviado'}</button>
-          <button type="button" class="btn btn-secondary" onclick="marcarComoPagadoDesdeFlujo('${item.contratoId}')">✅ Marcar pagado</button>
+          <button type="button" class="table-action-btn" title="Editar mensaje" onclick="toggleWaEdit('flujo-pend-${idx}-wrap')">✏️</button>
+          <button type="button" class="table-action-btn" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '📤'}</button>
+          <button type="button" class="table-action-btn" title="Marcar como pagado" onclick="marcarComoPagadoDesdeFlujo('${item.contratoId}')">✅</button>
+          <span class="status-msg" style="margin:0;">Aviso de pago</span>
         </div>
         <div id="flujo-pend-${idx}-wrap" style="display:none;margin-top:8px;">
           <textarea id="flujo-pend-${idx}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
