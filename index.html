@@ -3789,9 +3789,15 @@ function renderFlujoCobro(){
     const partes = [];
 
     // Ícono(s) de acción arriba a la derecha de la tarjeta. El estado/etapa ya se ve en el
-    // encabezado del grupo, así que no se repite dentro de la card.
+    // encabezado del grupo, así que no se repite dentro de la card. Solo se muestran las
+    // acciones que corresponden a la etapa asignada a esta tarjeta (recordatorio en 0/1, aviso
+    // de pago en 2/3) — así no aparecen ambos bloques de botones a la vez si el contrato tiene,
+    // por ejemplo, un aviso de un mes anterior sin pagar Y además ya toca recordatorio este mes.
+    const mostrarFoto = item.fotoItem && (etapaGrupo===0 || etapaGrupo===1);
+    const mostrarPend = item.pendItem && (etapaGrupo===2 || etapaGrupo===3);
+
     const accionesTop = [];
-    if(item.fotoItem){
+    if(mostrarFoto){
       const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
       accionesTop.push(sinTel
         ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
@@ -3799,7 +3805,7 @@ function renderFlujoCobro(){
       );
       accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅</button>`);
     }
-    if(item.pendItem){
+    if(mostrarPend){
       const m = item.pendItem;
       const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
       accionesTop.push(sinTel
@@ -3814,8 +3820,8 @@ function renderFlujoCobro(){
       <div class="row-actions" style="gap:4px;flex-wrap:wrap;margin:0;justify-content:flex-end;">${accionesTop.join('')}</div>
     </div>`);
 
-    // Recordatorio de fotos: mensaje oculto (texto completo se ve editando desde el envío mismo).
-    if(item.pendItem){
+    // Detalle del aviso de pago: solo se muestra junto con sus propios botones (mismo criterio).
+    if(mostrarPend){
       const m = item.pendItem;
       partes.push(`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
         <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}</div>
