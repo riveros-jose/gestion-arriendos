@@ -72,9 +72,7 @@
   /* Al crear una lectura, el valor $/unidad es solo referencial: se ve como texto, no como un
      campo editable. Al editar una lectura existente se le quita "readonly" y vuelve a verse
      como un input normal. */
-  #r-valorUnitario[readonly]{border:none;background:transparent;padding:2px 0;font-weight:400;color:var(--ink-soft);font-size:12px;}
-  #r-valorUnitario[readonly]::-webkit-outer-spin-button,#r-valorUnitario[readonly]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-  #r-valorUnitario[readonly]{-moz-appearance:textfield;}
+  #r-valorUnitario[readonly]{position:absolute;width:1px;height:1px;padding:0;margin:0;border:none;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal);}
   textarea{resize:vertical;min-height:60px;}
   .btn{font-family:'Inter',sans-serif;font-weight:600;font-size:13px;padding:10px 18px;border-radius:6px;border:none;cursor:pointer;transition:opacity .15s;}
@@ -455,6 +453,10 @@
         <label>Nuevo monto de arriendo ($)</label>
         <input type="text" inputmode="numeric" class="money-mask" id="cu-monto">
       </div>
+      <div id="cu-ipc-panel" style="display:none;margin-bottom:14px;">
+        <button type="button" class="btn btn-secondary" id="cu-calcular-ipc-btn" style="font-size:12.5px;padding:6px 12px;">📊 Calcular IPC (con la UF)</button>
+        <div id="cu-ipc-resultado" style="margin-top:8px;font-size:12.5px;"></div>
+      </div>
       <p class="drive-gate-fine" style="text-align:left;margin:0 0 14px;">Esto actualiza de inmediato la fecha de fin y el monto pactado del contrato vigente.</p>
     </div>
     <div id="cu-termino-fields" style="display:none;">
@@ -818,7 +820,7 @@
             <div class="field"><label>N° Medidor (solo si tiene más de uno)</label><input id="r-medidor" type="text" placeholder="1" maxlength="10"><span class="status-msg" id="r-medidor-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required><span class="status-msg" id="r-lecturaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
-            <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required readonly><span class="status-msg" id="r-valorUnitario-hint" style="display:block;margin-top:3px;font-weight:600;color:var(--teal-dark);"></span></div>
+            <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required readonly><span class="status-msg" id="r-valorUnitario-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field" id="r-estado-field" style="display:none;"><label>Estado de pago</label>
               <select id="r-estado"><option selected>Pendiente</option><option>Pagado</option></select>
             </div>
@@ -1345,11 +1347,12 @@ function buildWorkbook(){
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
     proximaDecisionMonto: c.proximaDecisionMonto||'', proximaDecisionComentarios: c.proximaDecisionComentarios||'',
-    proximaDecisionRegistrada: c.proximaDecisionRegistrada||'', recordatorioLecturaMes: c.recordatorioLecturaMes||''
+    proximaDecisionRegistrada: c.proximaDecisionRegistrada||'', recordatorioLecturaMes: c.recordatorioLecturaMes||'',
+    ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16,16,16,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -2652,6 +2655,8 @@ function populateUpdateContractForm(id){
   document.getElementById('cu-conDeuda').checked = false;
   document.getElementById('cu-deuda-field').style.display = 'none';
   document.getElementById('cu-deuda').value = '0';
+  cuIpcCalculado = null;
+  document.getElementById('cu-ipc-resultado').innerHTML = '';
   updateContractModalUI();
   refreshDateHints();
   document.getElementById('cu-selector-step').style.display = 'none';
@@ -2660,6 +2665,70 @@ function populateUpdateContractForm(id){
 
 function closeContractUpdateModal(){
   document.getElementById('contract-update-overlay').style.display = 'none';
+}
+
+// Guarda el último cálculo de IPC hecho en el modal (para poder registrar el % al guardar, y
+// para que "Usar este valor" sepa qué aplicar). Se limpia cada vez que cambia el motivo o se
+// abre el modal de nuevo.
+let cuIpcCalculado = null;
+
+// Consulta la UF de una fecha específica en la API pública de mindicador.cl (fuente: Banco
+// Central de Chile). La fecha se recibe en formato YYYY-MM-DD y se convierte a DD-MM-YYYY, que
+// es el formato que espera la API.
+async function fetchUF(fechaISO){
+  const [y,m,d] = fechaISO.split('-');
+  const res = await fetch(`https://mindicador.cl/api/uf/${d}-${m}-${y}`);
+  if(!res.ok) throw new Error('No se pudo consultar la UF para esa fecha.');
+  const data = await res.json();
+  if(!data.serie || !data.serie.length) throw new Error('La UF no está disponible para esa fecha.');
+  return Number(data.serie[0].valor);
+}
+
+document.getElementById('cu-calcular-ipc-btn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('cu-calcular-ipc-btn');
+  const resultado = document.getElementById('cu-ipc-resultado');
+  const montoActual = Number(rawMoneyValue(document.getElementById('cu-monto-actual').value)) || 0;
+  if(!montoActual){
+    resultado.innerHTML = '<span style="color:var(--brick)">⚠ Este contrato no tiene un monto de arriendo actual registrado — no se puede calcular.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = '🔎 Consultando UF…';
+  resultado.innerHTML = '';
+  try{
+    const hoyISO = new Date().toISOString().slice(0,10);
+    const haceUnAnio = new Date();
+    haceUnAnio.setFullYear(haceUnAnio.getFullYear()-1);
+    const haceUnAnioISO = haceUnAnio.toISOString().slice(0,10);
+
+    const [ufHoy, ufAnio] = await Promise.all([fetchUF(hoyISO), fetchUF(haceUnAnioISO)]);
+    const porcentaje = ((ufHoy/ufAnio)-1)*100;
+    const valorNuevo = Math.round(montoActual * (ufHoy/ufAnio));
+
+    cuIpcCalculado = { ufHoy, ufAnio, porcentaje, valorNuevo, fechaHoy: hoyISO, fechaAnio: haceUnAnioISO };
+
+    const colorPorcentaje = porcentaje>=0 ? 'var(--teal-dark)' : 'var(--brick)';
+    resultado.innerHTML = `<div style="background:var(--paper);border-radius:8px;padding:10px 12px;">
+      <div>UF hoy (${formatDate(hoyISO)}): <strong>${ufHoy.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
+      <div>UF hace 1 año (${formatDate(haceUnAnioISO)}): <strong>${ufAnio.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
+      <div style="margin-top:4px;">Variación IPC (UF): <strong style="color:${colorPorcentaje}">${porcentaje>=0?'+':''}${porcentaje.toFixed(2)}%</strong></div>
+      <div>Valor actual: ${money(montoActual)} → Nuevo valor sugerido: <strong>${money(valorNuevo)}</strong></div>
+      <button type="button" class="btn btn-primary" style="margin-top:8px;font-size:12px;padding:5px 10px;" onclick="aplicarValorIPCModal()">Usar este valor</button>
+    </div>`;
+  }catch(err){
+    console.error('Error calculando IPC', err);
+    resultado.innerHTML = `<span style="color:var(--brick)">⚠ No se pudo consultar la UF (${esc(err.message||'error de conexión')}). Puedes ingresar el nuevo valor manualmente.</span>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
+function aplicarValorIPCModal(){
+  if(!cuIpcCalculado) return;
+  document.getElementById('cu-monto').value = formatThousandsCLP(String(cuIpcCalculado.valorNuevo));
 }
 
 // Las tres primeras opciones son decisiones A FUTURO (se guardan pero no se aplican al
@@ -2677,6 +2746,13 @@ function updateContractModalUI(){
   if(soloFecha){
     // El arriendo no cambia con este motivo — se muestra el monto vigente, sin poder editarlo.
     montoInput.value = formatThousandsCLP(rawMoneyValue(document.getElementById('cu-monto-actual').value));
+  }
+
+  const esIPC = motivo==='ipc';
+  document.getElementById('cu-ipc-panel').style.display = esIPC ? 'block' : 'none';
+  if(!esIPC){
+    document.getElementById('cu-ipc-resultado').innerHTML = '';
+    cuIpcCalculado = null;
   }
 
   const esTermino = motivo==='termino';
@@ -2717,7 +2793,8 @@ async function submitContractUpdate(){
   const esTermino = motivo==='termino';
   const hoy = new Date().toISOString().slice(0,10);
   const motivoLabel = CU_MOTIVO_LABELS[motivo] || '';
-  const nota = [motivoLabel, comentarios].filter(Boolean).join(' — ');
+  const pctIPCTxt = (motivo==='ipc' && cuIpcCalculado) ? `Variación IPC (UF): ${cuIpcCalculado.porcentaje>=0?'+':''}${cuIpcCalculado.porcentaje.toFixed(2)}%` : '';
+  const nota = [motivoLabel, pctIPCTxt, comentarios].filter(Boolean).join(' — ');
   const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
   let resumen = '';
 
@@ -2742,6 +2819,15 @@ async function submitContractUpdate(){
     c.proximaDecisionComentarios = '';
     c.proximaDecisionRegistrada = '';
     resumen = `Nueva fecha de fin: ${formatDate(fecha)}\nMonto pactado: ${money(monto)}`;
+    if(motivo==='ipc' && cuIpcCalculado){
+      // Queda registrado de forma permanente el % de variación de la UF que se usó para este
+      // ajuste, no solo el nuevo monto — así se puede revisar después con qué IPC se calculó.
+      const pct = cuIpcCalculado.porcentaje;
+      const pctTxt = `${pct>=0?'+':''}${pct.toFixed(2)}%`;
+      c.ultimoAjusteIPCPorcentaje = Math.round(pct*100)/100;
+      c.ultimoAjusteIPCFecha = hoy;
+      resumen += `\nVariación IPC aplicada (UF): ${pctTxt}`;
+    }
   } else if(esTermino){
     const fechaTermino = document.getElementById('cu-fechaTermino').value;
     if(!fechaTermino){ alert('Ingresa la fecha en que se finalizó el contrato.'); return; }
@@ -2836,6 +2922,7 @@ function prefillValorUnitario(){
   }
   if(valor!==null){
     input.value = valor;
+    if(hint) hint.textContent = `Valor: ${money(valor)}`;
   } else if(hint){
     // Sin boleta ni historial previo — no se puede autocompletar. Se habilita para no bloquear
     // el guardado (caso poco común: primera lectura de este servicio, sin boleta cargada aún).
@@ -2878,7 +2965,7 @@ function updateLecturaAnteriorHints(){
   const consumoAnteriorTxt = anteAnterior
     ? ` · Consumo anterior: ${formatNumber(Math.max(Number(referencia.lecturaActual||0) - Number(anteAnterior.lecturaActual||0), 0))}`
     : '';
-  fechaHint.textContent = `📅 Lectura anterior: ${formatDate(referencia.fechaLectura)}${consumoAnteriorTxt}`;
+  fechaHint.textContent = `📅 Anterior: ${formatDate(referencia.fechaLectura)}${consumoAnteriorTxt}`;
 
   const nueva = Number(document.getElementById('r-lecturaActual').value);
   let consumoTxt = '';
@@ -3596,6 +3683,20 @@ function servicioIcono(s){
   return esc(s);
 }
 
+// Un color distinto por número de medidor, para diferenciarlos de un vistazo en la tabla de
+// lecturas cuando un mismo arrendatario tiene más de uno (ej. La Imprenta).
+const MEDIDOR_COLORES = [
+  { bg:'#D9EAF7', fg:'#1E5B8C' }, // 1 — azul
+  { bg:'#DCEEE7', fg:'#1E5445' }, // 2 — verde/teal
+  { bg:'#F4E3DF', fg:'#B4432E' }, // 3 — ladrillo
+  { bg:'#F7E9CE', fg:'#8A6410' }, // 4 — dorado
+  { bg:'#E7DEF2', fg:'#5B3B8C' }, // 5 — morado
+];
+function medidorColor(medidor){
+  const n = Math.max(parseInt(medidor,10) || 1, 1);
+  return MEDIDOR_COLORES[(n-1) % MEDIDOR_COLORES.length];
+}
+
 // ---- Sectores de lectura: agrupan las propiedades en dos zonas para facilitar la revisión ----
 // Sector 1: San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088.
 // Sector 2: los locales de San Diego 1946 a San Diego 1954 (1946, 1948, 1950, 1952 y 1954).
@@ -3657,7 +3758,7 @@ function buildReadingsTableHtml(list){
       </select>
     </td>
     <td class="mono cell-stacked">
-      <div><span class="medidor-badge" title="Medidor ${esc(r.medidor||'1')}">${esc(r.medidor||'1')}</span> ${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</div>
+      <div><span class="medidor-badge" style="background:${medidorColor(r.medidor).bg};color:${medidorColor(r.medidor).fg};" title="Medidor ${esc(r.medidor||'1')}">${esc(r.medidor||'1')}</span> ${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</div>
       <div class="cell-stacked-sub">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)} → ${formatNumber(r.lecturaActual)}</div>
     </td>
     <td class="mono">${formatDate(r.fechaLectura)}</td>
