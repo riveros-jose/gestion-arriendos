@@ -2558,14 +2558,14 @@ function buildAlerts(){
     const venc = contractEndDate(c);
     if(venc){
       const m = monthsUntil(toISO(venc));
-      if(m===1||m===2||m===3){ alerts.push({c, tipo:'Vencimiento de contrato', meses:m, fecha:toISO(venc)}); }
+      if(m===0||m===1||m===2||m===3){ alerts.push({c, tipo:'Vencimiento de contrato', meses:m, fecha:toISO(venc)}); }
       else if(m<0){ alerts.push({c, tipo:'Contrato vencido', meses:m, fecha:toISO(venc), vencido:true}); }
     }
     const intervalo = ipcIntervalMeses(c.tipoAjusteIPC);
     if(intervalo && c.fechaInicioContrato){
       const next = nextIpcDate(c.fechaInicioContrato, intervalo);
       const m = monthsUntil(toISO(next));
-      if(m===1||m===2||m===3){ alerts.push({c, tipo:'Ajuste de IPC', meses:m, fecha:toISO(next)}); }
+      if(m===0||m===1||m===2||m===3){ alerts.push({c, tipo:'Ajuste de IPC', meses:m, fecha:toISO(next)}); }
     }
   });
   return alerts;
@@ -2626,7 +2626,9 @@ function buildAlertCardHtml(g){
   const ipcItem = items.find(a=> a.tipo==='Ajuste de IPC');
   const anyVencido = items.some(a=>a.vencido);
   const minMeses = Math.min(...items.map(a=>a.meses));
-  const urgencyClass = anyVencido ? 'u1' : ('u'+minMeses);
+  // "0 meses" (vence dentro de este mismo mes, sin haber vencido aún) es el caso más urgente
+  // después de "vencido" — se trata igual que u1 (no existe una clase u0).
+  const urgencyClass = anyVencido ? 'u1' : ('u'+Math.max(minMeses,1));
 
   const titleParts = [];
   if(vencItem) titleParts.push(vencItem.vencido ? 'Contrato vencido' : 'Vencimiento de contrato');
@@ -2634,11 +2636,15 @@ function buildAlertCardHtml(g){
 
   const lines = [];
   if(vencItem){
-    const when = vencItem.vencido ? `Venció el ${formatDate(vencItem.fecha)}` : `${formatDate(vencItem.fecha)} · en ${vencItem.meses} mes${vencItem.meses>1?'es':''}`;
+    const when = vencItem.vencido
+      ? `Venció el ${formatDate(vencItem.fecha)}`
+      : (vencItem.meses===0
+          ? `${formatDate(vencItem.fecha)} · vence este mes`
+          : `${formatDate(vencItem.fecha)} · en ${vencItem.meses} mes${vencItem.meses>1?'es':''}`);
     lines.push(`<div class="alert-line"><span class="alert-line-label">📅 Vencimiento:</span> ${when}</div>`);
   }
   if(ipcItem){
-    const when = `${formatDate(ipcItem.fecha)} · en ${ipcItem.meses} mes${ipcItem.meses>1?'es':''}`;
+    const when = ipcItem.meses===0 ? `${formatDate(ipcItem.fecha)} · este mes` : `${formatDate(ipcItem.fecha)} · en ${ipcItem.meses} mes${ipcItem.meses>1?'es':''}`;
     lines.push(`<div class="alert-line"><span class="alert-line-label">📈 Ajuste IPC:</span> ${when} — arriendo actual: ${money(g.c.montoArriendoPactado)}</div>`);
   }
 
