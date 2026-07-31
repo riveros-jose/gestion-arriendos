@@ -532,8 +532,8 @@
     <div class="nav-item" data-tab="pagos" title="Pagos"><span class="num">02</span> <span class="nav-icon">💵</span><span class="nav-label"> Pagos</span></div>
     <div class="nav-item" data-tab="servicios" title="Servicios"><span class="num">03</span> <span class="nav-icon">💧</span><span class="nav-label"> Servicios</span></div>
     <div class="nav-item" data-tab="alertas" title="Alertas" style="display:none"><span class="nav-icon">🔔</span><span class="nav-label"> Alertas</span></div>
-    <div class="nav-item" data-tab="propiedades" title="Propiedades"><span class="num">04</span> <span class="nav-icon">🏠</span><span class="nav-label"> Propiedades</span></div>
-    <div class="nav-item" data-tab="arrendatarios" title="Arrendatarios & Contratos"><span class="num">05</span> <span class="nav-icon">📄</span><span class="nav-label"> Arrendatarios &amp; Contratos</span></div>
+    <div class="nav-item" data-tab="arrendatarios" title="Arrendatarios & Contratos"><span class="num">04</span> <span class="nav-icon">📄</span><span class="nav-label"> Arrendatarios &amp; Contratos</span></div>
+    <div class="nav-item" data-tab="propiedades" title="Propiedades"><span class="num">05</span> <span class="nav-icon">🏠</span><span class="nav-label"> Propiedades</span></div>
     <div class="nav-item" data-tab="historicos" title="Arrendatarios Históricos"><span class="num">06</span> <span class="nav-icon">🗂️</span><span class="nav-label"> Arrendatarios Históricos</span></div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
@@ -2265,7 +2265,7 @@ function renderTenantsContracts(){
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
-        <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
+        <div class="row-actions"><button onclick="editTenantContract('${c.tenantId}','${c.id}')">Editar</button><button onclick="openUpdateContractModal('${c.id}')">Actualizar contrato</button><button onclick="terminateContract('${c.id}')">Finalizar</button><button onclick="deleteTenantContract('${c.tenantId}','${c.id}')">Eliminar</button></div>
       </div>
       <div class="prop-card-body">
       ${contactoLine}
