@@ -772,17 +772,17 @@
         <div id="resumen-table" class="table-wrap"></div>
       </div>
       <div class="card">
-        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
-        <select class="filter" id="impagos-tenant-filter"></select>
-        <div id="resumen-impagos" class="table-wrap"></div>
-      </div>
-      <div class="card">
         <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <div class="line-row form-compact" style="margin-bottom:10px;max-width:520px">
           <div class="field"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0"></select></div>
           <div class="field"><label>Año</label><select id="matrix-year-filter"></select></div>
         </div>
         <div id="resumen-matrix" class="table-wrap"></div>
+      </div>
+      <div class="card">
+        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
+        <select class="filter" id="impagos-tenant-filter"></select>
+        <div id="resumen-impagos" class="table-wrap"></div>
       </div>
     </div>
 
@@ -849,14 +849,17 @@
         <div id="flujo-cobro-list"></div>
       </div>
       <div class="card">
-        <div class="toggle-form">
-          <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-          <button class="btn btn-secondary" id="export-readings-btn">Exportar a Google Sheets</button>
-        </div>
+        <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="r-filter"></select>
-        <div class="prop-card-section" style="margin-top:16px;padding-top:0;border-top:none">🏘️ Sector 1 — San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088</div>
+        <div class="prop-card-section" style="margin-top:16px;padding-top:0;border-top:none;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>🏘️ Sector 1 — San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088</span>
+          <button class="btn btn-secondary" id="export-readings-sector1-btn" style="font-weight:400;font-size:12px;padding:5px 10px;">Exportar Sector 1 a Google Sheets</button>
+        </div>
         <div id="reading-table-sector1" class="table-wrap"></div>
-        <div class="prop-card-section" style="margin-top:18px;padding-top:0;border-top:none">🏘️ Sector 2 — San Diego 1946 a San Diego 1954</div>
+        <div class="prop-card-section" style="margin-top:18px;padding-top:0;border-top:none;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>🏘️ Sector 2 — San Diego 1946 a San Diego 1954</span>
+          <button class="btn btn-secondary" id="export-readings-sector2-btn" style="font-weight:400;font-size:12px;padding:5px 10px;">Exportar Sector 2 a Google Sheets</button>
+        </div>
         <div id="reading-table-sector2" class="table-wrap"></div>
       </div>
     </div>
@@ -3628,39 +3631,39 @@ function renderReadings(){
   el2.innerHTML = mostrar2.length ? (buildReadingsTableHtml(mostrar2) + readingsToggleHtml(2, sector2.length)) : '<div class="empty">No hay lecturas registradas en este sector.</div>';
 }
 
-// Exporta las lecturas que están efectivamente visibles en este momento — respeta el filtro de
-// arrendatario elegido arriba, tal como se ve en las tablas (ambos sectores juntos), no solo lo
-// que quedó paginado con "Ver todo".
-document.getElementById('export-readings-btn').addEventListener('click', ()=>{
+// Exporta las lecturas de UN sector específico, respetando el filtro de arrendatario elegido
+// arriba (si aplica dentro de ese sector), tal como se ven en su tabla — no solo lo paginado
+// con "Ver todo".
+function exportReadingsSector(sector){
   const filter = document.getElementById('r-filter').value;
   const all = computeReadingsWithConsumption();
-  const list = all.filter(r=> !filter || r.contratoId===filter)
-                   .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
-  if(!list.length){ alert('No hay lecturas para exportar con el filtro actual.'); return; }
+  const list = all
+    .filter(r=> contratoSector(r.contratoId)===sector)
+    .filter(r=> !filter || r.contratoId===filter)
+    .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
+  if(!list.length){ alert(`No hay lecturas del Sector ${sector} para exportar con el filtro actual.`); return; }
 
-  const rows = list.map(r=>{
-    const sector = contratoSector(r.contratoId);
-    return {
-      Arrendatario: contractLabel(r.contratoId),
-      Sector: sector===1 ? 'Sector 1' : (sector===2 ? 'Sector 2' : 'Sin sector'),
-      Servicio: r.servicio,
-      FechaLectura: r.fechaLectura,
-      LecturaAnterior: r.lecturaAnterior===null ? '' : r.lecturaAnterior,
-      LecturaActual: r.lecturaActual,
-      Consumo: r.consumo===null ? 'Primera lectura' : r.consumo,
-      ValorUnitario: Number(r.valorUnitario||0),
-      Monto: Number(r.monto||0),
-      Estado: r.estadoEfectivo,
-      Comentarios: r.comentarios||''
-    };
-  });
+  const rows = list.map(r=>({
+    Arrendatario: contractLabel(r.contratoId),
+    Servicio: r.servicio,
+    FechaLectura: r.fechaLectura,
+    LecturaAnterior: r.lecturaAnterior===null ? '' : r.lecturaAnterior,
+    LecturaActual: r.lecturaActual,
+    Consumo: r.consumo===null ? 'Primera lectura' : r.consumo,
+    ValorUnitario: Number(r.valorUnitario||0),
+    Monto: Number(r.monto||0),
+    Estado: r.estadoEfectivo,
+    Comentarios: r.comentarios||''
+  }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  applyColumnFormats(ws, ['Arrendatario','Sector','Servicio','FechaLectura','LecturaAnterior','LecturaActual','Consumo','ValorUnitario','Monto','Estado','Comentarios']);
-  styleWorksheet(ws, [30,10,10,12,14,12,14,12,12,10,28]);
+  applyColumnFormats(ws, ['Arrendatario','Servicio','FechaLectura','LecturaAnterior','LecturaActual','Consumo','ValorUnitario','Monto','Estado','Comentarios']);
+  styleWorksheet(ws, [30,10,12,14,12,14,12,12,10,28]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Lecturas');
-  exportWorkbookToGoogleSheets(wb, 'lecturas-registradas');
-});
+  XLSX.utils.book_append_sheet(wb, ws, `Sector ${sector}`);
+  exportWorkbookToGoogleSheets(wb, `lecturas-sector${sector}`);
+}
+document.getElementById('export-readings-sector1-btn').addEventListener('click', ()=> exportReadingsSector(1));
+document.getElementById('export-readings-sector2-btn').addEventListener('click', ()=> exportReadingsSector(2));
 
 // ---------- AVISOS POR WHATSAPP (fotos de lectura + pago pendiente) ----------
 // WhatsApp no permite que una página web envíe mensajes de forma 100% automática: solo se
@@ -4434,6 +4437,10 @@ function renderChartAtScale(rows, layout, scaleRows){
   // a la misma altura, más fácil de leer de un vistazo que si cada una quedara a su propia mitad.
   const yLabelPagadoFija = zeroY - chartHPos*0.4;
   const esMobileChart = window.innerWidth <= 860;
+  // Mismo tamaño para ambas etiquetas (pactado arriba y pagado dentro de la barra) en desktop;
+  // en mobile se mantiene el tamaño que ya tenían antes (no se agranda ahí).
+  const fontPactado = esMobileChart ? 10 : 13;
+  const fontPagado = esMobileChart ? 9.5 : fontPactado;
 
   rows.forEach((d,i)=>{
     const x = i*(colW+colGap);
@@ -4445,10 +4452,13 @@ function renderChartAtScale(rows, layout, scaleRows){
 
     bars += `<rect x="${x}" y="${zeroY-hPagado}" width="${colW}" height="${hPagado}" fill="var(--azul)" rx="1.5"><title>Pagado: ${formatMM(d.pagado)}</title></rect>`;
     if(d.pagado>0 && zeroY-hPagado <= yLabelPagadoFija){
-      // Sin el sufijo "MM" en la etiqueta visible (se aclara una sola vez abajo del gráfico) —
-      // así el número entra cómodo en una sola línea, incluso en columnas angostas.
+      // Sin el sufijo "MM" en la etiqueta visible (se aclara una sola vez abajo del gráfico).
+      // Con fondo azul oscuro (píldora), igual que la etiqueta de arriendo pactado.
       const numTxt = formatMM(d.pagado).replace('MM','');
-      bars += `<text x="${cx}" y="${yLabelPagadoFija+3.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${numTxt}</text>`;
+      const wPagado = numTxt.length*fontPagado*0.62 + 8;
+      const hPillPagado = fontPagado + 5;
+      bars += `<rect x="${cx-wPagado/2}" y="${yLabelPagadoFija-hPillPagado/2-2}" width="${wPagado}" height="${hPillPagado}" rx="3" fill="var(--azul-oscuro)"/>`;
+      bars += `<text x="${cx}" y="${yLabelPagadoFija+3.5}" font-size="${fontPagado}" text-anchor="middle" fill="#fff" font-weight="700">${numTxt}</text>`;
     }
     bars += `<rect x="${x}" y="${zeroY-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--azul-claro)" rx="1.5"><title>Descuento: ${formatMM(d.descuento)}</title></rect>`;
 
@@ -4469,14 +4479,13 @@ function renderChartAtScale(rows, layout, scaleRows){
 
   const linePath = linePoints.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
   const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="#fff" stroke="var(--gris-linea)" stroke-width="1.8"><title>Arriendo pactado: ${formatMM(p.monto)}</title></circle>`).join('');
-  // Etiqueta del arriendo pactado con fondo (más fácil de leer sobre las barras) — un tono de la
-  // propia paleta (más armonioso que negro puro), y más grande en desktop, donde sí hay espacio.
-  const fontPactado = esMobileChart ? 10 : 13;
+  // Etiqueta del arriendo pactado con fondo azul oscuro (misma paleta que la barra de "Pagado",
+  // más armonioso que negro puro), en el mismo tamaño que la etiqueta de pagado en desktop.
   const lineLabels = linePoints.map(p=>{
     const txt = formatMM(p.monto).replace('MM','');
     const w = txt.length*fontPactado*0.62 + 8; // ancho aproximado según tamaño y cantidad de caracteres
     const hPill = fontPactado + 5;
-    return `<rect x="${p.x-w/2}" y="${p.y-8-hPill}" width="${w}" height="${hPill}" rx="3" fill="var(--teal-dark)"/>
+    return `<rect x="${p.x-w/2}" y="${p.y-8-hPill}" width="${w}" height="${hPill}" rx="3" fill="var(--azul-oscuro)"/>
     <text x="${p.x}" y="${p.y-8-hPill/2+fontPactado*0.35}" font-size="${fontPactado}" text-anchor="middle" fill="#fff" font-weight="700">${txt}</text>`;
   }).join('');
 
