@@ -120,6 +120,9 @@
   .wa-compact-row:nth-child(even){background:var(--paper);}
   .wa-compact-name{flex:1;min-width:0;font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .wa-compact-services{font-size:13px;flex-shrink:0;}
+  /* Globito con el número de medidor, en la columna de Consumo — útil cuando un arrendatario
+     tiene más de un medidor del mismo servicio (ej. La Imprenta). */
+  .medidor-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--azul-claro);color:var(--azul-oscuro);font-size:10px;font-weight:700;margin-right:2px;vertical-align:middle;}
   .table-action-btn{
     display:inline-flex;align-items:center;justify-content:center;
     width:27px;height:27px;border-radius:7px;border:1px solid var(--border);
@@ -417,6 +420,20 @@
 <div id="contract-update-overlay" class="drive-gate-overlay" style="display:none">
   <div class="drive-gate-card" style="max-width:460px;text-align:left;">
     <h2 style="text-align:left;">📝 Actualizar contrato</h2>
+
+    <div id="cu-selector-step">
+      <p style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">Elige el contrato que quieres actualizar o finalizar.</p>
+      <div class="field" style="margin-bottom:16px;text-align:left;">
+        <label>Arrendatario (Contrato)</label>
+        <select id="cu-selector-contrato"></select>
+      </div>
+      <div class="btn-row" style="margin-top:16px;">
+        <button type="button" class="btn btn-primary" onclick="continueUpdateContractModal()">Continuar</button>
+        <button type="button" class="btn btn-secondary" onclick="closeContractUpdateModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <div id="cu-form-step" style="display:none;">
     <p id="cu-subtitle" style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 18px;"></p>
     <input type="hidden" id="cu-contratoId">
     <input type="hidden" id="cu-monto-actual">
@@ -463,6 +480,7 @@
     <div class="btn-row" style="margin-top:16px;">
       <button type="button" class="btn btn-primary" onclick="submitContractUpdate()">Guardar</button>
       <button type="button" class="btn btn-secondary" onclick="closeContractUpdateModal()">Cancelar</button>
+    </div>
     </div>
   </div>
 </div>
@@ -797,7 +815,7 @@
           <div class="grid">
             <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
             <div class="field"><label>Servicio</label><select id="r-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select></div>
-            <div class="field"><label>N° Medidor (solo si tiene más de uno)</label><input id="r-medidor" type="text" placeholder="1" maxlength="10"></div>
+            <div class="field"><label>N° Medidor (solo si tiene más de uno)</label><input id="r-medidor" type="text" placeholder="1" maxlength="10"><span class="status-msg" id="r-medidor-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required><span class="status-msg" id="r-lecturaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required readonly><span class="status-msg" id="r-valorUnitario-hint" style="display:block;margin-top:3px;font-weight:600;color:var(--teal-dark);"></span></div>
@@ -2257,8 +2275,7 @@ document.getElementById('pay-contratoId').addEventListener('change', actualizarV
 
 document.getElementById('pay-open-contract-update-btn').addEventListener('click', ()=>{
   const contratoId = document.getElementById('pay-contratoId').value;
-  if(!contratoId){ alert('Primero selecciona un contrato arriba.'); return; }
-  openUpdateContractModal(contratoId);
+  openUpdateContractModal(contratoId || null);
 });
 
 document.getElementById('form-pago').addEventListener('submit', async e=>{
@@ -2591,7 +2608,27 @@ function buildAlertCardHtml(g){
   </div>`;
 }
 
+// Si se llama sin id (ej. desde Pagos sin arrendatario filtrado), se muestra primero un paso
+// para elegir el contrato, en vez de simplemente mostrar un error.
 function openUpdateContractModal(id){
+  document.getElementById('contract-update-overlay').style.display = 'flex';
+  if(!id){
+    const activos = contracts.filter(isActiveContract).slice().sort((a,b)=> contractLabel(a.id).localeCompare(contractLabel(b.id)));
+    document.getElementById('cu-selector-contrato').innerHTML = activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+    document.getElementById('cu-selector-step').style.display = 'block';
+    document.getElementById('cu-form-step').style.display = 'none';
+    return;
+  }
+  populateUpdateContractForm(id);
+}
+
+function continueUpdateContractModal(){
+  const id = document.getElementById('cu-selector-contrato').value;
+  if(!id){ alert('Elige un contrato para continuar.'); return; }
+  populateUpdateContractForm(id);
+}
+
+function populateUpdateContractForm(id){
   const c = contracts.find(x=>x.id===id);
   if(!c) return;
   const vencActual = contractEndDate(c);
@@ -2617,7 +2654,8 @@ function openUpdateContractModal(id){
   document.getElementById('cu-deuda').value = '0';
   updateContractModalUI();
   refreshDateHints();
-  document.getElementById('contract-update-overlay').style.display = 'flex';
+  document.getElementById('cu-selector-step').style.display = 'none';
+  document.getElementById('cu-form-step').style.display = 'block';
 }
 
 function closeContractUpdateModal(){
@@ -2853,6 +2891,27 @@ function updateLecturaAnteriorHints(){
 ['r-contratoId','r-servicio','r-medidor','r-fechaLectura'].forEach(id=> document.getElementById(id).addEventListener('change', updateLecturaAnteriorHints));
 document.getElementById('r-medidor').addEventListener('input', updateLecturaAnteriorHints);
 document.getElementById('r-lecturaActual').addEventListener('input', updateLecturaAnteriorHints);
+
+// Mapeo de la ubicación física de cada N° de medidor, para arrendatarios con más de uno del
+// mismo servicio (por ahora, solo La Imprenta). Se identifica por nombre — no depende del ID,
+// ya que este mapeo es específico de este caso puntual y no de una regla general.
+const MEDIDORES_UBICACION = {
+  imprenta: { '1':'Local 5', '2':'Local 7', '3':'Entrepiso' }
+};
+function updateMedidorUbicacionHint(){
+  const hint = document.getElementById('r-medidor-hint');
+  if(!hint) return;
+  const contratoId = document.getElementById('r-contratoId').value;
+  if(!contratoId){ hint.textContent = ''; return; }
+  const label = contractLabel(contratoId).toLowerCase();
+  const clave = Object.keys(MEDIDORES_UBICACION).find(k=> label.includes(k));
+  if(!clave){ hint.textContent = ''; return; }
+  const medidor = (document.getElementById('r-medidor').value || '1').trim();
+  const ubicacion = MEDIDORES_UBICACION[clave][medidor];
+  hint.textContent = ubicacion ? `📍 ${ubicacion}` : '';
+}
+['r-contratoId','r-medidor'].forEach(id=> document.getElementById(id).addEventListener('change', updateMedidorUbicacionHint));
+document.getElementById('r-medidor').addEventListener('input', updateMedidorUbicacionHint);
 
 // ---- Lectura automática de boletas en PDF (por ahora ajustada al formato de Aguas Andinas) ----
 if(typeof pdfjsLib !== 'undefined'){
@@ -3327,6 +3386,7 @@ function resetReadingForm(){
   updateMedidorCompartidoHint();
   updateReadingEstimate();
   updateLecturaAnteriorHints();
+  updateMedidorUbicacionHint();
 }
 function editReading(id){
   const r = readings.find(x=>x.id===id);
@@ -3344,6 +3404,7 @@ function editReading(id){
   updateMedidorCompartidoHint();
   updateReadingEstimate();
   updateLecturaAnteriorHints();
+  updateMedidorUbicacionHint();
   refreshDateHints();
   scrollAppToTop();
 }
@@ -3596,7 +3657,7 @@ function buildReadingsTableHtml(list){
       </select>
     </td>
     <td class="mono cell-stacked">
-      <div>${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</div>
+      <div><span class="medidor-badge" title="Medidor ${esc(r.medidor||'1')}">${esc(r.medidor||'1')}</span> ${r.consumo===null?'primera lectura':formatNumber(r.consumo)}${r.medidorCompartidoDescuento>0?` <span class="tag tag-pending" title="Medidor compartido con San Diego 1712: se restaron ${formatNumber(r.medidorCompartidoDescuento)} del consumo bruto, ya medido por el remarcador de San Diego 1712.">− ${formatNumber(r.medidorCompartidoDescuento)} compartido</span>`:''}</div>
       <div class="cell-stacked-sub">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)} → ${formatNumber(r.lecturaActual)}</div>
     </td>
     <td class="mono">${formatDate(r.fechaLectura)}</td>
@@ -4489,7 +4550,7 @@ function renderChartAtScale(rows, layout, scaleRows){
     const txt = formatMM(p.monto).replace('MM','');
     const w = txt.length*fontPactado*0.62 + 8; // ancho aproximado según tamaño y cantidad de caracteres
     const hPill = fontPactado + 5;
-    return `<rect x="${p.x-w/2}" y="${p.y-8-hPill}" width="${w}" height="${hPill}" rx="3" fill="#4A4F55"/>
+    return `<rect x="${p.x-w/2}" y="${p.y-8-hPill}" width="${w}" height="${hPill}" rx="3" fill="#6B7280"/>
     <text x="${p.x}" y="${p.y-8-hPill/2+fontPactado*0.35}" font-size="${fontPactado}" text-anchor="middle" fill="#fff" font-weight="700">${txt}</text>`;
   }).join('');
 
