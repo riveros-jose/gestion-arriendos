@@ -2821,7 +2821,8 @@ function prefillValorUnitario(){
   let valor = null;
   const sector = contratoSector(contratoId);
   if(sector===1 || sector===2){
-    const boleta = getBoletaSectorVigente(servicio, sector);
+    const fechaLectura = document.getElementById('r-fechaLectura').value; // si aún no se llena, se usa hoy
+    const boleta = getBoletaParaLectura(servicio, sector, fechaLectura);
     if(boleta && Number(boleta.total)>0 && Number(boleta.consumo)>0){
       valor = Math.round(Number(boleta.total)/Number(boleta.consumo));
     }
@@ -2844,6 +2845,7 @@ function prefillValorUnitario(){
 }
 document.getElementById('r-contratoId').addEventListener('change', prefillValorUnitario);
 document.getElementById('r-servicio').addEventListener('change', prefillValorUnitario);
+document.getElementById('r-fechaLectura').addEventListener('change', prefillValorUnitario);
 
 // Muestra, apenas se elige arrendatario+servicio, la fecha de la última lectura registrada (bajo
 // el campo de fecha) y su valor + el consumo calculado en vivo (junto al campo de lectura actual).
@@ -3118,13 +3120,27 @@ async function deleteSectorBoleta(id){
   pushToDriveIfConnected();
 }
 
-// La boleta de un sector aplica a los consumos más recientes hasta que se suba una boleta más
-// nueva que la reemplace — por eso siempre se usa la última cargada para ese sector y servicio,
-// sin exigir que coincida exactamente con el mes de la lectura.
-function getBoletaSectorVigente(servicio, sector){
-  return [...sectorBoletas].filter(b=> b.servicio===servicio && b.sector===sector).sort((a,b)=> b.mes.localeCompare(a.mes))[0] || null;
+// La boleta se carga alrededor del día 13 de cada mes y aplica a la lectura inmediatamente
+// anterior a esa fecha — es decir, a lecturas del mismo mes de la boleta o del mes justo
+// anterior. Si la lectura en cuestión es más antigua que eso (más de un mes de diferencia con
+// la boleta), esa boleta NO le corresponde: se busca la boleta precedente (más antigua) cuya
+// ventana sí cubra esa lectura; si ninguna calza, se deja el valor manual/histórico.
+function getBoletaParaLectura(servicio, sector, fechaLecturaISO){
+  const candidatas = [...sectorBoletas].filter(b=> b.servicio===servicio && b.sector===sector);
+  if(!candidatas.length) return null;
+  const mesLectura = (fechaLecturaISO||mesActualKey()).slice(0,7);
+  // 1) Se prioriza la boleta del MISMO mes de la lectura, si existe.
+  const exacta = candidatas.find(b=> b.mes===mesLectura);
+  if(exacta) return exacta;
+  // 2) Si no hay boleta de ese mes exacto, se usa la del mes siguiente (se emite ~13, cubriendo
+  //    la lectura del mes anterior).
+  const [ly,lm] = mesLectura.split('-').map(Number);
+  const siguiente = candidatas.find(b=>{
+    const [by,bm] = b.mes.split('-').map(Number);
+    return (by-ly)*12 + (bm-lm) === 1;
+  });
+  return siguiente || null; // ninguna boleta cae dentro de la ventana válida para esta lectura
 }
-
 // El link de la boleta solo debe mostrarse cuando REALMENTE se usó para calcular esa lectura —
 // es decir, cuando el $/unidad de la lectura coincide con el de la boleta. Si la lectura se
 // guardó con otro valor (uno anterior, o uno ingresado a mano), mostrar la boleta sería
@@ -3133,7 +3149,7 @@ function boletaUrlAplicadaA(r){
   if(r.boletaUrl) return { url: r.boletaUrl, servicio: r.servicio, mes: (r.fechaLectura||'').slice(0,7) };
   const sector = contratoSector(r.contratoId);
   if(sector!==1 && sector!==2) return null;
-  const boleta = getBoletaSectorVigente(r.servicio, sector);
+  const boleta = getBoletaParaLectura(r.servicio, sector, r.fechaLectura);
   if(!boleta || !(Number(boleta.total)>0) || !(Number(boleta.consumo)>0)) return null;
   const valorBoleta = Math.round(Number(boleta.total)/Number(boleta.consumo));
   // Tolerancia de $1 (no de centavos) para no perder la coincidencia por un redondeo menor.
