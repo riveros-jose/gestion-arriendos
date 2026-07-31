@@ -3710,8 +3710,8 @@ function renderFlujoCobro(){
       accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>`);
     }
 
-    partes.push(`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-      <div class="title" style="margin:0;">${esc(item.nombreContacto)}</div>
+    partes.push(`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <div class="title" style="margin:0;line-height:1.25;">${esc(item.nombreContacto)}</div>
       <div class="row-actions" style="gap:4px;flex-wrap:wrap;margin:0;justify-content:flex-end;">${accionesTop.join('')}</div>
     </div>`);
 
@@ -3726,7 +3726,7 @@ function renderFlujoCobro(){
       </div>`);
     }
 
-    return `<div class="alert-card" style="margin-bottom:8px;border-left-color:${info.color};background:${info.color}12;">${partes.join('')}</div>`;
+    return `<div class="alert-card" style="margin-bottom:6px;padding:8px 10px;gap:4px;border-left-color:${info.color};background:${info.color}12;">${partes.join('')}</div>`;
   };
 
   // Dentro de cada sector, las tarjetas se agrupan por etapa (siguiendo el orden del flujo), y
@@ -4401,7 +4401,12 @@ function renderChartAtScale(rows, layout, scaleRows){
 
   const linePath = linePoints.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
   const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="#fff" stroke="var(--gris-linea)" stroke-width="1.8"><title>Arriendo pactado: ${formatMM(p.monto)}</title></circle>`).join('');
-  const lineLabels = linePoints.map(p=>`<text x="${p.x}" y="${p.y-8}" font-size="10" text-anchor="middle" fill="var(--gris-linea)" font-weight="600">${formatMM(p.monto)}</text>`).join('');
+  const lineLabels = linePoints.map(p=>{
+    const txt = formatMM(p.monto);
+    const w = txt.length*6.2 + 8; // ancho aproximado según la cantidad de caracteres del texto
+    return `<rect x="${p.x-w/2}" y="${p.y-8-11}" width="${w}" height="15" rx="3" fill="#1E2622"/>
+    <text x="${p.x}" y="${p.y-8}" font-size="10" text-anchor="middle" fill="#fff" font-weight="700">${txt}</text>`;
+  }).join('');
 
   const gridSteps = [0,0.25,0.5,0.75,1];
   let axisSvg = '';
@@ -4653,18 +4658,27 @@ function renderResumenMatrix(){
   // 1) Contratos activos sin ningún registro en el último período visible (máxima urgencia)
   // 2) Contratos activos con $0 registrado ese último período
   // 3) Contratos históricos (no activos) que todavía tienen deuda pendiente por cobrar
-  // 4) Contratos activos con pagos normales
-  // 5) Contratos históricos sin deuda pendiente — al fondo de todo
+  // 4) Contratos activos que pagaron MENOS de lo pactado ese último período (parcial)
+  // 5) Contratos activos con pagos normales (pagaron todo)
+  // 6) Contratos históricos sin deuda pendiente — al fondo de todo
   // Dentro de cada grupo, orden alfabético.
   const ultimoKey = `${mostrarMonths[0].year}-${String(mostrarMonths[0].month+1).padStart(2,'0')}`;
+  const [ultimoAnio, ultimoMesNum] = ultimoKey.split('-');
   const categoriaFila = (r)=>{
     if(!r.historico){
       const d = sumas[r.c.id][ultimoKey];
-      if(!d) return 0;
-      if(d.pagado===0 && d.descuento===0) return 1;
-      return 3;
+      if(!d) return 0; // sin ningún registro este mes
+      if(d.pagado===0 && d.descuento===0) return 1; // pagó $0
+      // Se compara contra el monto esperado ese mes, para distinguir pago parcial de pago completo.
+      const pagosMes = payments.filter(p=> p.contratoId===r.c.id && p.fechaPago && p.fechaPago.slice(0,7)===ultimoKey);
+      const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
+      const montoEsperado = valoresPeriodo.length
+        ? Math.max(...valoresPeriodo)
+        : historicalValorArriendo(r.c.id, Number(ultimoAnio), Number(ultimoMesNum)-1, Number(r.c.montoArriendoPactado||0));
+      if(montoEsperado>0 && (d.pagado+d.descuento) < montoEsperado) return 4; // pagó menos de lo pactado
+      return 5; // pagó todo
     }
-    return computeCobranzaSaldo(r.c) > 0 ? 2 : 4;
+    return computeCobranzaSaldo(r.c) > 0 ? 2 : 6;
   };
   rows.sort((a,b)=>{
     const ca = categoriaFila(a), cb = categoriaFila(b);
@@ -4674,8 +4688,20 @@ function renderResumenMatrix(){
 
   const headerCells = mostrarMonths.map(({year,month})=> `<th>${MESES_ES[month].slice(0,3)} ${String(year).slice(2)}</th>`).join('');
 
+  let contadorSinPago = 0;
   const bodyRows = rows.map(r=>{
     const etiqueta = r.historico ? esc(r.label) + ' <span class="tag tag-pending">Hist.</span>' : esc(r.label);
+    const cat = categoriaFila(r);
+    // Filas sin ningún pago este mes (categoría 0 o 1): fondo rojizo, alternando entre dos tonos
+    // cuando hay más de una, para diferenciarlas visualmente entre sí.
+    // Filas con pago parcial (categoría 4): fondo rojizo, pero el más claro de todos.
+    let rowStyle = '';
+    if(cat===0 || cat===1){
+      rowStyle = ` style="background:${contadorSinPago%2===0 ? '#F0C9BF' : '#F5DDD5'};"`;
+      contadorSinPago++;
+    } else if(cat===4){
+      rowStyle = ` style="background:#FBEEEA;"`;
+    }
     const cells = mostrarMonths.map(({year,month})=>{
       const key = `${year}-${String(month+1).padStart(2,'0')}`;
       const d = sumas[r.c.id][key];
@@ -4695,7 +4721,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
