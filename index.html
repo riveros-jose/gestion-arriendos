@@ -128,6 +128,7 @@
   }
   .table-action-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
   .table-action-btn.danger:hover{background:var(--brick-soft);border-color:var(--brick);}
+  .table-action-btn-lg{width:36px;height:36px;font-size:17px;border-radius:9px;}
   .table-actions-group{display:flex;gap:5px;flex-wrap:wrap;}
   .row-actions-inline{display:inline-flex;gap:5px;margin-left:8px;vertical-align:middle;}
   .empty{color:var(--ink-soft);font-size:13.5px;padding:20px 0;text-align:center;}
@@ -277,9 +278,6 @@
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
-    /* Los botones de acción del Flujo de cobro llevan texto solo en desktop — en mobile queda
-       solo el ícono, para que sean más compactos. */
-    .hide-mobile{display:none;}
     /* El scroll ocurre dentro de .main (no en la página): así el navegador (p.ej. Samsung
        Internet) no muestra su botón flotante de "ir arriba" encima de nuestra barra inferior. */
     html,body{height:100%;overflow:hidden;}
@@ -848,7 +846,6 @@
       </div>
       <div class="card">
         <h2>🔄 Flujo de cobro de servicios</h2>
-        <div class="subtitle" style="margin-bottom:14px">Recordatorio → Lectura → Aviso de pago → Pagado. Un vistazo de en qué etapa está cada arrendatario este mes, con la acción que corresponde en cada caso.</div>
         <div id="flujo-cobro-list"></div>
       </div>
       <div class="card">
@@ -3692,25 +3689,25 @@ function renderFlujoCobro(){
     const info = ETAPAS_FLUJO[etapaGrupo];
     const partes = [];
 
-    // Ícono(s) de acción arriba a la derecha de la tarjeta (con texto solo en desktop). El
-    // estado/etapa ya se ve en el encabezado del grupo, así que no se repite dentro de la card.
+    // Ícono(s) de acción arriba a la derecha de la tarjeta. El estado/etapa ya se ve en el
+    // encabezado del grupo, así que no se repite dentro de la card.
     const accionesTop = [];
     if(item.fotoItem){
       const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
       accionesTop.push(sinTel
         ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-        : `<button type="button" class="table-action-btn" title="Enviar recordatorio de fotos por WhatsApp" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲<span class="hide-mobile"> Recordatorio</span></button>`
+        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar recordatorio de fotos por WhatsApp" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲</button>`
       );
-      accionesTop.push(`<button type="button" class="table-action-btn" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅<span class="hide-mobile"> Enviado</span></button>`);
+      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅</button>`);
     }
     if(item.pendItem){
       const m = item.pendItem;
       const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
       accionesTop.push(sinTel
         ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-        : `<button type="button" class="table-action-btn" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲<span class="hide-mobile"> Aviso</span></button>`
+        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
       );
-      accionesTop.push(`<button type="button" class="table-action-btn" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}<span class="hide-mobile"> ${m.enviado ? 'Pendiente' : 'Enviado'}</span></button>`);
+      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>`);
     }
 
     partes.push(`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -3721,10 +3718,8 @@ function renderFlujoCobro(){
     // Recordatorio de fotos: mensaje oculto (texto completo se ve editando desde el envío mismo).
     if(item.pendItem){
       const m = item.pendItem;
-      const estadoTag = m.enviado ? ' <span class="tag tag-ok">Aviso enviado</span>' : ' <span class="tag tag-debt">Falta enviar aviso</span>';
       partes.push(`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
-        <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}${estadoTag}</div>
-        <div class="status-msg" style="margin-top:4px;">El pago se marca por lectura en "Lecturas registradas" abajo.</div>
+        <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}</div>
         <div id="flujo-pend-${idx}-wrap" style="display:none;margin-top:8px;">
           <textarea id="flujo-pend-${idx}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
         </div>
@@ -4371,6 +4366,9 @@ function renderChartAtScale(rows, layout, scaleRows){
 
   let bars = '';
   const linePoints = [];
+  // Altura fija (no por barra) para las etiquetas de "Pagado" en MM — así quedan todas alineadas
+  // a la misma altura, más fácil de leer de un vistazo que si cada una quedara a su propia mitad.
+  const yLabelPagadoFija = zeroY - chartHPos*0.4;
 
   rows.forEach((d,i)=>{
     const x = i*(colW+colGap);
@@ -4381,8 +4379,8 @@ function renderChartAtScale(rows, layout, scaleRows){
     const saldo = d.monto - (d.pagado + d.descuento); // >0 = deuda del periodo, <0 = saldo a favor
 
     bars += `<rect x="${x}" y="${zeroY-hPagado}" width="${colW}" height="${hPagado}" fill="var(--azul)" rx="1.5"><title>Pagado: ${formatMM(d.pagado)}</title></rect>`;
-    if(hPagado > 14 && d.pagado>0){
-      bars += `<text x="${cx}" y="${zeroY-hPagado/2+3.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${formatMM(d.pagado)}</text>`;
+    if(d.pagado>0 && zeroY-hPagado <= yLabelPagadoFija){
+      bars += `<text x="${cx}" y="${yLabelPagadoFija+3.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${formatMM(d.pagado)}</text>`;
     }
     bars += `<rect x="${x}" y="${zeroY-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--azul-claro)" rx="1.5"><title>Descuento: ${formatMM(d.descuento)}</title></rect>`;
 
