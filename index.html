@@ -277,6 +277,9 @@
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
+    /* Los botones de acción del Flujo de cobro llevan texto solo en desktop — en mobile queda
+       solo el ícono, para que sean más compactos. */
+    .hide-mobile{display:none;}
     /* El scroll ocurre dentro de .main (no en la página): así el navegador (p.ej. Samsung
        Internet) no muestra su botón flotante de "ir arriba" encima de nuestra barra inferior. */
     html,body{height:100%;overflow:hidden;}
@@ -3683,58 +3686,45 @@ function renderFlujoCobro(){
     });
   });
 
-  const badgeServicio = d=>{
-    const info = ETAPAS_FLUJO[d.etapa];
-    return `<span class="tag ${info.clase}" style="margin:2px 4px 2px 0;white-space:nowrap;">${SERVICIO_SVG[d.servicio]||''}${d.servicio}: ${esc(info.label)}</span>`;
-  };
-
   let globalIdx = 0;
   const filaContrato = (item, etapaGrupo)=>{
     const idx = globalIdx++;
     const info = ETAPAS_FLUJO[etapaGrupo];
     const partes = [];
-    // Etapa principal destacada, bien visible arriba de la tarjeta.
-    partes.push(`<div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:20px;line-height:1;">${info.icono}</span>
-      <div>
-        <div class="title" style="margin:0;">${esc(item.nombreContacto)}</div>
-        <div style="font-size:12px;font-weight:700;color:${info.color};">${esc(info.label)}</div>
-      </div>
-    </div>`);
-    // Detalle por servicio (útil cuando tiene más de uno, o cuando difieren entre sí).
-    if(item.detalle.length>1 || item.detalle[0].etapa!==etapaGrupo){
-      partes.push(`<div style="margin:6px 0 0;">${item.detalle.map(badgeServicio).join('')}</div>`);
-    }
 
-    // Recordatorio de fotos: solo aparece si aún no se marca enviado este mes.
+    // Ícono(s) de acción arriba a la derecha de la tarjeta (con texto solo en desktop). El
+    // estado/etapa ya se ve en el encabezado del grupo, así que no se repite dentro de la card.
+    const accionesTop = [];
     if(item.fotoItem){
       const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
-      partes.push(`<div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">
-        ${sinTel
-          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-          : `<button type="button" class="table-action-btn" title="Enviar recordatorio de fotos por WhatsApp" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲</button>`
-        }
-        <button type="button" class="table-action-btn" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅</button>
-        <span class="status-msg" style="margin:0;">Recordatorio de fotos</span>
-      </div>`);
+      accionesTop.push(sinTel
+        ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
+        : `<button type="button" class="table-action-btn" title="Enviar recordatorio de fotos por WhatsApp" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲<span class="hide-mobile"> Recordatorio</span></button>`
+      );
+      accionesTop.push(`<button type="button" class="table-action-btn" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅<span class="hide-mobile"> Enviado</span></button>`);
     }
-
-    // Aviso de pago: aparece cuando hay una lectura ya lista con monto pendiente de cobrar.
     if(item.pendItem){
       const m = item.pendItem;
       const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
+      accionesTop.push(sinTel
+        ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
+        : `<button type="button" class="table-action-btn" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲<span class="hide-mobile"> Aviso</span></button>`
+      );
+      accionesTop.push(`<button type="button" class="table-action-btn" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}<span class="hide-mobile"> ${m.enviado ? 'Pendiente' : 'Enviado'}</span></button>`);
+    }
+
+    partes.push(`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <div class="title" style="margin:0;">${esc(item.nombreContacto)}</div>
+      <div class="row-actions" style="gap:4px;flex-wrap:wrap;margin:0;justify-content:flex-end;">${accionesTop.join('')}</div>
+    </div>`);
+
+    // Recordatorio de fotos: mensaje oculto (texto completo se ve editando desde el envío mismo).
+    if(item.pendItem){
+      const m = item.pendItem;
       const estadoTag = m.enviado ? ' <span class="tag tag-ok">Aviso enviado</span>' : ' <span class="tag tag-debt">Falta enviar aviso</span>';
       partes.push(`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
         <div class="alert-line" style="flex-direction:column;align-items:flex-start;gap:2px;">${m.resumenHtml}${estadoTag}</div>
-        <div class="row-actions" style="gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;">
-          ${sinTel
-            ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-            : `<button type="button" class="table-action-btn" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
-          }
-          <button type="button" class="table-action-btn" title="Editar mensaje" onclick="toggleWaEdit('flujo-pend-${idx}-wrap')">✏️</button>
-          <button type="button" class="table-action-btn" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>
-          <span class="status-msg" style="margin:0;">Aviso de pago — el pago se marca por lectura en "Lecturas registradas" abajo</span>
-        </div>
+        <div class="status-msg" style="margin-top:4px;">El pago se marca por lectura en "Lecturas registradas" abajo.</div>
         <div id="flujo-pend-${idx}-wrap" style="display:none;margin-top:8px;">
           <textarea id="flujo-pend-${idx}" rows="6" style="width:100%;font-size:12px;padding:8px;border-radius:6px;border:1px solid var(--border);font-family:inherit;box-sizing:border-box;">${esc(m.mensaje)}</textarea>
         </div>
@@ -4391,6 +4381,9 @@ function renderChartAtScale(rows, layout, scaleRows){
     const saldo = d.monto - (d.pagado + d.descuento); // >0 = deuda del periodo, <0 = saldo a favor
 
     bars += `<rect x="${x}" y="${zeroY-hPagado}" width="${colW}" height="${hPagado}" fill="var(--azul)" rx="1.5"><title>Pagado: ${formatMM(d.pagado)}</title></rect>`;
+    if(hPagado > 14 && d.pagado>0){
+      bars += `<text x="${cx}" y="${zeroY-hPagado/2+3.5}" font-size="9.5" text-anchor="middle" fill="#fff" font-weight="700">${formatMM(d.pagado)}</text>`;
+    }
     bars += `<rect x="${x}" y="${zeroY-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--azul-claro)" rx="1.5"><title>Descuento: ${formatMM(d.descuento)}</title></rect>`;
 
     if(saldo > 0){
