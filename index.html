@@ -178,6 +178,26 @@
   .icon-refresh-badge.c-drive{color:#1967D2;}
   .icon-btn-sm:hover{background:var(--teal-soft);color:var(--teal-dark);border-color:var(--teal);}
   .drive-gate-overlay{position:fixed;inset:0;background:rgba(22,38,31,0.82);backdrop-filter:blur(2px);z-index:9999;align-items:center;justify-content:center;padding:20px;}
+  /* Calendario visual propio, reemplaza al selector nativo de fecha (que varía mucho entre
+     navegadores/dispositivos) por una experiencia consistente en toda la app. */
+  input[type="date"].cal-input{background:#fdfdfc url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%234B5951" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>') no-repeat right 10px center;background-size:16px;padding-right:34px;cursor:pointer;}
+  input[type="date"].cal-input::-webkit-calendar-picker-indicator{opacity:0;position:absolute;right:0;width:34px;height:100%;cursor:pointer;}
+  .cal-picker-popup{position:fixed;z-index:10000;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(22,38,31,0.28);padding:12px;width:264px;font-family:'Inter',sans-serif;}
+  .cal-picker-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .cal-picker-title{font-weight:700;font-size:13.5px;color:var(--ink);}
+  .cal-nav-btn{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--paper);color:var(--teal-dark);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .cal-nav-btn:hover{background:var(--teal-soft);}
+  .cal-picker-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10.5px;color:var(--ink-soft);font-weight:700;margin-bottom:2px;}
+  .cal-picker-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-day{aspect-ratio:1;border:none;background:transparent;border-radius:8px;font-size:12.5px;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .cal-day:hover:not(:disabled){background:var(--teal-soft);}
+  .cal-day:disabled{color:var(--border);cursor:not-allowed;}
+  .cal-day-empty{visibility:hidden;}
+  .cal-day-today{font-weight:700;color:var(--teal-dark);box-shadow:inset 0 0 0 1.5px var(--teal);}
+  .cal-day-selected{background:var(--teal-dark)!important;color:#fff!important;font-weight:700;}
+  .cal-picker-footer{display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);}
+  .cal-picker-footer button{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--paper);color:var(--teal-dark);cursor:pointer;}
+  .cal-picker-footer button:hover{background:var(--teal-soft);}
   .drive-gate-card{background:var(--card);border-radius:14px;max-width:420px;width:100%;padding:36px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.35);}
   .drive-gate-icon{font-size:32px;margin-bottom:10px;}
   .drive-gate-card h2{font-family:'Fraunces',serif;font-size:22px;margin:0 0 12px;}
@@ -237,8 +257,8 @@
      que compensar) y para el filtro de arrendatario debajo (va dentro de una tarjeta, así que
      sí necesita compensar su padding con margen negativo, quedando "pegado" apenas debajo del
      sub-tab). */
-  .arrendatarios-subtabs-sticky{position:sticky;top:0;z-index:22;background:var(--paper);padding:6px 0 10px;margin-bottom:8px;}
-  .tenant-filter-sticky{position:sticky;top:52px;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
+  .arrendatarios-subtabs-sticky{position:sticky;top:0;z-index:22;background:var(--paper);padding:8px 0 10px;margin-bottom:8px;}
+  .tenant-filter-sticky{position:sticky;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
   .quick-jump-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;}
   .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
@@ -920,24 +940,9 @@
             <input type="hidden" id="mae-id">
             <div class="grid">
               <div class="field"><label>Nombre</label><input id="mae-nombre" required></div>
-              <div class="field"><label>Especialidad</label>
-                <select id="mae-especialidad">
-                  <option>Arquitecto</option>
-                  <option>Electricista</option>
-                  <option>Gasfíter / Plomero</option>
-                  <option>Desagües</option>
-                  <option>Proyectista Aguas</option>
-                  <option>Pintor</option>
-                  <option>Carpintero</option>
-                  <option>Albañil</option>
-                  <option>Cerrajero</option>
-                  <option>Cortinas Metálicas</option>
-                  <option>Jardinero</option>
-                  <option>Multioficio</option>
-                  <option>Otro</option>
-                </select>
+              <div class="field full"><label>Especialidades (puedes elegir más de una)</label>
+                <div id="mae-especialidad-checks" class="checkbox-list"></div>
               </div>
-              <div class="field"><label>Teléfono</label><input id="mae-telefono"></div>
               <div class="field"><label>WhatsApp de contacto</label><input id="mae-whatsapp" placeholder="+56 9 1234 5678"></div>
               <div class="field full"><label>Descripción general</label><textarea id="mae-descripcionGeneral" rows="2" placeholder="Notas generales sobre este maestro — especialidades, referencias, tarifas habituales, etc."></textarea></div>
             </div>
@@ -1465,12 +1470,12 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsBol, 'BoletasSector');
 
   const maestroRows = maestros.length ? maestros.map(m=>({
-    id: m.id, nombre: m.nombre, especialidad: m.especialidad, telefono: m.telefono||'', whatsapp: m.whatsapp||'',
+    id: m.id, nombre: m.nombre, especialidades: (m.especialidades||[]).join(', '), whatsapp: m.whatsapp||'',
     favorito: m.favorito||false, descripcionGeneral: m.descripcionGeneral||''
   })) : [{}];
   const wsMae = XLSX.utils.json_to_sheet(maestroRows);
-  applyColumnFormats(wsMae, ['id','nombre','especialidad','telefono','whatsapp','favorito','descripcionGeneral']);
-  styleWorksheet(wsMae, [10,22,16,14,14,10,36]);
+  applyColumnFormats(wsMae, ['id','nombre','especialidades','whatsapp','favorito','descripcionGeneral']);
+  styleWorksheet(wsMae, [10,22,26,14,10,36]);
   XLSX.utils.book_append_sheet(wb, wsMae, 'Maestros');
 
   const trabajoRows = trabajosMaestros.length ? trabajosMaestros.map(t=>({
@@ -1563,7 +1568,9 @@ function loadFromWorkbook(arrayBuffer){
     id:b.id, servicio:b.servicio||'Agua', sector:Number(b.sector)||1, mes:b.mes||'', total:b.total||'', consumo:b.consumo||'', lecturaActual:b.lecturaActual||'', boletaUrl:b.boletaUrl||''
   }));
   maestros = rawMaestros.map(m=>({
-    id:m.id, nombre:m.nombre||'', especialidad:m.especialidad||'Otro', telefono:m.telefono||'', whatsapp:m.whatsapp||'',
+    id:m.id, nombre:m.nombre||'',
+    especialidades: m.especialidades ? String(m.especialidades).split(',').map(s=>s.trim()).filter(Boolean) : (m.especialidad ? [m.especialidad] : []),
+    whatsapp:m.whatsapp||'',
     favorito: (m.favorito===true || m.favorito==='TRUE' || m.favorito==='true'),
     correo:m.correo||'', direccion:m.direccion||'', descripcionGeneral:m.descripcionGeneral||''
   }));
@@ -1874,6 +1881,134 @@ DATE_INPUT_IDS.forEach(id=>{
   if(input) input.addEventListener('input', refreshDateHints);
 });
 
+// ---------- CALENDARIO VISUAL (reemplaza al selector nativo en todos los campos de fecha) ----------
+// El selector nativo de "type=date" varía muchísimo entre navegadores y sistemas operativos
+// (algunos muestran un calendario decente, otros solo un campo de texto con flechitas). Para que
+// la experiencia sea la misma en todos lados, se reemplaza por un calendario propio: el input
+// pasa a ser de solo lectura (no se puede tipear), y al tocarlo se abre este calendario. Sigue
+// guardando la fecha en formato AAAA-MM-DD como siempre, así que el resto de la app no se entera
+// del cambio — solo cambia CÓMO se elige la fecha.
+const MESES_CAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_CAL = ['L','M','M','J','V','S','D'];
+let calPickerEl = null, calPickerTarget = null, calPickerViewDate = null;
+
+function buildCalendarPickerDOM(){
+  if(calPickerEl) return calPickerEl;
+  const el = document.createElement('div');
+  el.className = 'cal-picker-popup';
+  el.style.display = 'none';
+  document.body.appendChild(el);
+  calPickerEl = el;
+  return el;
+}
+
+function renderCalendarPicker(){
+  const el = buildCalendarPickerDOM();
+  const y = calPickerViewDate.getFullYear(), m = calPickerViewDate.getMonth();
+  const primerDia = new Date(y, m, 1);
+  const offsetLunes = (primerDia.getDay()+6)%7; // 0=lunes, para que la semana empiece en lunes
+  const diasEnMes = new Date(y, m+1, 0).getDate();
+  const min = calPickerTarget.min || '';
+  const max = calPickerTarget.max || '';
+  const valorActual = calPickerTarget.value || '';
+  const hoyIso = new Date().toISOString().slice(0,10);
+
+  let celdas = '';
+  for(let i=0;i<offsetLunes;i++) celdas += '<span class="cal-day cal-day-empty"></span>';
+  for(let d=1; d<=diasEnMes; d++){
+    const iso = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const deshabilitado = (min && iso<min) || (max && iso>max);
+    const clases = ['cal-day'];
+    if(iso===hoyIso) clases.push('cal-day-today');
+    if(iso===valorActual) clases.push('cal-day-selected');
+    celdas += `<button type="button" class="${clases.join(' ')}" ${deshabilitado?'disabled':''} onclick="pickCalendarDate('${iso}')">${d}</button>`;
+  }
+
+  el.innerHTML = `
+    <div class="cal-picker-header">
+      <button type="button" class="cal-nav-btn" onclick="calendarPickerNav(-1)">‹</button>
+      <span class="cal-picker-title">${MESES_CAL[m]} ${y}</span>
+      <button type="button" class="cal-nav-btn" onclick="calendarPickerNav(1)">›</button>
+    </div>
+    <div class="cal-picker-weekdays">${DIAS_CAL.map(d=>`<span>${d}</span>`).join('')}</div>
+    <div class="cal-picker-grid">${celdas}</div>
+    <div class="cal-picker-footer">
+      <button type="button" onclick="pickCalendarDate('${hoyIso}')">Hoy</button>
+      <button type="button" onclick="clearCalendarDate()">Borrar</button>
+    </div>`;
+}
+
+function calendarPickerNav(delta){
+  calPickerViewDate.setMonth(calPickerViewDate.getMonth()+delta);
+  renderCalendarPicker();
+}
+
+function openCalendarPicker(input){
+  calPickerTarget = input;
+  calPickerViewDate = (input.value && /^\d{4}-\d{2}-\d{2}/.test(input.value)) ? new Date(input.value+'T00:00:00') : new Date();
+  renderCalendarPicker();
+  const el = buildCalendarPickerDOM();
+  el.style.display = 'block';
+  const rect = input.getBoundingClientRect();
+  const popupWidth = 264;
+  let top = rect.bottom + 6;
+  let left = Math.min(rect.left, window.innerWidth - popupWidth - 10);
+  left = Math.max(8, left);
+  // Si no cabe abajo (cerca del borde inferior de la pantalla), se abre hacia arriba del campo.
+  if(top + 320 > window.innerHeight) top = Math.max(8, rect.top - 326);
+  el.style.top = top+'px';
+  el.style.left = left+'px';
+}
+
+function closeCalendarPicker(){
+  if(calPickerEl) calPickerEl.style.display = 'none';
+  calPickerTarget = null;
+}
+
+function pickCalendarDate(iso){
+  if(!calPickerTarget) return;
+  calPickerTarget.value = iso;
+  calPickerTarget.dispatchEvent(new Event('input', {bubbles:true}));
+  calPickerTarget.dispatchEvent(new Event('change', {bubbles:true}));
+  closeCalendarPicker();
+}
+function clearCalendarDate(){
+  if(!calPickerTarget) return;
+  calPickerTarget.value = '';
+  calPickerTarget.dispatchEvent(new Event('input', {bubbles:true}));
+  calPickerTarget.dispatchEvent(new Event('change', {bubbles:true}));
+  closeCalendarPicker();
+}
+
+function convertDateInput(input){
+  if(input.dataset.calConverted) return;
+  input.dataset.calConverted = '1';
+  input.type = 'text';
+  input.readOnly = true;
+  input.inputMode = 'none';
+  input.autocomplete = 'off';
+  input.classList.add('cal-input');
+}
+function scanAndConvertDateInputs(root){
+  (root||document).querySelectorAll('input[type="date"]').forEach(convertDateInput);
+}
+scanAndConvertDateInputs();
+new MutationObserver(muts=>{
+  muts.forEach(mut=> mut.addedNodes.forEach(node=>{
+    if(node.nodeType!==1) return;
+    if(node.matches && node.matches('input[type="date"]')) convertDateInput(node);
+    if(node.querySelectorAll) scanAndConvertDateInputs(node);
+  }));
+}).observe(document.body, { childList:true, subtree:true });
+
+document.addEventListener('click', e=>{
+  if(e.target.closest && e.target.closest('.cal-input')){
+    openCalendarPicker(e.target.closest('.cal-input'));
+  } else if(calPickerEl && calPickerEl.style.display!=='none' && !calPickerEl.contains(e.target)){
+    closeCalendarPicker();
+  }
+});
+
 const formatNumber = n => (n===''||n===null||n===undefined||isNaN(Number(n))) ? '' : new Intl.NumberFormat('es-CL').format(Number(n));
 const formatMM = n => {
   if(n===''||n===null||n===undefined||isNaN(Number(n))) return '';
@@ -1933,6 +2068,7 @@ function renderAll(){
   renderMaestros();
   refreshDateHints();
   buildQuickJumpBar(document.querySelector('.tab-section.active'));
+  ajustarStickyFiltroArrendatarios();
 }
 
 // ---------- NAV ----------
@@ -1940,6 +2076,17 @@ function renderAll(){
 // no tener que scrollear todo el módulo para llegar a la parte que se necesita. Se arma
 // automáticamente a partir de los <h2> de las tarjetas visibles en ese momento (si una tarjeta
 // está oculta —p.ej. detrás de un sub-tab—, no aparece en la barra).
+// El filtro de arrendatario (dentro de la tarjeta) queda "pegado" justo debajo del sub-tab
+// Vigentes/Históricos — se mide su altura real en vez de adivinar un valor fijo en px, para que
+// nunca quede un espacio ni se superpongan, sin importar el tamaño de letra o el dispositivo.
+function ajustarStickyFiltroArrendatarios(){
+  const subtabs = document.getElementById('arrendatarios-subtabs');
+  if(!subtabs) return;
+  const h = subtabs.getBoundingClientRect().height;
+  document.querySelectorAll('.tenant-filter-sticky').forEach(f=> f.style.top = h+'px');
+}
+window.addEventListener('resize', ajustarStickyFiltroArrendatarios);
+
 function buildQuickJumpBar(section){
   if(!section) return;
   const h1 = section.querySelector(':scope > h1');
@@ -1971,6 +2118,7 @@ function switchTab(tabName){
   if(navItem) navItem.classList.add('active');
   const section = document.getElementById('tab-'+tabName);
   if(section){ section.classList.add('active'); buildQuickJumpBar(section); }
+  if(tabName==='arrendatarios') ajustarStickyFiltroArrendatarios();
   const topBell = document.getElementById('topbar-alert-btn');
   if(topBell) topBell.classList.toggle('active', tabName==='alertas');
   const sideBell = document.getElementById('sidebar-alert-btn');
@@ -2062,7 +2210,7 @@ function propField(label, value){
 }
 
 function renderPropSelectOptions(){
-  const optionsHtml = '<option value="">Todos</option>' + properties.map(p=>`<option value="${p.id}">${esc(p.direccion)}${p.unidad?' '+esc(p.unidad):''}</option>`).join('');
+  const optionsHtml = '<option value="">Todas las propiedades</option>' + properties.map(p=>`<option value="${p.id}">${esc(p.direccion)}${p.unidad?' '+esc(p.unidad):''}</option>`).join('');
   const sel = document.getElementById('prop-select');
   const current = sel.value;
   sel.innerHTML = optionsHtml;
@@ -2146,6 +2294,7 @@ document.getElementById('arrendatarios-subtabs').addEventListener('click', e=>{
   document.getElementById('arrendatarios-vigentes-panel').style.display = esVigentes ? 'block' : 'none';
   document.getElementById('arrendatarios-historicos-panel').style.display = esVigentes ? 'none' : 'block';
   buildQuickJumpBar(document.getElementById('tab-arrendatarios'));
+  ajustarStickyFiltroArrendatarios();
 });
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
@@ -2317,7 +2466,7 @@ function contractLabel(id){
 }
 
 function renderTenantSelectOptions(activos){
-  const optionsHtml = '<option value="">Todos</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const optionsHtml = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
   const sel = document.getElementById('tenant-select');
   const current = sel.value;
   sel.innerHTML = optionsHtml;
@@ -2474,14 +2623,17 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   pushToDriveIfConnected();
 });
 document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
+document.getElementById('pay-fechaPago').value = new Date().toISOString().slice(0,10);
 
 function resetPayForm(){
   editingPay = null;
   document.getElementById('form-pago').reset();
+  document.getElementById('pay-fechaPago').value = new Date().toISOString().slice(0,10);
   document.getElementById('pay-form-title').textContent='💵 Nuevo pago';
   document.getElementById('pay-cancel').style.display='none';
   document.getElementById('pay-valorArriendo-actual').textContent = '';
   document.getElementById('pay-valorArriendo-edit-field').style.display = 'none';
+  refreshDateHints();
 }
 function editPayment(id){
   const p = payments.find(x=>x.id===id);
@@ -3619,10 +3771,12 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
   pushToDriveIfConnected();
 });
 document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
+document.getElementById('r-fechaLectura').value = new Date().toISOString().slice(0,10);
 
 function resetReadingForm(){
   editingReading = null;
   document.getElementById('form-lectura').reset();
+  document.getElementById('r-fechaLectura').value = new Date().toISOString().slice(0,10);
   document.getElementById('r-form-title').textContent='🔧 Ingresar lectura o boleta';
   document.getElementById('r-cancel').style.display='none';
   document.getElementById('r-valorUnitario').readOnly = true;
@@ -4307,8 +4461,8 @@ function renderHistorialSelects(){
   const activos = contracts.filter(isActiveContract);
   const historicos = contracts.filter(c=>!isActiveContract(c));
 
-  selActivo.innerHTML = '<option value="">Todos</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  selHist.innerHTML = '<option value="">Todos</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  selActivo.innerHTML = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  selHist.innerHTML = '<option value="">Todos los arrendatarios</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
 
   if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
   if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
@@ -4488,7 +4642,7 @@ function computeCobranzaSaldo(c){
 }
 
 function renderHistoricosSelectOptions(historicos){
-  const optionsHtml = '<option value="">Todos</option>' + historicos.map(c=>`<option value="${c.id}">${esc(tenantNemo(c.tenantId) || tenantName(c.tenantId))} — ${contractPropertyIds(c).length ? esc(propAddresses(c)) : 'Sin identificar'}</option>`).join('');
+  const optionsHtml = '<option value="">Todos los arrendatarios</option>' + historicos.map(c=>`<option value="${c.id}">${esc(tenantNemo(c.tenantId) || tenantName(c.tenantId))} — ${contractPropertyIds(c).length ? esc(propAddresses(c)) : 'Sin identificar'}</option>`).join('');
   const sel = document.getElementById('historicos-select');
   const current = sel.value;
   sel.innerHTML = optionsHtml;
@@ -4555,6 +4709,8 @@ const MAESTRO_ESPECIALIDAD_STYLE = {
   'Albañil': { icono:'🧱', color:'#B4432E', bg:'#F4E3DF' },
   'Cerrajero': { icono:'🔑', color:'#4B5951', bg:'#E4E8E5' },
   'Cortinas Metálicas': { icono:'🚪', color:'#5B5B5B', bg:'#E6E6E6' },
+  'Retiro de escombros': { icono:'🪣', color:'#8A5A2E', bg:'#EBDDC9' },
+  'Poda de árboles': { icono:'🌲', color:'#3D6B2E', bg:'#E2EEDA' },
   'Jardinero': { icono:'🌳', color:'#1E5445', bg:'#DCEEE7' },
   'Multioficio': { icono:'🛠️', color:'#2B6F5C', bg:'#E1EEE9' },
   'Otro': { icono:'🔧', color:'#4B5951', bg:'#E4E8E5' },
@@ -4563,7 +4719,14 @@ function maestroEstilo(especialidad){
   return MAESTRO_ESPECIALIDAD_STYLE[especialidad] || MAESTRO_ESPECIALIDAD_STYLE['Otro'];
 }
 
+function renderMaestroEspecialidadChecks(){
+  const cont = document.getElementById('mae-especialidad-checks');
+  if(!cont.innerHTML){
+    cont.innerHTML = Object.keys(MAESTRO_ESPECIALIDAD_STYLE).map(e=>`<label><input type="checkbox" value="${esc(e)}"> ${maestroEstilo(e).icono} ${esc(e)}</label>`).join('');
+  }
+}
 function showMaestroForm(){
+  renderMaestroEspecialidadChecks();
   document.getElementById('maestroForm-wrap').style.display = 'block';
   document.getElementById('maestroForm-open-btn').style.display = 'none';
 }
@@ -4572,6 +4735,7 @@ function hideMaestroForm(){
   document.getElementById('maestroForm-open-btn').style.display = 'flex';
   editingMaestro = null;
   document.getElementById('form-maestro').reset();
+  document.querySelectorAll('#mae-especialidad-checks input').forEach(cb=> cb.checked=false);
   document.getElementById('maestro-form-title').textContent = '🛠️ Nuevo maestro';
   document.getElementById('maestro-cancel').style.display = 'none';
 }
@@ -4582,11 +4746,12 @@ document.getElementById('form-maestro').addEventListener('submit', async e=>{
   e.preventDefault();
   const nombre = document.getElementById('mae-nombre').value.trim();
   if(!nombre){ alert('Ingresa el nombre del maestro.'); return; }
+  const especialidades = Array.from(document.querySelectorAll('#mae-especialidad-checks input:checked')).map(cb=>cb.value);
+  if(!especialidades.length){ alert('Selecciona al menos una especialidad.'); return; }
   const obj = {
     id: editingMaestro || uid(),
     nombre,
-    especialidad: document.getElementById('mae-especialidad').value,
-    telefono: document.getElementById('mae-telefono').value.trim(),
+    especialidades,
     whatsapp: document.getElementById('mae-whatsapp').value.trim(),
     descripcionGeneral: document.getElementById('mae-descripcionGeneral').value.trim(),
   };
@@ -4601,14 +4766,14 @@ function editMaestro(id){
   const m = maestros.find(x=>x.id===id);
   if(!m) return;
   editingMaestro = id;
+  showMaestroForm();
   document.getElementById('mae-nombre').value = m.nombre||'';
-  document.getElementById('mae-especialidad').value = m.especialidad||'Otro';
-  document.getElementById('mae-telefono').value = m.telefono||'';
+  const especialidades = m.especialidades || (m.especialidad ? [m.especialidad] : []);
+  document.querySelectorAll('#mae-especialidad-checks input').forEach(cb=>{ cb.checked = especialidades.includes(cb.value); });
   document.getElementById('mae-whatsapp').value = m.whatsapp||'';
   document.getElementById('mae-descripcionGeneral').value = m.descripcionGeneral||'';
   document.getElementById('maestro-form-title').textContent = '🛠️ Editar maestro';
   document.getElementById('maestro-cancel').style.display = 'inline-block';
-  showMaestroForm();
   scrollAppToTop();
 }
 
@@ -4635,7 +4800,7 @@ async function toggleMaestroFavorito(id){
 function renderMaestroEspecialidadFilter(){
   const sel = document.getElementById('maestro-especialidad-filter');
   const current = sel.value;
-  const especialidadesUsadas = [...new Set(maestros.map(m=>m.especialidad))].sort();
+  const especialidadesUsadas = [...new Set(maestros.flatMap(m=>m.especialidades||[]))].sort();
   sel.innerHTML = '<option value="">Todas las especialidades</option>' + especialidadesUsadas.map(e=>`<option value="${esc(e)}">${maestroEstilo(e).icono} ${esc(e)}</option>`).join('');
   if(especialidadesUsadas.includes(current)) sel.value = current;
 }
@@ -4646,20 +4811,19 @@ function renderMaestros(){
   if(!el) return;
   renderMaestroEspecialidadFilter();
   const filtro = document.getElementById('maestro-especialidad-filter').value;
-  const lista = (filtro ? maestros.filter(m=>m.especialidad===filtro) : maestros)
-    .slice().sort((a,b)=> (b.favorito?1:0)-(a.favorito?1:0) || a.nombre.localeCompare(b.nombre));
+  const lista = (filtro ? maestros.filter(m=> (m.especialidades||[]).includes(filtro)) : maestros)
+    .slice().sort((a,b)=> (b.favorito?1:0)-(a.favorito?1:0) || (a.especialidades[0]||'').localeCompare(b.especialidades[0]||'') || a.nombre.localeCompare(b.nombre));
 
   if(!lista.length){ el.innerHTML = '<div class="empty">Aún no hay maestros registrados.</div>'; return; }
 
   el.innerHTML = lista.map((m,idx)=>{
-    const estilo = maestroEstilo(m.especialidad);
+    const estilo = maestroEstilo((m.especialidades||[])[0]);
     const trabajos = trabajosMaestros.filter(t=>t.maestroId===m.id).sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
     const cardKey = 'maestro:'+m.id;
     const expandido = expandedCards.has(cardKey);
 
     const contactoLinea = [
-      m.telefono ? `📞 ${esc(m.telefono)}` : '',
-      m.whatsapp ? `<a href="${waLink(m.whatsapp,'')}" target="_blank" rel="noopener">📲 WhatsApp</a>` : '',
+      m.whatsapp ? `<a href="${waLink(m.whatsapp,'')}" target="_blank" rel="noopener">📲 ${esc(m.whatsapp)}</a>` : '',
     ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
     let trabajosHtml = '';
@@ -4689,7 +4853,7 @@ function renderMaestros(){
               <div class="field"><label>Tipo</label>
                 <select id="tra-tipo-${m.id}"><option>Trabajo realizado</option><option>Presupuesto</option></select>
               </div>
-              <div class="field"><label>Categoría / rubro</label><input id="tra-categoria-${m.id}" placeholder="Ej: Pintura, Electricidad, Cañerías…" value="${esc(m.especialidad)}"></div>
+              <div class="field"><label>Categoría / rubro</label><input id="tra-categoria-${m.id}" placeholder="Ej: Pintura, Electricidad, Cañerías…" value="${esc((m.especialidades||[])[0]||'')}"></div>
               <div class="field"><label>Fecha del trabajo</label><input type="date" id="tra-fecha-${m.id}"></div>
               <div class="field"><label>Fecha de pago (si ya se pagó)</label><input type="date" id="tra-fechaPago-${m.id}"></div>
               <div class="field"><label>Propiedad / dirección (opcional)</label><input id="tra-propiedad-${m.id}" placeholder="Ej: San Diego 1712"></div>
@@ -4715,7 +4879,7 @@ function renderMaestros(){
           <span class="card-index">${idx+1})</span>
           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${estilo.bg};margin-right:4px;font-size:12px;">${estilo.icono}</span>
           <span class="prop-card-dir">${m.favorito?'⭐ ':''}${esc(m.nombre)}</span>
-          <span class="prop-card-unidad">${esc(m.especialidad)}${trabajos.length?` · ${trabajos.length} trabajo${trabajos.length>1?'s':''}`:''}</span>
+          <span class="prop-card-unidad">${esc((m.especialidades||[]).join(', '))}${trabajos.length?` · ${trabajos.length} trabajo${trabajos.length>1?'s':''}`:''}</span>
           <span class="prop-card-chevron">▸</span>
         </div>
         <div class="row-actions">
@@ -4745,7 +4909,7 @@ function toggleTrabajoForm(maestroId){
     if(!document.getElementById('tra-editId-'+maestroId).value){
       const m = maestros.find(x=>x.id===maestroId);
       document.getElementById('tra-tipo-'+maestroId).value = 'Trabajo realizado';
-      document.getElementById('tra-categoria-'+maestroId).value = m ? m.especialidad : '';
+      document.getElementById('tra-categoria-'+maestroId).value = m ? ((m.especialidades||[])[0]||'') : '';
       document.getElementById('tra-fecha-'+maestroId).value = new Date().toISOString().slice(0,10);
       document.getElementById('tra-fechaPago-'+maestroId).value = '';
       document.getElementById('tra-propiedad-'+maestroId).value = '';
