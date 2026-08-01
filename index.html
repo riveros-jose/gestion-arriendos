@@ -715,6 +715,7 @@
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required><span class="date-hint" id="c-fechaInicioContrato-hint"></span></div>
               <div class="field"><label>Fecha fin contrato</label><input id="c-fechaFinContrato" type="date"><span class="date-hint" id="c-fechaFinContrato-hint"></span></div>
+              <div class="field"><label>Meses de gracia (sin cobro, si aplica)</label><input id="c-mesesGracia" type="number" min="0" step="1" placeholder="0"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo de contrato</label><select id="c-tipoContrato"><option>Renovable</option><option>No Renovable</option></select></div>
@@ -1424,7 +1425,7 @@ function buildWorkbook(){
     direccion: propAddresses(c),
     nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
-    fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'',
+    fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'', mesesGracia: c.mesesGracia||0,
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
     tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
@@ -1434,8 +1435,8 @@ function buildWorkbook(){
     ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16,16,16,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16,16,16,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -2299,7 +2300,7 @@ document.getElementById('arrendatarios-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','whatsappNombreContacto','whatsappContacto'];
-const contractFields = ['fechaInicioContrato','fechaFinContrato','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -5063,8 +5064,11 @@ function computeContratoMonthlySeries(contratoId){
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
     const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
-    const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-    const monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(contratoId, year, month, montoContrato);
+    let monto = 0;
+    if(!estaEnMesDeGracia(c, year, month)){
+      const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
+      monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(contratoId, year, month, montoContrato);
+    }
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
 }
@@ -5108,15 +5112,45 @@ function contratoVigenteAlPrincipioDeMes(c, year, month){
   return true;
 }
 
+// Meses de gracia: los primeros N meses de un contrato (desde su fecha de inicio) en que se
+// pactó no cobrar arriendo. El contrato está vigente esos meses, pero no forman parte del
+// "pactado" porque no se espera recibir nada en ellos.
+function estaEnMesDeGracia(c, year, month){
+  const gracia = Number(c.mesesGracia||0);
+  if(!gracia || !c.fechaInicioContrato) return false;
+  const [iy, im] = c.fechaInicioContrato.split('-').map(Number);
+  const mesesTranscurridos = (year - iy)*12 + (month - (im-1));
+  return mesesTranscurridos >= 0 && mesesTranscurridos < gracia;
+}
+
+// A partir de este mes (inclusive) se exige que el contrato esté realmente vigente según sus
+// fechas registradas — antes de este corte, muchos contratos antiguos se renovaron sin quedar
+// registrados, así que se asume que si hubo un pago ese mes, el contrato seguía vigente.
+const CORTE_PACTADO_ESTRICTO = '2026-08';
+
+// ¿Corresponde contar el arriendo de este contrato en el "pactado" de este mes?
+function correspondeAlPactado(c, year, month, vigenteEseMes, tuvoPagoEseMes){
+  if(estaEnMesDeGracia(c, year, month)) return false;
+  const mesKey = `${year}-${String(month+1).padStart(2,'0')}`;
+  if(mesKey >= CORTE_PACTADO_ESTRICTO){
+    // Desde agosto 2026 en adelante: solo cuenta si está realmente vigente según sus fechas.
+    return vigenteEseMes;
+  }
+  const esHistoricoConDeuda = !isActiveContract(c) && Number(c.deudaPactada||0)>0;
+  if(esHistoricoConDeuda){
+    // Más estricto: solo si se cumplen ambas a la vez (vigente Y con pago real ese mes), para no
+    // inflar el pactado con meses sin cobrar de un contrato que terminó con saldo pendiente.
+    return vigenteEseMes && tuvoPagoEseMes;
+  }
+  // Antes del corte: cuenta si estaba vigente O si hubo un pago registrado ese mes (respaldo por
+  // contratos antiguos renovados sin quedar registrados).
+  return vigenteEseMes || tuvoPagoEseMes;
+}
+
 function computeGlobalMonthlySeries(){
-  // Se consideran TODOS los contratos (activos e históricos). El "arriendo pactado" (esperado)
-  // de un mes suma a TODOS los contratos que estaban vigentes al principio de ese mes, tuvieran
-  // o no un pago ya registrado — así el gráfico muestra bien la brecha real entre lo esperado y
-  // lo efectivamente cobrado, en vez de "esconder" a quienes simplemente no se han ingresado
-  // todavía. Lo pagado/descontado, en cambio, sigue dependiendo de los pagos realmente
-  // registrados (no se puede inventar un pago que no existe).
-  // EXCEPCIÓN: un contrato histórico (ya finalizado) que quedó con deuda pactada pendiente no se
-  // considera en el "pactado" — ese saldo es cobranza de una deuda, no arriendo normal del mes.
+  // Se consideran TODOS los contratos (activos e históricos). Ver correspondeAlPactado() para la
+  // definición completa de qué meses cuentan como "pactado" de cada contrato. Lo pagado y los
+  // descuentos, en cambio, siempre dependen de los pagos realmente registrados.
   const todos = contracts;
   const starts = todos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
   if(!starts.length) return [];
@@ -5135,17 +5169,10 @@ function computeGlobalMonthlySeries(){
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
       const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
 
-      const esHistoricoConDeuda = !isActiveContract(c) && Number(c.deudaPactada||0)>0;
       const vigenteEseMes = contratoVigenteAlPrincipioDeMes(c, year, month);
       const tuvoPagoEseMes = pagosMes.length>0;
-      // Caso normal: cuenta si estaba vigente O si hay un pago registrado ese mes (respaldo por
-      // si la fecha de inicio/término del contrato quedó incompleta o mal cargada).
-      // Histórico CON deuda pendiente: más estricto — solo cuenta si se cumplen AMBAS a la vez
-      // (vigente Y con pago real ese mes), para no inflar el pactado con meses sin cobrar de un
-      // contrato que terminó con saldo pendiente.
-      const correspondeEseMes = esHistoricoConDeuda ? (vigenteEseMes && tuvoPagoEseMes) : (vigenteEseMes || tuvoPagoEseMes);
       let montoC = 0;
-      if(correspondeEseMes){
+      if(correspondeAlPactado(c, year, month, vigenteEseMes, tuvoPagoEseMes)){
         const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
         montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
       }
