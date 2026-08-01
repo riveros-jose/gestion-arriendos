@@ -5178,10 +5178,19 @@ function computeGlobalMonthlySeries(){
       const tuvoPagoEseMes = pagosMes.length>0;
       let montoC = 0;
       if(correspondeAlPactado(c, year, month, vigenteEseMes, tuvoPagoEseMes)){
-        // Se usa directamente el monto pactado ACTUAL del contrato — no se busca el valor
-        // histórico/con IPC de pagos anteriores, ya que "pactado" es lo que corresponde cobrar
-        // hoy según el contrato vigente, no una reconstrucción de lo que se cobraba antes.
-        montoC = Number(c.montoArriendoPactado||0);
+        const mesKey = `${year}-${String(month+1).padStart(2,'0')}`;
+        if(mesKey >= CORTE_PACTADO_ESTRICTO){
+          // Mes actual/reciente: se usa el monto pactado ACTUAL del contrato — es lo que
+          // corresponde cobrar hoy, sin buscar valores históricos.
+          montoC = Number(c.montoArriendoPactado||0);
+        } else {
+          // Mes histórico: se usa el valor real que se cobraba en ese momento (el propio pago
+          // de ese mes, o el más cercano conocido) — NO el monto pactado actual, que para un
+          // contrato ya finalizado (como uno con deuda) puede haber quedado en $0 o desactualizado
+          // y borraría sus meses realmente pagados.
+          const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
+          montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
+        }
       }
       monto += montoC; pagado += pagadoC; descuento += descC;
     });
