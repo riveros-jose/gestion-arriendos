@@ -5112,14 +5112,19 @@ function contratoVigenteAlPrincipioDeMes(c, year, month){
   return true;
 }
 
-// Meses de gracia: los primeros N meses de un contrato (desde su fecha de inicio) en que se
-// pactó no cobrar arriendo. El contrato está vigente esos meses, pero no forman parte del
-// "pactado" porque no se espera recibir nada en ellos.
+// Meses de gracia: los primeros N meses COMPLETOS de un contrato (desde su fecha de inicio) en
+// que se pactó no cobrar arriendo. El contrato está vigente esos meses, pero no forman parte
+// del "pactado" porque no se espera recibir nada en ellos. Si el contrato no empieza el día 1
+// de un mes (ej. 31 de julio), ese mes suelto no cuenta como el primero de los de gracia — el
+// primer mes de gracia es el siguiente mes completo (ej. empieza el 31-jul → gracia parte en
+// agosto, no en julio).
 function estaEnMesDeGracia(c, year, month){
   const gracia = Number(c.mesesGracia||0);
   if(!gracia || !c.fechaInicioContrato) return false;
-  const [iy, im] = c.fechaInicioContrato.split('-').map(Number);
-  const mesesTranscurridos = (year - iy)*12 + (month - (im-1));
+  const [iy, im, id] = c.fechaInicioContrato.split('-').map(Number);
+  let baseYear = iy, baseMonth = im-1; // mes de inicio, en formato 0-based
+  if(id !== 1){ baseMonth++; if(baseMonth>11){ baseMonth=0; baseYear++; } }
+  const mesesTranscurridos = (year - baseYear)*12 + (month - baseMonth);
   return mesesTranscurridos >= 0 && mesesTranscurridos < gracia;
 }
 
@@ -5173,8 +5178,10 @@ function computeGlobalMonthlySeries(){
       const tuvoPagoEseMes = pagosMes.length>0;
       let montoC = 0;
       if(correspondeAlPactado(c, year, month, vigenteEseMes, tuvoPagoEseMes)){
-        const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-        montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
+        // Se usa directamente el monto pactado ACTUAL del contrato — no se busca el valor
+        // histórico/con IPC de pagos anteriores, ya que "pactado" es lo que corresponde cobrar
+        // hoy según el contrato vigente, no una reconstrucción de lo que se cobraba antes.
+        montoC = Number(c.montoArriendoPactado||0);
       }
       monto += montoC; pagado += pagadoC; descuento += descC;
     });
