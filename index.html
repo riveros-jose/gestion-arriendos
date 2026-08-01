@@ -4663,7 +4663,7 @@ function renderMaestros(){
     ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
     let trabajosHtml = '';
-    if(expandido){
+    {
       const filasTrabajos = trabajos.length ? trabajos.map(t=>{
         const tagClass = t.tipo==='Presupuesto' ? 'tag-pending' : 'tag-ok';
         return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
