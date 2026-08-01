@@ -101,6 +101,9 @@
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
   .tag-debt{background:var(--brick-soft);color:var(--brick);}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
+  .estado-select-pagado{background:var(--teal-soft);color:var(--teal-dark);border-color:var(--teal)!important;}
+  .estado-select-atrasado{background:var(--brick-soft);color:var(--brick);border-color:var(--brick)!important;}
+  .estado-select-pendiente{background:#FBF1DC;color:#8A6410;border-color:var(--gold)!important;}
   .row-actions{display:flex;gap:8px;}
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
@@ -131,7 +134,7 @@
   .table-action-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
   .table-action-btn.danger:hover{background:var(--brick-soft);border-color:var(--brick);}
   .table-action-btn-lg{width:36px;height:36px;font-size:17px;border-radius:9px;}
-  .table-actions-group{display:flex;gap:5px;flex-wrap:wrap;}
+  .table-actions-group{display:flex;gap:5px;flex-wrap:nowrap;white-space:nowrap;}
   .row-actions-inline{display:inline-flex;gap:5px;margin-left:8px;vertical-align:middle;}
   .empty{color:var(--ink-soft);font-size:13.5px;padding:20px 0;text-align:center;}
   .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
@@ -3754,7 +3757,7 @@ function buildReadingsTableHtml(list){
       <div class="cell-stacked-sub">$${formatNumber(r.valorUnitario)} c/u</div>
     </td>
     <td>
-      <select class="mini-select" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--border);" title="Cambiar estado de esta lectura" onchange="confirmarCambioEstadoLectura(this,'${r.id}')">
+      <select class="mini-select estado-select-${r.estado==='Pagado' ? 'pagado' : (r.estadoEfectivo==='Atrasado' ? 'atrasado' : 'pendiente')}" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--border);font-weight:600;" title="Cambiar estado de esta lectura" onchange="confirmarCambioEstadoLectura(this,'${r.id}')">
         <option value="Pendiente" ${r.estado!=='Pagado'?'selected':''}>${r.estadoEfectivo==='Atrasado'?'Atrasado':'Pendiente'}</option>
         <option value="Pagado" ${r.estado==='Pagado'?'selected':''}>Pagado</option>
       </select>
