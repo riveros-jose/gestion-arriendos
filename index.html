@@ -59,6 +59,7 @@
   .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;}
   .card h2{font-family:'Fraunces',serif;font-size:18px;margin:0 0 18px;font-weight:600;}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  #form-pago .grid{gap:8px;}
   .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
   input[type="file"]{width:100%;max-width:100%;box-sizing:border-box;}
   .field.full{grid-column:1 / -1;}
@@ -329,9 +330,10 @@
     .card{padding:16px 14px;margin-bottom:18px;border-radius:12px;}
     .subtabs-sticky{margin:0 -14px 16px;padding:10px 14px;}
     .grid{grid-template-columns:1fr;}
-    /* El formulario de "Ingresar lectura" usa 2 columnas incluso en mobile (los campos que no
-       son "full" son cortos), para que el formulario entero quepa en menos alto de pantalla. */
-    #form-lectura .grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+    /* El formulario de "Ingresar lectura" y el de "Ingresar pago" usan 2 columnas incluso en
+       mobile (la mayoría de sus campos son cortos), para que el formulario entero quepa en
+       menos alto de pantalla. */
+    #form-lectura .grid,#form-pago .grid{grid-template-columns:repeat(2,1fr);gap:10px;}
     .line-row{grid-template-columns:1fr;}
     .summary-cards{grid-template-columns:repeat(2,1fr);}
     .page-header-row h1{font-size:19px;}
@@ -2607,7 +2609,7 @@ function buildAlertCardHtml(g){
   return `<div class="alert-card ${urgencyClass}">
     <div class="title">${esc(titleParts.join(' + '))}</div>
     ${lines.join('')}
-    ${anyVencido ? `<button type="button" class="btn" style="background:var(--azul);color:#fff;border-color:var(--azul);" onclick="openUpdateContractModal('${g.c.id}')">Actualizar o finalizar contrato</button>` : ''}
+    <button type="button" class="btn" style="background:var(--azul);color:#fff;border-color:var(--azul);" onclick="openUpdateContractModal('${g.c.id}')">Actualizar o finalizar contrato</button>
   </div>`;
 }
 
