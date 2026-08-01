@@ -5109,6 +5109,10 @@ function contratoVigenteAlPrincipioDeMes(c, year, month){
   const inicioMesIso = `${year}-${String(month+1).padStart(2,'0')}-01`;
   if(c.fechaInicioContrato && c.fechaInicioContrato > inicioMesIso) return false; // aún no empezaba
   if(c.fechaTermino && c.fechaTermino < inicioMesIso) return false; // ya había terminado
+  // Un contrato HISTÓRICO (ya no activo) sin fecha de término registrada no se puede asumir
+  // "vigente para siempre" solo porque falta ese dato — sin él, se confía únicamente en si hay
+  // un pago real registrado ese mes (ver correspondeAlPactado).
+  if(!isActiveContract(c) && !c.fechaTermino) return false;
   return true;
 }
 
