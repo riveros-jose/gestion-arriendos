@@ -101,9 +101,9 @@
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
   .tag-debt{background:var(--brick-soft);color:var(--brick);}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
-  .estado-select-pagado{background:var(--teal-soft);color:var(--teal-dark);border-color:var(--teal)!important;}
-  .estado-select-atrasado{background:var(--brick-soft);color:var(--brick);border-color:var(--brick)!important;}
-  .estado-select-pendiente{background:#FBF1DC;color:#8A6410;border-color:var(--gold)!important;}
+  .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
+  .estado-select-atrasado{background:#F2C4B8!important;color:var(--brick)!important;border-color:var(--brick)!important;}
+  .estado-select-pendiente{background:#FCE588!important;color:#6B4E00!important;border-color:#D9A800!important;}
   .row-actions{display:flex;gap:8px;}
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
@@ -234,6 +234,9 @@
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
   .subtabs-sticky{position:sticky;top:0;z-index:20;background:var(--card);padding:10px 24px;margin:0 -24px 16px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.15);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
+  .quick-jump-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;}
+  .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
+  .quick-jump-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
   .subtab-btn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
   .checkbox-list{border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:150px;overflow-y:auto;background:#fdfdfc;}
   .checkbox-list label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--ink);padding:4px 0;cursor:pointer;}
@@ -393,6 +396,8 @@
     .mini-reload{display:none;}
     .subtabs{overflow-x:visible;flex-wrap:nowrap;padding-bottom:0;gap:6px;}
     .subtab-btn{flex:1;flex-shrink:1;padding:8px 6px;font-size:11px;text-align:center;white-space:nowrap;}
+    .quick-jump-bar{gap:5px;margin-bottom:16px;}
+    .quick-jump-btn{font-size:10.5px;padding:5px 9px;}
     .toggle-form{flex-wrap:wrap;gap:8px;}
     .toggle-form .btn{width:100%;}
     .checkbox-list label{padding:8px 0;}
@@ -545,7 +550,7 @@
     <div class="nav-item" data-tab="alertas" title="Alertas" style="display:none"><span class="nav-icon">🔔</span><span class="nav-label"> Alertas</span></div>
     <div class="nav-item" data-tab="arrendatarios" title="Arrendatarios & Contratos"><span class="num">04</span> <span class="nav-icon">📄</span><span class="nav-label"> Arrendatarios &amp; Contratos</span></div>
     <div class="nav-item" data-tab="propiedades" title="Propiedades"><span class="num">05</span> <span class="nav-icon">🏠</span><span class="nav-label"> Propiedades</span></div>
-    <div class="nav-item" data-tab="historicos" title="Arrendatarios Históricos"><span class="num">06</span> <span class="nav-icon">🗂️</span><span class="nav-label"> Arrendatarios Históricos</span></div>
+    <div class="nav-item" data-tab="maestros" title="Maestros y Arreglos"><span class="num">06</span> <span class="nav-icon">🛠️</span><span class="nav-label"> Maestros y Arreglos</span></div>
     <div class="sidebar-foot">Los datos se guardan en Google Drive, en la carpeta RentaPro.</div>
   </div>
 
@@ -706,14 +711,28 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="collapsible-header" onclick="toggleCollapse('tenants')">
-          <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" title="Recargar desde Excel" onclick="event.stopPropagation();reloadFromDrive()">⟳</span></h2>
-          <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
+      <div class="subtabs subtabs-sticky" id="arrendatarios-subtabs">
+        <button type="button" class="subtab-btn active" data-subtab="vigentes">📋 Contratos Vigentes</button>
+        <button type="button" class="subtab-btn" data-subtab="historicos">🗂️ Históricos</button>
+      </div>
+
+      <div id="arrendatarios-vigentes-panel">
+        <div class="card">
+          <div class="collapsible-header" onclick="toggleCollapse('tenants')">
+            <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" title="Recargar desde Excel" onclick="event.stopPropagation();reloadFromDrive()">⟳</span></h2>
+            <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
+          </div>
+          <div id="tenants-list-wrap" style="display:block">
+            <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
+            <div id="tenant-table" class="table-wrap"></div>
+          </div>
         </div>
-        <div id="tenants-list-wrap" style="display:block">
-          <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
-          <div id="tenant-table" class="table-wrap"></div>
+      </div>
+
+      <div id="arrendatarios-historicos-panel" style="display:none">
+        <div class="card">
+          <select class="filter" id="historicos-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
+          <div id="historicos-table" class="table-wrap"></div>
         </div>
       </div>
     </div>
@@ -876,15 +895,57 @@
       </div>
     </div>
 
-    <!-- HISTORIAL MENSUAL -->
-    <!-- ARRENDATARIOS HISTÓRICOS -->
-    <div class="tab-section" id="tab-historicos">
-      <h1>🗂️ Arrendatarios Históricos</h1>
+    <!-- MAESTROS Y ARREGLOS -->
+    <div class="tab-section" id="tab-maestros">
+      <h1>🛠️ Maestros y Arreglos</h1>
+
       <div class="card">
-        <select class="filter" id="historicos-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
-        <div id="historicos-table" class="table-wrap"></div>
+        <button type="button" class="btn-add-new" id="maestroForm-open-btn" onclick="showMaestroForm()"><span class="plus-icon">+</span> Registrar nuevo maestro</button>
+        <div id="maestroForm-wrap" style="display:none">
+          <div class="toggle-form">
+            <h2 id="maestro-form-title">🛠️ Nuevo maestro</h2>
+            <button type="button" class="btn btn-secondary" onclick="hideMaestroForm()">Ocultar formulario</button>
+          </div>
+          <form id="form-maestro" class="form-compact">
+            <input type="hidden" id="mae-id">
+            <div class="grid">
+              <div class="field"><label>Nombre</label><input id="mae-nombre" required></div>
+              <div class="field"><label>Especialidad</label>
+                <select id="mae-especialidad">
+                  <option>Electricista</option>
+                  <option>Gasfíter / Plomero</option>
+                  <option>Pintor</option>
+                  <option>Carpintero</option>
+                  <option>Albañil</option>
+                  <option>Cerrajero</option>
+                  <option>Jardinero</option>
+                  <option>Multioficio</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div class="field"><label>Teléfono</label><input id="mae-telefono"></div>
+              <div class="field"><label>WhatsApp de contacto</label><input id="mae-whatsapp" placeholder="+56 9 1234 5678"></div>
+              <div class="field"><label>Correo</label><input id="mae-correo" type="email"></div>
+              <div class="field"><label>Dirección</label><input id="mae-direccion"></div>
+              <div class="field full"><label>Descripción general</label><textarea id="mae-descripcionGeneral" rows="2" placeholder="Notas generales sobre este maestro — especialidades, referencias, tarifas habituales, etc."></textarea></div>
+            </div>
+            <div class="btn-row">
+              <button type="submit" class="btn btn-primary">Guardar maestro</button>
+              <button type="button" class="btn btn-secondary" id="maestro-cancel" style="display:none">Cancelar edición</button>
+            </div>
+            <div class="status-msg" id="maestro-status"></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🛠️ Maestros registrados <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+        <select class="filter" id="maestro-especialidad-filter" style="max-width:320px;"></select>
+        <div id="maestros-list" style="margin-top:14px;"></div>
       </div>
     </div>
+
+    <!-- HISTORIAL MENSUAL -->
 
   </div>
 </div>
@@ -1391,6 +1452,24 @@ function buildWorkbook(){
   styleWorksheet(wsBol, [10,10,8,10,12,10,12,32]);
   XLSX.utils.book_append_sheet(wb, wsBol, 'BoletasSector');
 
+  const maestroRows = maestros.length ? maestros.map(m=>({
+    id: m.id, nombre: m.nombre, especialidad: m.especialidad, telefono: m.telefono||'', whatsapp: m.whatsapp||'',
+    correo: m.correo||'', direccion: m.direccion||'', descripcionGeneral: m.descripcionGeneral||''
+  })) : [{}];
+  const wsMae = XLSX.utils.json_to_sheet(maestroRows);
+  applyColumnFormats(wsMae, ['id','nombre','especialidad','telefono','whatsapp','correo','direccion','descripcionGeneral']);
+  styleWorksheet(wsMae, [10,22,16,14,14,22,28,36]);
+  XLSX.utils.book_append_sheet(wb, wsMae, 'Maestros');
+
+  const trabajoRows = trabajosMaestros.length ? trabajosMaestros.map(t=>({
+    id: t.id, maestroId: t.maestroId, tipo: t.tipo, fecha: t.fecha||'', propiedadDireccion: t.propiedadDireccion||'',
+    descripcion: t.descripcion||'', monto: t.monto||'', estado: t.estado||'', comentarios: t.comentarios||''
+  })) : [{}];
+  const wsTra = XLSX.utils.json_to_sheet(trabajoRows);
+  applyColumnFormats(wsTra, ['id','maestroId','tipo','fecha','propiedadDireccion','descripcion','monto','estado','comentarios']);
+  styleWorksheet(wsTra, [10,10,16,12,26,36,12,14,32]);
+  XLSX.utils.book_append_sheet(wb, wsTra, 'TrabajosMaestros');
+
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
@@ -1444,6 +1523,8 @@ function loadFromWorkbook(arrayBuffer){
   const paySheet = wb.Sheets['Pagos'];
   const readingSheet = wb.Sheets['Servicios'];
   const boletaSheet = wb.Sheets['BoletasSector'];
+  const maestroSheet = wb.Sheets['Maestros'];
+  const trabajoSheet = wb.Sheets['TrabajosMaestros'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
 
@@ -1451,6 +1532,8 @@ function loadFromWorkbook(arrayBuffer){
   const rawPayments = paySheet ? XLSX.utils.sheet_to_json(paySheet).filter(r=>r.id) : [];
   const rawReadings = readingSheet ? XLSX.utils.sheet_to_json(readingSheet).filter(r=>r.id) : [];
   const rawBoletas = boletaSheet ? XLSX.utils.sheet_to_json(boletaSheet).filter(r=>r.id) : [];
+  const rawMaestros = maestroSheet ? XLSX.utils.sheet_to_json(maestroSheet).filter(r=>r.id) : [];
+  const rawTrabajos = trabajoSheet ? XLSX.utils.sheet_to_json(trabajoSheet).filter(r=>r.id) : [];
   lastDateCorruptionCount = countDateTimeCorruption(rawContracts) + countDateTimeCorruption(rawPayments) + countDateTimeCorruption(rawReadings);
 
   contracts = rawContracts.map(c=> normalizeDates({
@@ -1466,6 +1549,14 @@ function loadFromWorkbook(arrayBuffer){
   }));
   sectorBoletas = rawBoletas.map(b=>({
     id:b.id, servicio:b.servicio||'Agua', sector:Number(b.sector)||1, mes:b.mes||'', total:b.total||'', consumo:b.consumo||'', lecturaActual:b.lecturaActual||'', boletaUrl:b.boletaUrl||''
+  }));
+  maestros = rawMaestros.map(m=>({
+    id:m.id, nombre:m.nombre||'', especialidad:m.especialidad||'Otro', telefono:m.telefono||'', whatsapp:m.whatsapp||'',
+    correo:m.correo||'', direccion:m.direccion||'', descripcionGeneral:m.descripcionGeneral||''
+  }));
+  trabajosMaestros = rawTrabajos.map(t=> normalizeDates({
+    id:t.id, maestroId:t.maestroId, tipo:t.tipo||'Trabajo realizado', fecha:t.fecha||'', propiedadDireccion:t.propiedadDireccion||'',
+    descripcion:t.descripcion||'', monto:t.monto||'', estado:t.estado||'Presupuestado', comentarios:t.comentarios||''
   }));
 }
 
@@ -1636,6 +1727,7 @@ async function exportWorkbookToGoogleSheets(wb, filenamePrefix){
 // ================== FIN CONFIGURACIÓN DRIVE ==================
 
 let properties = [], tenants = [], contracts = [], payments = [], readings = [], sectorBoletas = [];
+let maestros = [], trabajosMaestros = [];
 const collapseState = { tenants:true, contracts:false };
 // Sube al inicio: en desktop scrollea la ventana; en mobile scrollea el contenedor .main
 // (que es donde ocurre el scroll para evitar el botón flotante nativo del navegador).
@@ -1825,17 +1917,47 @@ function renderAll(){
   renderFlujoCobro();
   renderHistorial();
   renderHistoricos();
+  renderMaestros();
   refreshDateHints();
+  buildQuickJumpBar(document.querySelector('.tab-section.active'));
 }
 
 // ---------- NAV ----------
+// Construye, arriba de cada sección, una barra de accesos rápidos a sus propias tarjetas — para
+// no tener que scrollear todo el módulo para llegar a la parte que se necesita. Se arma
+// automáticamente a partir de los <h2> de las tarjetas visibles en ese momento (si una tarjeta
+// está oculta —p.ej. detrás de un sub-tab—, no aparece en la barra).
+function buildQuickJumpBar(section){
+  if(!section) return;
+  const h1 = section.querySelector(':scope > h1');
+  if(!h1) return;
+  let bar = section.querySelector(':scope > .quick-jump-bar');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.className = 'quick-jump-bar';
+    h1.insertAdjacentElement('afterend', bar);
+  }
+  const cards = Array.from(section.querySelectorAll('.card')).filter(c=> c.offsetParent!==null);
+  const items = [];
+  cards.forEach((card, i)=>{
+    const h2 = card.querySelector('h2');
+    if(!h2) return;
+    if(!card.id) card.id = section.id+'-jump-'+i;
+    const label = h2.textContent.replace(/⟳/g,'').replace(/\s+/g,' ').trim();
+    if(label) items.push({ id: card.id, label });
+  });
+  if(items.length<=1){ bar.style.display='none'; bar.innerHTML=''; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = items.map(it=> `<button type="button" class="quick-jump-btn" onclick="document.getElementById('${it.id}').scrollIntoView({behavior:'smooth',block:'start'})">${esc(it.label)}</button>`).join('');
+}
+
 function switchTab(tabName){
   document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
   document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
   const navItem = document.querySelector('.nav-item[data-tab="'+tabName+'"]');
   if(navItem) navItem.classList.add('active');
   const section = document.getElementById('tab-'+tabName);
-  if(section) section.classList.add('active');
+  if(section){ section.classList.add('active'); buildQuickJumpBar(section); }
   const topBell = document.getElementById('topbar-alert-btn');
   if(topBell) topBell.classList.toggle('active', tabName==='alertas');
   const sideBell = document.getElementById('sidebar-alert-btn');
@@ -2001,6 +2123,16 @@ document.getElementById('prop-subtabs').addEventListener('click', e=>{
   propActiveSubtab = btn.dataset.subtab;
   document.querySelectorAll('#prop-subtabs .subtab-btn').forEach(b=> b.classList.toggle('active', b===btn));
   renderProperties();
+});
+
+document.getElementById('arrendatarios-subtabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.subtab-btn');
+  if(!btn) return;
+  document.querySelectorAll('#arrendatarios-subtabs .subtab-btn').forEach(b=> b.classList.toggle('active', b===btn));
+  const esVigentes = btn.dataset.subtab==='vigentes';
+  document.getElementById('arrendatarios-vigentes-panel').style.display = esVigentes ? 'block' : 'none';
+  document.getElementById('arrendatarios-historicos-panel').style.display = esVigentes ? 'none' : 'block';
+  buildQuickJumpBar(document.getElementById('tab-arrendatarios'));
 });
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
@@ -2407,8 +2539,17 @@ function effectiveDebtStartDate(contratoId){
 }
 
 function computeResumenRows(){
+  // El mes en curso no se cuenta como deuda todavía — recién se considera "atrasado" una vez
+  // que pasó ese mes completo. Si ya se registró un pago para el mes en curso (por ejemplo, pagó
+  // adelantado), sí se contabiliza normalmente, para no esconder ese pago del cálculo.
+  const hoy = new Date();
+  const mesActualY = hoy.getFullYear(), mesActualM = hoy.getMonth();
   const activos = contracts.filter(isActiveContract).map(c=>{
-    const series = computeContratoMonthlySeries(c.id);
+    const series = computeContratoMonthlySeries(c.id).map(d=>{
+      const esMesActual = d.year===mesActualY && d.month===mesActualM;
+      const sinPagoAun = d.pagado===0 && d.descuento===0;
+      return (esMesActual && sinPagoAun) ? {...d, monto:0} : d;
+    });
     const totalPagado = series.reduce((s,d)=>s+d.pagado,0);
     const totalDescuentos = series.reduce((s,d)=>s+d.descuento,0);
     const totalEsperado = series.reduce((s,d)=>s+d.monto,0);
@@ -4384,6 +4525,259 @@ function renderHistoricos(){
   }).join('');
 }
 document.getElementById('historicos-select').addEventListener('change', renderHistoricos);
+
+// ---------- MAESTROS Y ARREGLOS ----------
+const MAESTRO_ESPECIALIDAD_STYLE = {
+  'Electricista': { icono:'⚡', color:'#B98B2A', bg:'#F7E9CE' },
+  'Gasfíter / Plomero': { icono:'🚰', color:'#1E5B8C', bg:'#D9EAF7' },
+  'Pintor': { icono:'🎨', color:'#5B3B8C', bg:'#E7DEF2' },
+  'Carpintero': { icono:'🪚', color:'#8A5A2E', bg:'#F0E1D0' },
+  'Albañil': { icono:'🧱', color:'#B4432E', bg:'#F4E3DF' },
+  'Cerrajero': { icono:'🔑', color:'#4B5951', bg:'#E4E8E5' },
+  'Jardinero': { icono:'🌳', color:'#1E5445', bg:'#DCEEE7' },
+  'Multioficio': { icono:'🛠️', color:'#2B6F5C', bg:'#E1EEE9' },
+  'Otro': { icono:'🔧', color:'#4B5951', bg:'#E4E8E5' },
+};
+function maestroEstilo(especialidad){
+  return MAESTRO_ESPECIALIDAD_STYLE[especialidad] || MAESTRO_ESPECIALIDAD_STYLE['Otro'];
+}
+
+function showMaestroForm(){
+  document.getElementById('maestroForm-wrap').style.display = 'block';
+  document.getElementById('maestroForm-open-btn').style.display = 'none';
+}
+function hideMaestroForm(){
+  document.getElementById('maestroForm-wrap').style.display = 'none';
+  document.getElementById('maestroForm-open-btn').style.display = 'flex';
+  editingMaestro = null;
+  document.getElementById('form-maestro').reset();
+  document.getElementById('maestro-form-title').textContent = '🛠️ Nuevo maestro';
+  document.getElementById('maestro-cancel').style.display = 'none';
+}
+let editingMaestro = null;
+document.getElementById('maestro-cancel').addEventListener('click', hideMaestroForm);
+
+document.getElementById('form-maestro').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const nombre = document.getElementById('mae-nombre').value.trim();
+  if(!nombre){ alert('Ingresa el nombre del maestro.'); return; }
+  const obj = {
+    id: editingMaestro || uid(),
+    nombre,
+    especialidad: document.getElementById('mae-especialidad').value,
+    telefono: document.getElementById('mae-telefono').value.trim(),
+    whatsapp: document.getElementById('mae-whatsapp').value.trim(),
+    correo: document.getElementById('mae-correo').value.trim(),
+    direccion: document.getElementById('mae-direccion').value.trim(),
+    descripcionGeneral: document.getElementById('mae-descripcionGeneral').value.trim(),
+  };
+  maestros = editingMaestro ? maestros.map(m=> m.id===editingMaestro ? obj : m) : [...maestros, obj];
+  await saveKey('maestros', maestros);
+  hideMaestroForm();
+  renderMaestros();
+  pushToDriveIfConnected();
+});
+
+function editMaestro(id){
+  const m = maestros.find(x=>x.id===id);
+  if(!m) return;
+  editingMaestro = id;
+  document.getElementById('mae-nombre').value = m.nombre||'';
+  document.getElementById('mae-especialidad').value = m.especialidad||'Otro';
+  document.getElementById('mae-telefono').value = m.telefono||'';
+  document.getElementById('mae-whatsapp').value = m.whatsapp||'';
+  document.getElementById('mae-correo').value = m.correo||'';
+  document.getElementById('mae-direccion').value = m.direccion||'';
+  document.getElementById('mae-descripcionGeneral').value = m.descripcionGeneral||'';
+  document.getElementById('maestro-form-title').textContent = '🛠️ Editar maestro';
+  document.getElementById('maestro-cancel').style.display = 'inline-block';
+  showMaestroForm();
+  scrollAppToTop();
+}
+
+async function deleteMaestro(id){
+  const m = maestros.find(x=>x.id===id);
+  if(!m) return;
+  const tieneTrabajos = trabajosMaestros.some(t=>t.maestroId===id);
+  if(!confirm(`¿Eliminar a ${m.nombre}?${tieneTrabajos ? ' Esto también eliminará su historial de trabajos y presupuestos registrados.' : ''}`)) return;
+  maestros = maestros.filter(x=>x.id!==id);
+  trabajosMaestros = trabajosMaestros.filter(t=>t.maestroId!==id);
+  await saveKey('maestros', maestros);
+  await saveKey('trabajosMaestros', trabajosMaestros);
+  renderMaestros();
+  pushToDriveIfConnected();
+}
+
+function renderMaestroEspecialidadFilter(){
+  const sel = document.getElementById('maestro-especialidad-filter');
+  const current = sel.value;
+  const especialidadesUsadas = [...new Set(maestros.map(m=>m.especialidad))].sort();
+  sel.innerHTML = '<option value="">Todas las especialidades</option>' + especialidadesUsadas.map(e=>`<option value="${esc(e)}">${maestroEstilo(e).icono} ${esc(e)}</option>`).join('');
+  if(especialidadesUsadas.includes(current)) sel.value = current;
+}
+document.getElementById('maestro-especialidad-filter').addEventListener('change', renderMaestros);
+
+function renderMaestros(){
+  const el = document.getElementById('maestros-list');
+  if(!el) return;
+  renderMaestroEspecialidadFilter();
+  const filtro = document.getElementById('maestro-especialidad-filter').value;
+  const lista = (filtro ? maestros.filter(m=>m.especialidad===filtro) : maestros)
+    .slice().sort((a,b)=> a.nombre.localeCompare(b.nombre));
+
+  if(!lista.length){ el.innerHTML = '<div class="empty">Aún no hay maestros registrados.</div>'; return; }
+
+  el.innerHTML = lista.map((m,idx)=>{
+    const estilo = maestroEstilo(m.especialidad);
+    const trabajos = trabajosMaestros.filter(t=>t.maestroId===m.id).sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
+    const cardKey = 'maestro:'+m.id;
+    const expandido = expandedCards.has(cardKey);
+
+    const contactoLinea = [
+      m.telefono ? `📞 ${esc(m.telefono)}` : '',
+      m.whatsapp ? `<a href="${waLink(m.whatsapp,'')}" target="_blank" rel="noopener">📲 WhatsApp</a>` : '',
+      m.correo ? `✉️ ${esc(m.correo)}` : '',
+    ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+
+    let trabajosHtml = '';
+    if(expandido){
+      const filasTrabajos = trabajos.length ? trabajos.map(t=>{
+        const tagClass = t.tipo==='Presupuesto' ? 'tag-pending' : 'tag-ok';
+        return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div><span class="tag ${tagClass}">${esc(t.tipo)}</span> <strong>${esc(t.descripcion)}</strong></div>
+            <div class="cell-stacked-sub">${t.fecha?formatDate(t.fecha):'Sin fecha'}${t.propiedadDireccion?` · 📍 ${esc(t.propiedadDireccion)}`:''}${t.estado?` · Estado: ${esc(t.estado)}`:''}</div>
+            ${t.comentarios ? `<div class="cell-stacked-sub">${esc(t.comentarios)}</div>` : ''}
+          </div>
+          <div style="font-weight:700;white-space:nowrap;">${t.monto?money(t.monto):''}</div>
+          <button type="button" class="table-action-btn" title="Editar" onclick="editTrabajoMaestro('${t.id}')">✏️</button>
+          <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteTrabajoMaestro('${t.id}')">🗑️</button>
+        </div>`;
+      }).join('') : '<div class="empty">Sin trabajos ni presupuestos registrados todavía.</div>';
+
+      trabajosHtml = `
+        <div class="prop-card-section" style="margin-top:14px;">🧾 Trabajos y presupuestos</div>
+        <div class="wa-compact-list">${filasTrabajos}</div>
+        <div style="margin-top:10px;">
+          <button type="button" class="btn btn-secondary" onclick="toggleTrabajoForm('${m.id}')" id="trabajo-form-toggle-${m.id}">+ Agregar trabajo o presupuesto</button>
+          <div id="trabajo-form-${m.id}" style="display:none;margin-top:10px;padding:12px;background:var(--paper);border-radius:8px;">
+            <input type="hidden" id="tra-editId-${m.id}">
+            <div class="grid form-compact">
+              <div class="field"><label>Tipo</label>
+                <select id="tra-tipo-${m.id}"><option>Trabajo realizado</option><option>Presupuesto</option></select>
+              </div>
+              <div class="field"><label>Fecha</label><input type="date" id="tra-fecha-${m.id}"></div>
+              <div class="field"><label>Propiedad / dirección (opcional)</label><input id="tra-propiedad-${m.id}" placeholder="Ej: San Diego 1712"></div>
+              <div class="field"><label>Monto ($)</label><input type="text" inputmode="numeric" class="money-mask" id="tra-monto-${m.id}"></div>
+              <div class="field"><label>Estado</label>
+                <select id="tra-estado-${m.id}"><option>Presupuestado</option><option>Aprobado</option><option>En curso</option><option>Completado</option></select>
+              </div>
+              <div class="field full"><label>Descripción</label><input id="tra-descripcion-${m.id}" placeholder="Ej: Reparación de filtración en baño"></div>
+              <div class="field full"><label>Comentarios</label><textarea id="tra-comentarios-${m.id}" rows="2"></textarea></div>
+            </div>
+            <div class="btn-row" style="margin-top:8px;">
+              <button type="button" class="btn btn-primary" onclick="guardarTrabajoMaestro('${m.id}')">Guardar</button>
+              <button type="button" class="btn btn-secondary" onclick="toggleTrabajoForm('${m.id}')">Cancelar</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    return `<div class="prop-card${expandido?'':' collapsed'}" data-card-key="${cardKey}" style="border-left:4px solid ${estilo.color};">
+      <div class="prop-card-header">
+        <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
+          <span class="card-index">${idx+1})</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${estilo.bg};margin-right:4px;font-size:12px;">${estilo.icono}</span>
+          <span class="prop-card-dir">${esc(m.nombre)}</span>
+          <span class="prop-card-unidad">${esc(m.especialidad)}${trabajos.length?` · ${trabajos.length} trabajo${trabajos.length>1?'s':''}`:''}</span>
+          <span class="prop-card-chevron">▸</span>
+        </div>
+        <div class="row-actions">
+          <button class="table-action-btn" title="Editar" onclick="editMaestro('${m.id}')">✏️</button>
+          <button class="table-action-btn danger" title="Eliminar" onclick="deleteMaestro('${m.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="prop-card-body">
+        <div class="prop-fields-grid">
+          ${propField('Contacto', contactoLinea || '—')}
+          ${propField('Dirección', m.direccion || '—')}
+        </div>
+        ${m.descripcionGeneral ? `<div class="prop-card-section" style="margin-top:10px;">📝 Descripción general</div><div style="font-size:13px;color:var(--ink-soft);">${esc(m.descripcionGeneral)}</div>` : ''}
+        ${trabajosHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleTrabajoForm(maestroId){
+  const wrap = document.getElementById('trabajo-form-'+maestroId);
+  if(!wrap) return;
+  const abrir = wrap.style.display==='none';
+  wrap.style.display = abrir ? 'block' : 'none';
+  if(abrir){
+    // Limpiar el formulario cada vez que se abre para uno nuevo (a menos que se esté editando).
+    if(!document.getElementById('tra-editId-'+maestroId).value){
+      document.getElementById('tra-tipo-'+maestroId).value = 'Trabajo realizado';
+      document.getElementById('tra-fecha-'+maestroId).value = new Date().toISOString().slice(0,10);
+      document.getElementById('tra-propiedad-'+maestroId).value = '';
+      document.getElementById('tra-monto-'+maestroId).value = '';
+      document.getElementById('tra-estado-'+maestroId).value = 'Presupuestado';
+      document.getElementById('tra-descripcion-'+maestroId).value = '';
+      document.getElementById('tra-comentarios-'+maestroId).value = '';
+    }
+  }
+}
+
+async function guardarTrabajoMaestro(maestroId){
+  const descripcion = document.getElementById('tra-descripcion-'+maestroId).value.trim();
+  if(!descripcion){ alert('Describe brevemente el trabajo o presupuesto.'); return; }
+  const editId = document.getElementById('tra-editId-'+maestroId).value;
+  const obj = {
+    id: editId || uid(),
+    maestroId,
+    tipo: document.getElementById('tra-tipo-'+maestroId).value,
+    fecha: document.getElementById('tra-fecha-'+maestroId).value,
+    propiedadDireccion: document.getElementById('tra-propiedad-'+maestroId).value.trim(),
+    descripcion,
+    monto: Number(rawMoneyValue(document.getElementById('tra-monto-'+maestroId).value))||'',
+    estado: document.getElementById('tra-estado-'+maestroId).value,
+    comentarios: document.getElementById('tra-comentarios-'+maestroId).value.trim(),
+  };
+  trabajosMaestros = editId ? trabajosMaestros.map(t=> t.id===editId ? obj : t) : [...trabajosMaestros, obj];
+  await saveKey('trabajosMaestros', trabajosMaestros);
+  document.getElementById('tra-editId-'+maestroId).value = '';
+  renderMaestros();
+  pushToDriveIfConnected();
+}
+
+function editTrabajoMaestro(id){
+  const t = trabajosMaestros.find(x=>x.id===id);
+  if(!t) return;
+  expandedCards.add('maestro:'+t.maestroId);
+  renderMaestros();
+  setTimeout(()=>{
+    const wrap = document.getElementById('trabajo-form-'+t.maestroId);
+    if(!wrap) return;
+    wrap.style.display = 'block';
+    document.getElementById('tra-editId-'+t.maestroId).value = t.id;
+    document.getElementById('tra-tipo-'+t.maestroId).value = t.tipo||'Trabajo realizado';
+    document.getElementById('tra-fecha-'+t.maestroId).value = t.fecha||'';
+    document.getElementById('tra-propiedad-'+t.maestroId).value = t.propiedadDireccion||'';
+    document.getElementById('tra-monto-'+t.maestroId).value = t.monto ? formatThousandsCLP(String(t.monto)) : '';
+    document.getElementById('tra-estado-'+t.maestroId).value = t.estado||'Presupuestado';
+    document.getElementById('tra-descripcion-'+t.maestroId).value = t.descripcion||'';
+    document.getElementById('tra-comentarios-'+t.maestroId).value = t.comentarios||'';
+    wrap.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 50);
+}
+
+async function deleteTrabajoMaestro(id){
+  if(!confirm('¿Eliminar este trabajo/presupuesto?')) return;
+  trabajosMaestros = trabajosMaestros.filter(t=>t.id!==id);
+  await saveKey('trabajosMaestros', trabajosMaestros);
+  renderMaestros();
+  pushToDriveIfConnected();
+}
 
 // ---------- ORDEN DE TABLAS (clic en encabezado) ----------
 const sortState = {};
