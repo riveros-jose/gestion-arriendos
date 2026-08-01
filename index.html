@@ -3932,12 +3932,12 @@ function renderFlujoCobro(){
     const partes = [];
 
     // Ícono(s) de acción arriba a la derecha de la tarjeta. El estado/etapa ya se ve en el
-    // encabezado del grupo, así que no se repite dentro de la card. Solo se muestran las
-    // acciones que corresponden a la etapa asignada a esta tarjeta (recordatorio en 0/1, aviso
-    // de pago en 2/3) — así no aparecen ambos bloques de botones a la vez si el contrato tiene,
-    // por ejemplo, un aviso de un mes anterior sin pagar Y además ya toca recordatorio este mes.
-    const mostrarFoto = item.fotoItem && (etapaGrupo===0 || etapaGrupo===1);
-    const mostrarPend = item.pendItem && (etapaGrupo===2 || etapaGrupo===3);
+    // encabezado del grupo, así que no se repite dentro de la card. Ambos bloques (recordatorio
+    // y aviso de pago) se muestran de forma independiente cuando corresponden — un arrendatario
+    // puede estar atrasado en el pago de meses anteriores Y a la vez tocarle el recordatorio de
+    // este mes; en ese caso deben verse ambas acciones juntas, no ocultarse una.
+    const mostrarFoto = !!item.fotoItem;
+    const mostrarPend = !!item.pendItem;
 
     const accionesTop = [];
     if(mostrarFoto){
