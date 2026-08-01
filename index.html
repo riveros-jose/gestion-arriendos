@@ -5115,6 +5115,8 @@ function computeGlobalMonthlySeries(){
   // lo efectivamente cobrado, en vez de "esconder" a quienes simplemente no se han ingresado
   // todavía. Lo pagado/descontado, en cambio, sigue dependiendo de los pagos realmente
   // registrados (no se puede inventar un pago que no existe).
+  // EXCEPCIÓN: un contrato histórico (ya finalizado) que quedó con deuda pactada pendiente no se
+  // considera en el "pactado" — ese saldo es cobranza de una deuda, no arriendo normal del mes.
   const todos = contracts;
   const starts = todos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
   if(!starts.length) return [];
@@ -5133,8 +5135,17 @@ function computeGlobalMonthlySeries(){
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
       const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
 
+      const esHistoricoConDeuda = !isActiveContract(c) && Number(c.deudaPactada||0)>0;
+      const vigenteEseMes = contratoVigenteAlPrincipioDeMes(c, year, month);
+      const tuvoPagoEseMes = pagosMes.length>0;
+      // Caso normal: cuenta si estaba vigente O si hay un pago registrado ese mes (respaldo por
+      // si la fecha de inicio/término del contrato quedó incompleta o mal cargada).
+      // Histórico CON deuda pendiente: más estricto — solo cuenta si se cumplen AMBAS a la vez
+      // (vigente Y con pago real ese mes), para no inflar el pactado con meses sin cobrar de un
+      // contrato que terminó con saldo pendiente.
+      const correspondeEseMes = esHistoricoConDeuda ? (vigenteEseMes && tuvoPagoEseMes) : (vigenteEseMes || tuvoPagoEseMes);
       let montoC = 0;
-      if(contratoVigenteAlPrincipioDeMes(c, year, month)){
+      if(correspondeEseMes){
         const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
         montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
       }
