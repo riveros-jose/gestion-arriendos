@@ -233,6 +233,12 @@
   .cell-tap-full{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
   .subtabs-sticky{position:sticky;top:0;z-index:20;background:var(--card);padding:10px 24px;margin:0 -24px 16px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.15);}
+  /* Sticky para el sub-tab de Arrendatarios (va directo en la sección, sin padding de tarjeta
+     que compensar) y para el filtro de arrendatario debajo (va dentro de una tarjeta, así que
+     sí necesita compensar su padding con margen negativo, quedando "pegado" apenas debajo del
+     sub-tab). */
+  .arrendatarios-subtabs-sticky{position:sticky;top:0;z-index:22;background:var(--paper);padding:6px 0 10px;margin-bottom:8px;}
+  .tenant-filter-sticky{position:sticky;top:52px;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
   .quick-jump-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;}
   .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
@@ -711,7 +717,7 @@
         </div>
       </div>
 
-      <div class="subtabs" id="arrendatarios-subtabs" style="margin-top:4px;">
+      <div class="subtabs arrendatarios-subtabs-sticky" id="arrendatarios-subtabs">
         <button type="button" class="subtab-btn active" data-subtab="vigentes">📋 Contratos Vigentes</button>
         <button type="button" class="subtab-btn" data-subtab="historicos">🗂️ Históricos</button>
       </div>
@@ -723,7 +729,9 @@
             <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
           </div>
           <div id="tenants-list-wrap" style="display:block">
-            <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
+            <div class="tenant-filter-sticky">
+              <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:0;"></select>
+            </div>
             <div id="tenant-table" class="table-wrap"></div>
           </div>
         </div>
@@ -731,7 +739,9 @@
 
       <div id="arrendatarios-historicos-panel" style="display:none">
         <div class="card">
-          <select class="filter" id="historicos-select" style="width:100%;max-width:420px;margin-bottom:14px;"></select>
+          <div class="tenant-filter-sticky">
+            <select class="filter" id="historicos-select" style="width:100%;max-width:420px;margin-bottom:0;"></select>
+          </div>
           <div id="historicos-table" class="table-wrap"></div>
         </div>
       </div>
