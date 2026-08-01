@@ -5099,10 +5099,22 @@ function applyYearGroupFilter(series, yearSel, groupSel){
   return filtered.map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento }));
 }
 
+// ¿Estaba vigente este contrato al principio de ese mes? (para saber si corresponde sumar su
+// arriendo esperado, tenga o no un pago ya registrado ese mes en particular)
+function contratoVigenteAlPrincipioDeMes(c, year, month){
+  const inicioMesIso = `${year}-${String(month+1).padStart(2,'0')}-01`;
+  if(c.fechaInicioContrato && c.fechaInicioContrato > inicioMesIso) return false; // aún no empezaba
+  if(c.fechaTermino && c.fechaTermino < inicioMesIso) return false; // ya había terminado
+  return true;
+}
+
 function computeGlobalMonthlySeries(){
-  // Se consideran TODOS los contratos (activos e históricos) — cada uno solo aporta a los
-  // meses donde efectivamente tuvo un pago registrado (ver el filtro más abajo), así que un
-  // contrato ya finalizado sigue contando correctamente en los meses en que sí estuvo pagando.
+  // Se consideran TODOS los contratos (activos e históricos). El "arriendo pactado" (esperado)
+  // de un mes suma a TODOS los contratos que estaban vigentes al principio de ese mes, tuvieran
+  // o no un pago ya registrado — así el gráfico muestra bien la brecha real entre lo esperado y
+  // lo efectivamente cobrado, en vez de "esconder" a quienes simplemente no se han ingresado
+  // todavía. Lo pagado/descontado, en cambio, sigue dependiendo de los pagos realmente
+  // registrados (no se puede inventar un pago que no existe).
   const todos = contracts;
   const starts = todos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
   if(!starts.length) return [];
@@ -5111,8 +5123,6 @@ function computeGlobalMonthlySeries(){
   return months.map(({year,month})=>{
     let monto=0, pagado=0, descuento=0;
     todos.forEach(c=>{
-      // Solo se suman los clientes que tuvieron algún registro de pago ese mes (aunque sea $0) —
-      // no todos los contratos desde su fecha de inicio hasta hoy.
       let pagosMes = payments.filter(p=>p.contratoId===c.id && sameYearMonth(p.fechaPago,year,month));
       // Para un contrato YA FINALIZADO, solo cuentan los pagos anteriores a su término (cuando
       // todavía era un arriendo activo) — los pagos posteriores son cobranza de la deuda pactada,
@@ -5120,11 +5130,14 @@ function computeGlobalMonthlySeries(){
       if(!isActiveContract(c) && c.fechaTermino){
         pagosMes = pagosMes.filter(p=> p.fechaPago && p.fechaPago < c.fechaTermino);
       }
-      if(!pagosMes.length) return;
       const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
       const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
-      const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-      const montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
+
+      let montoC = 0;
+      if(contratoVigenteAlPrincipioDeMes(c, year, month)){
+        const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
+        montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
+      }
       monto += montoC; pagado += pagadoC; descuento += descC;
     });
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
