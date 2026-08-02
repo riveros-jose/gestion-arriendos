@@ -681,7 +681,7 @@
             <div class="line-row">
               <div class="field"><label>Nemo arrendatario</label><input id="t-nemoArrendatario" placeholder="Ej: Imprenta, Cine, Marcelo…"></div>
               <div class="field"><label>Nombre sociedad</label><input id="t-nombreSociedad"></div>
-              <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad" class="rut-mask" placeholder="12.345.678-9"></div>
+              <div class="field"><label>Rut sociedad</label><input id="t-rutSociedad" class="rut-mask" placeholder="Ej: 12.345.678-9"></div>
             </div>
           </div>
           <div class="line-group">
@@ -699,7 +699,7 @@
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Nombre contacto WhatsApp</label><input id="t-whatsappNombreContacto" placeholder="Quién recibe los avisos"></div>
-              <div class="field"><label>WhatsApp de contacto</label><input id="t-whatsappContacto" placeholder="+56 9 1234 5678"></div>
+              <div class="field"><label>WhatsApp de contacto</label><input id="t-whatsappContacto" placeholder="Ej: +56 9 1234 5678"></div>
             </div>
           </div>
           <div class="line-group">
@@ -737,20 +737,19 @@
       </div>
 
       <div class="card">
-        <div class="subtabs subtabs-sticky" id="arrendatarios-subtabs">
+        <div class="subtabs subtabs-sticky" id="arrendatarios-subtabs" style="justify-content:center;">
           <button type="button" class="subtab-btn active" data-subtab="vigentes">📋 Contratos Vigentes</button>
           <button type="button" class="subtab-btn" data-subtab="historicos">🗂️ Históricos</button>
         </div>
 
         <div id="arrendatarios-vigentes-panel">
-          <div class="collapsible-header" onclick="toggleCollapse('tenants')">
-            <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" title="Recargar desde Excel" onclick="event.stopPropagation();reloadFromDrive()">⟳</span></h2>
-            <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span>
+          <div class="tenant-filter-sticky">
+            <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:0;"></select>
+          </div>
+          <div class="collapsible-header" onclick="toggleCollapse('tenants')" style="margin-top:14px;">
+            <h2>📋 Arrendatarios y contratos registrados <span class="mini-reload" title="Recargar desde Excel" onclick="event.stopPropagation();reloadFromDrive()">⟳</span> <span class="collapse-arrow" id="tenants-arrow" style="transform:rotate(90deg)">▸</span></h2>
           </div>
           <div id="tenants-list-wrap" style="display:block">
-            <div class="tenant-filter-sticky">
-              <select class="filter" id="tenant-select" style="width:100%;max-width:420px;margin-bottom:0;"></select>
-            </div>
             <div id="tenant-table" class="table-wrap"></div>
           </div>
         </div>
@@ -869,7 +868,7 @@
             <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
             <div class="field"><label>Servicio</label><select id="r-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select></div>
             <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
-            <div class="field full"><label>N° Medidor</label><input id="r-medidor" type="text" placeholder="1" maxlength="10"><span class="status-msg" id="r-medidor-hint" style="display:block;margin-top:2px;"></span></div>
+            <div class="field full"><label>N° Medidor</label><input id="r-medidor" type="text" placeholder="Ej: 1" maxlength="10"><span class="status-msg" id="r-medidor-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required><span class="status-msg" id="r-lecturaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required readonly><span class="status-msg" id="r-valorUnitario-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field" id="r-estado-field" style="display:none;"><label>Estado de pago</label>
@@ -948,7 +947,7 @@
                 <div class="field full"><label>Especialidades (puedes elegir más de una)</label>
                   <div id="mae-especialidad-checks" class="checkbox-list"></div>
                 </div>
-                <div class="field"><label>WhatsApp de contacto</label><input id="mae-whatsapp" placeholder="+56 9 1234 5678"></div>
+                <div class="field"><label>WhatsApp de contacto</label><input id="mae-whatsapp" placeholder="Ej: +56 9 1234 5678"></div>
                 <div class="field full"><label>Descripción general</label><textarea id="mae-descripcionGeneral" rows="2" placeholder="Notas generales sobre este maestro — especialidades, referencias, tarifas habituales, etc."></textarea></div>
               </div>
               <div class="btn-row">
@@ -1868,7 +1867,7 @@ function addRepRow(nombre, rut){
   const row = document.createElement('div');
   row.className = 'rep-row';
   row.innerHTML = `<input type="text" class="rep-nombre" placeholder="Nombre representante" value="${esc(nombre||'')}">
-    <input type="text" class="rep-rut rut-mask" placeholder="12.345.678-9" value="${esc(rut||'')}">
+    <input type="text" class="rep-rut rut-mask" placeholder="Ej: 12.345.678-9" value="${esc(rut||'')}">
     <button type="button" class="table-action-btn danger rep-remove-btn" title="Quitar" onclick="this.closest('.rep-row').remove()">🗑️</button>`;
   wrap.appendChild(row);
 }
@@ -4296,13 +4295,14 @@ function renderFlujoCobro(){
   const filaContrato = (item, etapaGrupo)=>{
     const idx = globalIdx++;
     const info = ETAPAS_FLUJO[etapaGrupo];
+    const bodyId = `flujo-body-${idx}`;
     const partes = [];
 
-    // Ícono(s) de acción arriba a la derecha de la tarjeta. El estado/etapa ya se ve en el
-    // encabezado del grupo, así que no se repite dentro de la card. Ambos bloques (recordatorio
-    // y aviso de pago) se muestran de forma independiente cuando corresponden — un arrendatario
-    // puede estar atrasado en el pago de meses anteriores Y a la vez tocarle el recordatorio de
-    // este mes; en ese caso deben verse ambas acciones juntas, no ocultarse una.
+    // Ícono(s) de acción arriba a la derecha del cuerpo (ya desplegado). El estado/etapa ya se ve
+    // en el encabezado del grupo, así que no se repite dentro de la card. Ambos bloques
+    // (recordatorio y aviso de pago) se muestran de forma independiente cuando corresponden — un
+    // arrendatario puede estar atrasado en el pago de meses anteriores Y a la vez tocarle el
+    // recordatorio de este mes; en ese caso deben verse ambas acciones juntas, no ocultarse una.
     const mostrarFoto = !!item.fotoItem;
     const mostrarPend = !!item.pendItem;
 
@@ -4311,24 +4311,20 @@ function renderFlujoCobro(){
       const sinTel = !item.fotoItem.telefono || !item.fotoItem.telefono.replace(/\D/g,'');
       accionesTop.push(sinTel
         ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar recordatorio de fotos por WhatsApp" onclick="enviarRecordatorioFoto('${item.contratoId}')">📲</button>`
+        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar recordatorio de fotos por WhatsApp" onclick="event.stopPropagation();enviarRecordatorioFoto('${item.contratoId}')">📲</button>`
       );
-      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Marcar recordatorio como enviado" onclick="marcarRecordatorioFotoManual('${item.contratoId}')">✅</button>`);
+      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Marcar recordatorio como enviado" onclick="event.stopPropagation();marcarRecordatorioFotoManual('${item.contratoId}')">✅</button>`);
     }
     if(mostrarPend){
       const m = item.pendItem;
       const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
       accionesTop.push(sinTel
         ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar aviso de pago por WhatsApp" onclick="enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
+        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar aviso de pago por WhatsApp" onclick="event.stopPropagation();enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
       );
-      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>`);
+      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="event.stopPropagation();toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>`);
     }
-
-    partes.push(`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-      <div class="title" style="margin:0;line-height:1.25;">${esc(item.nombreContacto)}</div>
-      <div class="row-actions" style="gap:4px;flex-wrap:wrap;margin:0;justify-content:flex-end;">${accionesTop.join('')}</div>
-    </div>`);
+    partes.push(`<div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;">${accionesTop.join('')}</div>`);
 
     // Detalle del aviso de pago: solo se muestra junto con sus propios botones (mismo criterio).
     if(mostrarPend){
@@ -4341,7 +4337,18 @@ function renderFlujoCobro(){
       </div>`);
     }
 
-    return `<div class="alert-card" style="margin-bottom:6px;padding:8px 10px;gap:4px;border-left-color:${info.color};background:${info.color}12;">${partes.join('')}</div>`;
+    const totalPendiente = mostrarPend ? item.pendItem.total : null;
+
+    return `<div class="alert-card" style="margin-bottom:6px;padding:8px 10px;gap:4px;border-left-color:${info.color};background:${info.color}12;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="const b=document.getElementById('${bodyId}');const abrir=b.style.display==='none';b.style.display=abrir?'block':'none';this.querySelector('.flujo-chevron').style.transform=abrir?'rotate(90deg)':'rotate(0deg)';">
+        <div class="title" style="margin:0;line-height:1.25;">${esc(item.nombreContacto)}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${totalPendiente!=null ? `<strong style="color:var(--brick);font-size:13px;">${money(totalPendiente)}</strong>` : ''}
+          <span class="flujo-chevron" style="display:inline-block;transition:transform .15s;color:var(--ink-soft);">▸</span>
+        </div>
+      </div>
+      <div id="${bodyId}" style="display:none;">${partes.join('')}</div>
+    </div>`;
   };
 
   // Dentro de cada sector, las tarjetas se agrupan por etapa (siguiendo el orden del flujo), y
@@ -4474,7 +4481,7 @@ function computePendientesItems(){
       return `<div class="cell-stacked-sub">${SERVICIO_SVG[r.servicio]||''} ${r.servicio} (${formatDate(r.fechaLectura)}): ${calculoTxt}${boletaTag}</div>`;
     }).join('');
 
-    return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado };
+    return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado, total };
   }).filter(Boolean);
 
   waPendItems = items;
