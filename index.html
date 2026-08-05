@@ -885,7 +885,16 @@
               <div class="grid">
                 <div class="field"><label>Descripción</label><input id="gf-descripcion" required placeholder="Ej: Sueldo administración"></div>
                 <div class="field"><label>Categoría</label><input id="gf-categoria" placeholder="Ej: Sueldos, Honorarios, Seguros…"></div>
-                <div class="field"><label>Monto mensual ($)</label><input type="text" inputmode="numeric" class="money-mask" id="gf-monto" required></div>
+                <div class="field"><label>Monto por pago ($)</label><input type="text" inputmode="numeric" class="money-mask" id="gf-monto" required></div>
+                <div class="field"><label>Se repite cada</label>
+                  <select id="gf-frecuenciaMeses">
+                    <option value="1">1 mes (mensual)</option>
+                    <option value="2">2 meses</option>
+                    <option value="3">3 meses (trimestral)</option>
+                    <option value="6">6 meses (semestral)</option>
+                    <option value="12">12 meses (anual)</option>
+                  </select>
+                </div>
                 <div class="field"><label>Desde</label><input type="date" id="gf-fechaInicio" required></div>
                 <div class="field"><label>Hasta (si ya terminó)</label><input type="date" id="gf-fechaTermino"></div>
               </div>
@@ -913,7 +922,10 @@
             <form id="form-gastoPuntual" class="form-compact">
               <input type="hidden" id="gp-id">
               <div class="grid">
-                <div class="field"><label>Descripción</label><input id="gp-descripcion" required placeholder="Ej: Compra de pintura"></div>
+                <div class="field full"><label>Foto o PDF de la boleta (opcional)</label><input type="file" id="gp-boletaFile" accept="image/*,application/pdf" capture="environment">
+                  <span class="status-msg" id="gp-boleta-status">Si subes una foto, intentamos leer la tienda y el monto automáticamente (puedes corregirlos abajo si el OCR se equivoca).</span>
+                </div>
+                <div class="field"><label>Descripción / Tienda</label><input id="gp-descripcion" required placeholder="Ej: Compra de pintura, o el nombre de la tienda"></div>
                 <div class="field"><label>Categoría</label><input id="gp-categoria" placeholder="Ej: Materiales, Trámites…"></div>
                 <div class="field"><label>Monto ($)</label><input type="text" inputmode="numeric" class="money-mask" id="gp-monto" required></div>
                 <div class="field"><label>Fecha</label><input type="date" id="gp-fecha" required></div>
@@ -1445,6 +1457,7 @@ async function driveUpdateXlsxFile(fileId, arrayBuffer){
 
 // Carpeta "Servicios" dentro de RentaPro, donde se guardan las boletas adjuntadas (PDF).
 let driveServiciosFolderId = null;
+let driveGastosFolderId = null;
 async function driveFindOrCreateSubfolder(parentId, name){
   const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`);
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, { headers:{ Authorization:'Bearer '+driveToken } });
@@ -1636,29 +1649,33 @@ function buildWorkbook(){
   styleWorksheet(wsTra, [10,10,16,12,12,26,36,10,12,12,12]);
   XLSX.utils.book_append_sheet(wb, wsTra, 'TrabajosMaestros');
 
-  // Guarda el ID real de la carpeta "Servicios" en Drive — así cualquier cuenta que abra este
-  // mismo archivo (no solo la que creó la carpeta) sabe directamente dónde subir las boletas,
-  // en vez de tener que buscarla (una búsqueda que con el permiso "drive.file" solo funciona
-  // bien desde la cuenta que originalmente creó la carpeta, y crea una nueva por cuenta si no).
-  const wsCfg = XLSX.utils.json_to_sheet([{ clave:'driveServiciosFolderId', valor: driveServiciosFolderId||'' }]);
+  // Guarda el ID real de la carpeta "Servicios" (y "GastosBoletas") en Drive — así cualquier
+  // cuenta que abra este mismo archivo (no solo la que creó la carpeta) sabe directamente dónde
+  // subir los archivos, en vez de tener que buscarla (una búsqueda que con el permiso
+  // "drive.file" solo funciona bien desde la cuenta que originalmente creó la carpeta, y crea
+  // una nueva por cuenta si no).
+  const wsCfg = XLSX.utils.json_to_sheet([
+    { clave:'driveServiciosFolderId', valor: driveServiciosFolderId||'' },
+    { clave:'driveGastosFolderId', valor: driveGastosFolderId||'' },
+  ]);
   applyColumnFormats(wsCfg, ['clave','valor']);
   styleWorksheet(wsCfg, [28,40]);
   XLSX.utils.book_append_sheet(wb, wsCfg, 'Config');
 
   const gastoFijoRows = gastosFijos.length ? gastosFijos.map(g=>({
-    id: g.id, descripcion: g.descripcion, categoria: g.categoria||'', monto: g.monto||'', fechaInicio: g.fechaInicio||'', fechaTermino: g.fechaTermino||''
+    id: g.id, descripcion: g.descripcion, categoria: g.categoria||'', monto: g.monto||'', frecuenciaMeses: g.frecuenciaMeses||1, fechaInicio: g.fechaInicio||'', fechaTermino: g.fechaTermino||''
   })) : [{}];
   const wsGF = XLSX.utils.json_to_sheet(gastoFijoRows);
-  applyColumnFormats(wsGF, ['id','descripcion','categoria','monto','fechaInicio','fechaTermino']);
-  styleWorksheet(wsGF, [10,30,18,14,12,12]);
+  applyColumnFormats(wsGF, ['id','descripcion','categoria','monto','frecuenciaMeses','fechaInicio','fechaTermino']);
+  styleWorksheet(wsGF, [10,30,18,14,10,12,12]);
   XLSX.utils.book_append_sheet(wb, wsGF, 'GastosFijos');
 
   const gastoPuntualRows = gastosPuntuales.length ? gastosPuntuales.map(g=>({
-    id: g.id, descripcion: g.descripcion, categoria: g.categoria||'', monto: g.monto||'', fecha: g.fecha||''
+    id: g.id, descripcion: g.descripcion, categoria: g.categoria||'', monto: g.monto||'', fecha: g.fecha||'', boletaUrl: g.boletaUrl||''
   })) : [{}];
   const wsGP = XLSX.utils.json_to_sheet(gastoPuntualRows);
-  applyColumnFormats(wsGP, ['id','descripcion','categoria','monto','fecha']);
-  styleWorksheet(wsGP, [10,30,18,14,12]);
+  applyColumnFormats(wsGP, ['id','descripcion','categoria','monto','fecha','boletaUrl']);
+  styleWorksheet(wsGP, [10,30,18,14,12,32]);
   XLSX.utils.book_append_sheet(wb, wsGP, 'GastosPuntuales');
 
   const mantRows = mantenimientos.length ? mantenimientos.map(m=>({
@@ -1767,10 +1784,10 @@ function loadFromWorkbook(arrayBuffer){
     descripcion:t.descripcion||'', m2:t.m2||'', monto:t.monto||'', tipoPrecio:t.tipoPrecio||'Neto', precioM2:t.precioM2||''
   }));
   gastosFijos = rawGastosFijos.map(g=> normalizeDates({
-    id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', fechaInicio:g.fechaInicio||'', fechaTermino:g.fechaTermino||''
+    id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', frecuenciaMeses:g.frecuenciaMeses||1, fechaInicio:g.fechaInicio||'', fechaTermino:g.fechaTermino||''
   }));
   gastosPuntuales = rawGastosPuntuales.map(g=> normalizeDates({
-    id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', fecha:g.fecha||''
+    id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', fecha:g.fecha||'', boletaUrl:g.boletaUrl||''
   }));
   mantenimientos = rawMant.map(m=> normalizeDates({
     id:m.id, descripcion:m.descripcion||'',
@@ -1778,14 +1795,17 @@ function loadFromWorkbook(arrayBuffer){
     intervaloMeses:m.intervaloMeses||'', ultimaFecha:m.ultimaFecha||'', maestroId:m.maestroId||'', comentarios:m.comentarios||''
   }));
 
-  // Carpeta de Servicios: si ya quedó guardada en el propio Excel (por cualquier cuenta que la
-  // haya creado antes), se usa directamente — así cualquier otra cuenta que abra este archivo
-  // sube sus boletas al mismo lugar, sin crear una carpeta personal nueva.
+  // Carpeta de Servicios / GastosBoletas: si ya quedaron guardadas en el propio Excel (por
+  // cualquier cuenta que las haya creado antes), se usan directamente — así cualquier otra
+  // cuenta que abra este archivo sube sus archivos al mismo lugar, sin crear una carpeta
+  // personal nueva.
   const cfgSheet = wb.Sheets['Config'];
   if(cfgSheet){
     const cfgRows = XLSX.utils.sheet_to_json(cfgSheet);
-    const fila = cfgRows.find(r=>r.clave==='driveServiciosFolderId');
-    if(fila && fila.valor) driveServiciosFolderId = String(fila.valor);
+    const filaServ = cfgRows.find(r=>r.clave==='driveServiciosFolderId');
+    if(filaServ && filaServ.valor) driveServiciosFolderId = String(filaServ.valor);
+    const filaGastos = cfgRows.find(r=>r.clave==='driveGastosFolderId');
+    if(filaGastos && filaGastos.valor) driveGastosFolderId = String(filaGastos.valor);
   }
 }
 
@@ -1897,6 +1917,15 @@ async function driveSync(isInitialLoad){
 async function pushToDriveIfConnected(){
   if(!driveToken) return false;
   return await driveSync(false);
+}
+
+// Para acciones más silenciosas (eliminar, activar/desactivar, marcar como enviado, etc.): no
+// hace falta celebrar cada una con un modal, pero SÍ hay que avisar si Drive no pudo confirmar
+// el guardado — si no, el cambio puede "desaparecer" al recargar sin que nadie se entere.
+async function pushToDriveAndWarn(){
+  const ok = await pushToDriveIfConnected();
+  if(!ok) showResultModal('⚠ El cambio se aplicó en pantalla, pero no se pudo confirmar el guardado en Google Drive — revisa tu conexión. Si no se soluciona, puede que se pierda al recargar.', false);
+  return ok;
 }
 
 // ---- Exportar un workbook auxiliar (pagos / meses con deuda) directo a Google Drive ----
@@ -2433,7 +2462,7 @@ async function deleteProperty(id){
   properties = properties.filter(p=>p.id!==id);
   await saveKey('properties',properties);
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 // Recuerda qué tarjetas están desplegadas (por una clave única, ej. "prop:ID") para que el
@@ -2680,7 +2709,7 @@ async function deleteTenantContract(tenantId, contractId){
     await saveKey('tenants',tenants);
   }
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 async function reactivateContract(id){
@@ -2694,7 +2723,7 @@ async function reactivateContract(id){
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 async function closeDebtManually(id){
@@ -2709,7 +2738,7 @@ async function closeDebtManually(id){
   contracts = contracts.map(x=> x.id===id ? c : x);
   await saveKey('contracts',contracts);
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 function propAddress(id){
@@ -2934,7 +2963,7 @@ async function deletePayment(id){
   payments = payments.filter(p=>p.id!==id);
   await saveKey('payments',payments);
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 document.getElementById('export-payments-btn').addEventListener('click', ()=>{
@@ -3447,15 +3476,15 @@ async function submitContractUpdate(){
   if(nota) c.infoGeneral = [c.infoGeneral, `[${formatDate(hoy)}] ${nota}`].filter(Boolean).join(' | ');
 
   contracts = contracts.map(x=> x.id===id ? c : x);
-  const ok = await saveKey('contracts',contracts);
-  const persistido = ok || !!driveToken;
-  alert(
-    (persistido ? '✅ Contrato actualizado con éxito\n\n' : '⚠ Hubo un problema al guardar — verifica tu conexión a Google Drive e inténtalo de nuevo.\n\n')
-    + `${nemo} — ${propAddresses(c)}\n\n${resumen}`
-  );
+  await saveKey('contracts',contracts);
   closeContractUpdateModal();
   renderAll();
-  pushToDriveIfConnected();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(
+    (ok ? '✅ Contrato actualizado con éxito en Google Drive\n\n' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.\n\n')
+    + `${nemo} — ${propAddresses(c)}\n\n${resumen}`,
+    ok
+  );
 }
 
 // ---------- SERVICIOS (lecturas de luz/agua/gas) ----------
@@ -3699,6 +3728,75 @@ async function subirBoletaSector(file, servicio, sector, mes, datos){
   return resultado.webViewLink || `https://drive.google.com/file/d/${resultado.id}/view`;
 }
 
+// Sube la foto de la boleta de un gasto puntual a la carpeta RentaPro/GastosBoletas, con nombre
+// Fecha_Monto_Tienda — así queda identificable de un vistazo sin tener que abrirla.
+async function subirBoletaGasto(file, fecha, monto, tienda){
+  if(!driveToken) throw new Error('No estás conectado a Google Drive.');
+  const rentaProFolderId = await driveFindOrCreateFolder();
+  if(!driveGastosFolderId) driveGastosFolderId = await driveFindOrCreateSubfolder(rentaProFolderId, 'GastosBoletas');
+  const partes = [fecha, Math.round(Number(monto)||0), tienda || 'SD'];
+  const ext = (file.type==='application/pdf') ? 'pdf' : (file.name.split('.').pop() || 'jpg');
+  const nombreArchivo = (partes.join('_') + '.' + ext).replace(/[\\/:*?"<>|]/g,'-');
+  const resultado = await driveUploadFile(file, nombreArchivo, driveGastosFolderId, file.type || 'image/jpeg');
+  return resultado.webViewLink || `https://drive.google.com/file/d/${resultado.id}/view`;
+}
+
+// ---- Lectura automática (OCR) de boletas de compra genéricas ----
+// A diferencia de las boletas de servicios (que son PDF con texto real y formato fijo de una
+// sola empresa), una boleta de compra cualquiera suele ser una FOTO — no tiene texto real
+// "adentro", así que primero hay que leerla con OCR. Se usa Tesseract.js (corre en el propio
+// navegador, sin necesitar ninguna clave ni servidor propio) y después se buscan patrones
+// típicos de una boleta chilena para adivinar la tienda y el monto total. No es perfecto —
+// por eso los campos quedan editables para corregir antes de guardar.
+let tesseractLoadPromise = null;
+function ensureTesseractLoaded(){
+  if(tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise = new Promise((resolve, reject)=>{
+    if(typeof Tesseract !== 'undefined'){ resolve(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js';
+    script.onload = resolve;
+    script.onerror = ()=> reject(new Error('No se pudo cargar el lector de boletas (OCR).'));
+    document.head.appendChild(script);
+  });
+  return tesseractLoadPromise;
+}
+
+async function leerTextoBoletaConOCR(file){
+  await ensureTesseractLoaded();
+  const { data } = await Tesseract.recognize(file, 'spa');
+  return data.text || '';
+}
+
+// Heurísticas sobre el texto ya leído: la tienda suele ser la primera línea con letras
+// (ignorando encabezados como RUT/dirección), y el total suele ser el monto en pesos más
+// grande del documento, muchas veces junto a la palabra "TOTAL".
+function extraerTiendaYMontoDeTexto(texto){
+  const lineas = texto.split('\n').map(l=>l.trim()).filter(Boolean);
+  let tienda = '';
+  for(const linea of lineas){
+    if(linea.length>=3 && /[A-Za-zÁÉÍÓÚáéíóúÑñ]{3,}/.test(linea) && !/^R\.?\s?U\.?\s?T/i.test(linea) && !/^(BOLETA|FACTURA|GIRO|DIRECCI[OÓ]N)/i.test(linea)){
+      tienda = linea.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9.,'&\- ]/g,'').trim();
+      if(tienda) break;
+    }
+  }
+  let monto = null;
+  const lineaTotal = lineas.find(l=> /TOTAL/i.test(l));
+  const candidatos = [];
+  const fuente = lineaTotal ? [lineaTotal, ...lineas] : lineas;
+  for(const linea of fuente){
+    const matches = [...linea.matchAll(/\$?\s?(\d{1,3}(?:[.,]\d{3})+|\d{4,})/g)];
+    for(const m of matches){
+      const val = Number(m[1].replace(/[.,]/g,''));
+      if(val>=100) candidatos.push({val, deLineaTotal: linea===lineaTotal});
+    }
+  }
+  const deTotal = candidatos.filter(c=>c.deLineaTotal);
+  if(deTotal.length) monto = Math.max(...deTotal.map(c=>c.val));
+  else if(candidatos.length) monto = Math.max(...candidatos.map(c=>c.val));
+  return { tienda, monto };
+}
+
 // Lee el listado REAL de archivos en RentaPro/Servicios (no lo que la app recuerda) — así se ve
 // exactamente lo que hay en Drive, incluso si algo se subió fuera de la app.
 async function listarBoletasEnDrive(){
@@ -3825,7 +3923,7 @@ async function deleteSectorBoleta(id){
   await saveKey('sectorBoletas', sectorBoletas);
   renderSectorBoletasList();
   renderFlujoCobro();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 // La boleta se carga alrededor del día 13 de cada mes y aplica a la lectura inmediatamente
@@ -3945,7 +4043,7 @@ async function actualizarTodasLecturasMismatch(){
   await saveKey('readings', readings);
   cerrarModalDesajusteBoleta();
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 async function actualizarValorUnitarioLectura(id, valorBoleta){
@@ -3955,7 +4053,7 @@ async function actualizarValorUnitarioLectura(id, valorBoleta){
   if(fila) fila.remove();
   if(!document.querySelector('#boleta-mismatch-list .alert-card')) cerrarModalDesajusteBoleta();
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 function cerrarModalDesajusteBoleta(){
@@ -4103,7 +4201,7 @@ async function deleteReading(id){
   readings = readings.filter(r=>r.id!==id);
   await saveKey('readings',readings);
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 async function setReadingEstado(id, estado){
   const r = readings.find(x=>x.id===id);
@@ -4112,7 +4210,7 @@ async function setReadingEstado(id, estado){
   readings = readings.map(x=> x.id===id ? r : x);
   await saveKey('readings',readings);
   renderAll();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 // El pago se marca a nivel de LECTURA individual (no por card completa) — un contrato puede
@@ -4658,7 +4756,7 @@ function enviarRecordatorioFoto(contratoId){
 async function marcarRecordatorioFotoManual(contratoId){
   await marcarRecordatorioLecturaEnviado([contratoId]);
   renderFlujoCobro();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 function enviarTodosRecordatoriosFoto(sector){
@@ -4744,7 +4842,7 @@ async function toggleAvisoEnviado(contratoId, estabaEnviado){
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, avisoEnviado: nuevoEstado} : r);
   await saveKey('readings', readings);
   renderFlujoCobro();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 // ---------- HISTORIAL MENSUAL ----------
@@ -5087,14 +5185,14 @@ async function deleteMaestro(id){
   await saveKey('maestros', maestros);
   await saveKey('trabajosMaestros', trabajosMaestros);
   renderMaestros();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 async function toggleMaestroFavorito(id){
   maestros = maestros.map(m=> m.id===id ? {...m, favorito: !m.favorito} : m);
   await saveKey('maestros', maestros);
   renderMaestros();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 function renderMaestroEspecialidadFilter(){
@@ -5266,7 +5364,8 @@ async function guardarTrabajoMaestro(maestroId){
   await saveKey('trabajosMaestros', trabajosMaestros);
   document.getElementById('tra-editId-'+maestroId).value = '';
   renderMaestros();
-  pushToDriveIfConnected();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(ok ? `✅ Trabajo guardado en Google Drive: ${descripcion}${monto?` — ${money(monto)}`:''}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.', ok);
 }
 
 function editTrabajoMaestro(id){
@@ -5297,7 +5396,7 @@ async function deleteTrabajoMaestro(id){
   trabajosMaestros = trabajosMaestros.filter(t=>t.id!==id);
   await saveKey('trabajosMaestros', trabajosMaestros);
   renderMaestros();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 // ---- Presupuestos de referencia: agrupa todos los trabajos registrados por categoría/rubro,
@@ -5374,12 +5473,14 @@ document.getElementById('form-gastoFijo').addEventListener('submit', async e=>{
   const descripcion = document.getElementById('gf-descripcion').value.trim();
   const monto = Number(rawMoneyValue(document.getElementById('gf-monto').value));
   const fechaInicio = document.getElementById('gf-fechaInicio').value;
-  if(!descripcion || !monto || !fechaInicio){ alert('Completa descripción, monto mensual y fecha de inicio.'); return; }
+  if(!descripcion || !monto || !fechaInicio){ alert('Completa descripción, monto y fecha de inicio.'); return; }
+  const frecuenciaMeses = Number(document.getElementById('gf-frecuenciaMeses').value);
   const obj = {
     id: editingGastoFijo || uid(),
     descripcion,
     categoria: document.getElementById('gf-categoria').value.trim(),
     monto,
+    frecuenciaMeses,
     fechaInicio,
     fechaTermino: document.getElementById('gf-fechaTermino').value,
   };
@@ -5388,7 +5489,8 @@ document.getElementById('form-gastoFijo').addEventListener('submit', async e=>{
   hideGastoFijoForm();
   renderGastosYFlujoCaja();
   const ok = await pushToDriveIfConnected();
-  showResultModal(ok ? `✅ Gasto fijo guardado: ${descripcion} — ${money(monto)}/mes` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+  const frecTxt = frecuenciaMeses===1 ? '/mes' : ` cada ${frecuenciaMeses} meses`;
+  showResultModal(ok ? `✅ Gasto fijo guardado: ${descripcion} — ${money(monto)}${frecTxt}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
 });
 
 function editGastoFijo(id){
@@ -5399,6 +5501,7 @@ function editGastoFijo(id){
   document.getElementById('gf-descripcion').value = g.descripcion||'';
   document.getElementById('gf-categoria').value = g.categoria||'';
   document.getElementById('gf-monto').value = g.monto ? formatThousandsCLP(String(g.monto)) : '';
+  document.getElementById('gf-frecuenciaMeses').value = g.frecuenciaMeses||1;
   document.getElementById('gf-fechaInicio').value = g.fechaInicio||'';
   document.getElementById('gf-fechaTermino').value = g.fechaTermino||'';
   document.getElementById('gastoFijo-form-title').textContent = '💰 Editar gasto fijo';
@@ -5413,7 +5516,7 @@ async function deleteGastoFijo(id){
   gastosFijos = gastosFijos.filter(x=>x.id!==id);
   await saveKey('gastosFijos', gastosFijos);
   renderGastosYFlujoCaja();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 function showGastoPuntualForm(){
@@ -5432,25 +5535,67 @@ function hideGastoPuntualForm(){
 let editingGastoPuntual = null;
 document.getElementById('gastoPuntual-cancel').addEventListener('click', hideGastoPuntualForm);
 
+document.getElementById('gp-boletaFile').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  const statusEl = document.getElementById('gp-boleta-status');
+  if(!file){ return; }
+  if(file.type==='application/pdf'){
+    statusEl.textContent = 'Es un PDF — completa tienda y monto manualmente (el lector automático solo funciona con fotos).';
+    return;
+  }
+  statusEl.textContent = '🔎 Leyendo la boleta (puede tardar unos segundos)…';
+  try{
+    const texto = await leerTextoBoletaConOCR(file);
+    const { tienda, monto } = extraerTiendaYMontoDeTexto(texto);
+    if(tienda && !document.getElementById('gp-descripcion').value.trim()) document.getElementById('gp-descripcion').value = tienda;
+    if(monto) document.getElementById('gp-monto').value = formatThousandsCLP(String(monto));
+    statusEl.textContent = (tienda||monto)
+      ? `Detectado automáticamente${tienda?`: "${tienda}"`:''}${monto?` — ${money(monto)}`:''}. Revisa y corrige si hace falta.`
+      : 'No se pudo leer con claridad — completa tienda y monto manualmente.';
+  }catch(err){
+    console.error('Error leyendo boleta con OCR', err);
+    statusEl.textContent = 'No se pudo leer la boleta automáticamente — completa tienda y monto manualmente.';
+  }
+});
+
 document.getElementById('form-gastoPuntual').addEventListener('submit', async e=>{
   e.preventDefault();
   const descripcion = document.getElementById('gp-descripcion').value.trim();
   const monto = Number(rawMoneyValue(document.getElementById('gp-monto').value));
   const fecha = document.getElementById('gp-fecha').value;
   if(!descripcion || !monto || !fecha){ alert('Completa descripción, monto y fecha.'); return; }
+
+  const statusEl = document.getElementById('gp-boleta-status');
+  const file = document.getElementById('gp-boletaFile').files[0];
+  let boletaUrl = editingGastoPuntual ? (gastosPuntuales.find(g=>g.id===editingGastoPuntual)?.boletaUrl || '') : '';
+  if(file){
+    if(!driveToken){ alert('Necesitas estar conectado a Google Drive para subir la foto de la boleta.'); return; }
+    statusEl.textContent = 'Subiendo boleta a Drive…';
+    try{
+      boletaUrl = await subirBoletaGasto(file, fecha, monto, descripcion);
+    }catch(err){
+      console.error('Error subiendo boleta de gasto', err);
+      alert('No se pudo subir la foto/boleta a Drive: '+(err.message||err));
+      statusEl.textContent = '';
+      return;
+    }
+    statusEl.textContent = '';
+  }
+
   const obj = {
     id: editingGastoPuntual || uid(),
     descripcion,
     categoria: document.getElementById('gp-categoria').value.trim(),
     monto,
     fecha,
+    boletaUrl,
   };
   gastosPuntuales = editingGastoPuntual ? gastosPuntuales.map(g=> g.id===editingGastoPuntual ? obj : g) : [...gastosPuntuales, obj];
   await saveKey('gastosPuntuales', gastosPuntuales);
   hideGastoPuntualForm();
   renderGastosYFlujoCaja();
   const ok = await pushToDriveIfConnected();
-  showResultModal(ok ? `✅ Gasto puntual guardado: ${descripcion} — ${money(monto)}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+  showResultModal(ok ? `✅ Gasto puntual guardado y reflejado en el flujo de caja: ${descripcion} — ${money(monto)}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
 });
 
 function editGastoPuntual(id){
@@ -5474,7 +5619,7 @@ async function deleteGastoPuntual(id){
   gastosPuntuales = gastosPuntuales.filter(x=>x.id!==id);
   await saveKey('gastosPuntuales', gastosPuntuales);
   renderGastosYFlujoCaja();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 function renderGastosFijosList(){
@@ -5484,12 +5629,14 @@ function renderGastosFijosList(){
   const ordenados = gastosFijos.slice().sort((a,b)=> a.descripcion.localeCompare(b.descripcion));
   el.innerHTML = ordenados.map(g=>{
     const vigente = !g.fechaTermino;
+    const frecuencia = Number(g.frecuenciaMeses||1);
+    const frecTxt = frecuencia===1 ? '/mes' : ` cada ${frecuencia} meses`;
     return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;">
         <div><strong>${esc(g.descripcion)}</strong>${g.categoria?` <span class="tag">${esc(g.categoria)}</span>`:''}${vigente?' <span class="tag tag-ok">Vigente</span>':' <span class="tag">Terminado</span>'}</div>
         <div class="cell-stacked-sub">Desde ${formatDate(g.fechaInicio)}${g.fechaTermino?` hasta ${formatDate(g.fechaTermino)}`:' — indefinido'}</div>
       </div>
-      <div style="font-weight:700;white-space:nowrap;">${money(g.monto)}/mes</div>
+      <div style="font-weight:700;white-space:nowrap;">${money(g.monto)}${frecTxt}</div>
       <button type="button" class="table-action-btn" title="Editar" onclick="editGastoFijo('${g.id}')">✏️</button>
       <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteGastoFijo('${g.id}')">🗑️</button>
     </div>`;
@@ -5505,7 +5652,7 @@ function renderGastosPuntualesList(){
     return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;">
         <div><strong>${esc(g.descripcion)}</strong>${g.categoria?` <span class="tag">${esc(g.categoria)}</span>`:''}</div>
-        <div class="cell-stacked-sub">${formatDate(g.fecha)}</div>
+        <div class="cell-stacked-sub">${formatDate(g.fecha)}${g.boletaUrl?` · <a href="${esc(g.boletaUrl)}" target="_blank" rel="noopener">📄 Ver boleta</a>`:''}</div>
       </div>
       <div style="font-weight:700;white-space:nowrap;">${money(g.monto)}</div>
       <button type="button" class="table-action-btn" title="Editar" onclick="editGastoPuntual('${g.id}')">✏️</button>
@@ -5514,12 +5661,18 @@ function renderGastosPuntualesList(){
   }).join('');
 }
 
-// ¿Está vigente este gasto fijo al principio de este mes? (mismo criterio que un contrato)
+// ¿Corresponde pagar este gasto fijo en este mes? Tiene que estar dentro del rango vigente Y,
+// si se repite cada más de 1 mes (trimestral, semestral, anual), calzar con ese intervalo
+// contado desde la fecha de inicio — no todos los meses del rango, solo los que tocan.
 function gastoFijoVigenteEnMes(g, year, month){
   const inicioMesIso = `${year}-${String(month+1).padStart(2,'0')}-01`;
   if(g.fechaInicio && g.fechaInicio > inicioMesIso) return false;
   if(g.fechaTermino && g.fechaTermino < inicioMesIso) return false;
-  return true;
+  const frecuencia = Number(g.frecuenciaMeses||1);
+  if(frecuencia<=1) return true;
+  const [iy, im] = g.fechaInicio.split('-').map(Number);
+  const mesesTranscurridos = (year-iy)*12 + (month-(im-1));
+  return mesesTranscurridos>=0 && mesesTranscurridos % frecuencia === 0;
 }
 
 // Arma el flujo de caja mes a mes: ingresos = arriendos efectivamente cobrados (serie global de
@@ -5658,7 +5811,7 @@ async function deleteMantenimiento(id){
   await saveKey('mantenimientos', mantenimientos);
   renderMantenimientos();
   renderAlertas();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 async function marcarMantenimientoRealizado(id){
@@ -5670,7 +5823,7 @@ async function marcarMantenimientoRealizado(id){
   await saveKey('mantenimientos', mantenimientos);
   renderMantenimientos();
   renderAlertas();
-  pushToDriveIfConnected();
+  await pushToDriveAndWarn();
 }
 
 // Próxima fecha = última vez realizado + intervalo. Si nunca se ha hecho, se considera que ya
