@@ -5967,10 +5967,13 @@ function computeFlujoCajaMensual(){
     const totalPuntualesYMaestros = totalPuntuales + totalMaestros;
 
     // La garantía es su PROPIA columna, aparte del ingreso por arriendo — positiva cuando se
-    // recibe (contrato nuevo), negativa cuando se devuelve (término de contrato). Ambas usan la
-    // fecha específica en que efectivamente se movió la plata, no la fecha del contrato en sí.
+    // recibe (contrato nuevo), negativa cuando se devuelve (término de contrato). Se usa la
+    // fecha específica de pago si se cargó; si no (contratos antiguos, cargados antes de que
+    // existiera este campo), se asume por defecto que se pagó junto con la fecha de inicio del
+    // contrato — es la aproximación más razonable, ya que la garantía normalmente se paga al
+    // firmar.
     const totalGarantiasRecibidas = contracts
-      .filter(c=> !esContratoExcluidoDeIngresos(c) && Number(c.garantia||0)>0 && sameYearMonth(c.garantiaFechaPago, year, month))
+      .filter(c=> !esContratoExcluidoDeIngresos(c) && Number(c.garantia||0)>0 && sameYearMonth(c.garantiaFechaPago || c.fechaInicioContrato, year, month))
       .reduce((s,c)=>s+Number(c.garantia||0),0);
     const totalGarantiasDevueltas = contracts
       .filter(c=> !esContratoExcluidoDeIngresos(c) && Number(c.garantiaDevueltaMonto||0)>0 && sameYearMonth(c.garantiaDevueltaFecha, year, month))
@@ -6002,7 +6005,11 @@ function renderFlujoCajaYearFilter(todasLasFilas){
     // libremente después, esto solo aplica la primera vez que se arma el filtro.
     sel.value = '2026';
   }
-  flujoCajaDefaultAplicado = true;
+  // Solo se marca como "ya aplicado" cuando efectivamente hubo años con los que trabajar — si
+  // esta pasada se ejecutó antes de que cargaran los datos reales de Drive (lista vacía), no
+  // cuenta como el intento, para no perder la oportunidad de aplicar el 2026 por defecto una vez
+  // que los datos ya estén.
+  if(anios.length) flujoCajaDefaultAplicado = true;
 }
 
 function renderFlujoCajaTable(){
