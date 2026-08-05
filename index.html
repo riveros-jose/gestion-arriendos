@@ -946,6 +946,10 @@
         <h2>🔔 Próximos vencimientos y ajustes</h2>
         <div id="alertas-list"></div>
       </div>
+      <div class="card">
+        <h2>🗓️ Mantenimientos programados</h2>
+        <div id="alertas-mantenimientos-list"></div>
+      </div>
     </div>
 
     <!-- SERVICIOS -->
@@ -1026,6 +1030,7 @@
         <div class="subtabs subtabs-sticky" id="maestros-subtabs">
           <button type="button" class="subtab-btn active" data-subtab="lista">🛠️ Maestros</button>
           <button type="button" class="subtab-btn" data-subtab="presupuestos">📊 Presupuestos de Referencia</button>
+          <button type="button" class="subtab-btn" data-subtab="mantenimientos">🗓️ Mantenimientos Programados</button>
         </div>
       </div>
 
@@ -1068,6 +1073,40 @@
           <h2>📊 Presupuestos de Referencia por tipo de trabajo</h2>
           <div class="subtitle" style="margin-bottom:14px">Basado en lo que los maestros han cobrado realmente, agrupado por categoría — útil para tener una referencia antes de pedir un presupuesto nuevo.</div>
           <div id="presupuestos-referencia-list"></div>
+        </div>
+      </div>
+
+      <div id="maestros-mantenimientos-panel" style="display:none">
+        <div class="card">
+          <button type="button" class="btn-add-new" id="mantForm-open-btn" onclick="showMantenimientoForm()"><span class="plus-icon">+</span> Programar nuevo mantenimiento</button>
+          <div id="mantForm-wrap" style="display:none">
+            <div class="toggle-form">
+              <h2 id="mant-form-title">🗓️ Nuevo mantenimiento programado</h2>
+              <button type="button" class="btn btn-secondary" onclick="hideMantenimientoForm()">Ocultar formulario</button>
+            </div>
+            <form id="form-mantenimiento" class="form-compact">
+              <input type="hidden" id="mant-id">
+              <div class="grid">
+                <div class="field full"><label>Descripción</label><input id="mant-descripcion" required placeholder="Ej: Revisión de techumbre y canaletas"></div>
+                <div class="field full"><label>Propiedades a las que aplica</label>
+                  <div id="mant-propiedadId-checks" class="checkbox-list"></div>
+                </div>
+                <div class="field"><label>Cada cuántos meses</label><input type="number" min="1" step="1" id="mant-intervaloMeses" required placeholder="Ej: 6"></div>
+                <div class="field"><label>Última vez realizado (si aplica)</label><input type="date" id="mant-ultimaFecha"></div>
+                <div class="field"><label>Maestro sugerido (opcional)</label><select id="mant-maestroId"><option value="">— Sin especificar —</option></select></div>
+                <div class="field full"><label>Comentarios</label><textarea id="mant-comentarios" rows="2"></textarea></div>
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn btn-primary">Guardar mantenimiento</button>
+                <button type="button" class="btn btn-secondary" id="mant-cancel" style="display:none">Cancelar edición</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>🗓️ Mantenimientos programados</h2>
+          <div id="mantenimientos-list"></div>
         </div>
       </div>
     </div>
@@ -1622,6 +1661,14 @@ function buildWorkbook(){
   styleWorksheet(wsGP, [10,30,18,14,12]);
   XLSX.utils.book_append_sheet(wb, wsGP, 'GastosPuntuales');
 
+  const mantRows = mantenimientos.length ? mantenimientos.map(m=>({
+    id: m.id, descripcion: m.descripcion, propiedadIds: (m.propiedadIds||[]).join(','), intervaloMeses: m.intervaloMeses||'', ultimaFecha: m.ultimaFecha||'', maestroId: m.maestroId||'', comentarios: m.comentarios||''
+  })) : [{}];
+  const wsMant = XLSX.utils.json_to_sheet(mantRows);
+  applyColumnFormats(wsMant, ['id','descripcion','propiedadIds','intervaloMeses','ultimaFecha','maestroId','comentarios']);
+  styleWorksheet(wsMant, [10,30,24,14,12,10,32]);
+  XLSX.utils.book_append_sheet(wb, wsMant, 'Mantenimientos');
+
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
@@ -1634,7 +1681,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio','ultimaFecha'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -1679,6 +1726,7 @@ function loadFromWorkbook(arrayBuffer){
   const trabajoSheet = wb.Sheets['TrabajosMaestros'];
   const gastoFijoSheet = wb.Sheets['GastosFijos'];
   const gastoPuntualSheet = wb.Sheets['GastosPuntuales'];
+  const mantSheet = wb.Sheets['Mantenimientos'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
 
@@ -1690,6 +1738,7 @@ function loadFromWorkbook(arrayBuffer){
   const rawTrabajos = trabajoSheet ? XLSX.utils.sheet_to_json(trabajoSheet).filter(r=>r.id) : [];
   const rawGastosFijos = gastoFijoSheet ? XLSX.utils.sheet_to_json(gastoFijoSheet).filter(r=>r.id) : [];
   const rawGastosPuntuales = gastoPuntualSheet ? XLSX.utils.sheet_to_json(gastoPuntualSheet).filter(r=>r.id) : [];
+  const rawMant = mantSheet ? XLSX.utils.sheet_to_json(mantSheet).filter(r=>r.id) : [];
   lastDateCorruptionCount = countDateTimeCorruption(rawContracts) + countDateTimeCorruption(rawPayments) + countDateTimeCorruption(rawReadings);
 
   contracts = rawContracts.map(c=> normalizeDates({
@@ -1722,6 +1771,11 @@ function loadFromWorkbook(arrayBuffer){
   }));
   gastosPuntuales = rawGastosPuntuales.map(g=> normalizeDates({
     id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', fecha:g.fecha||''
+  }));
+  mantenimientos = rawMant.map(m=> normalizeDates({
+    id:m.id, descripcion:m.descripcion||'',
+    propiedadIds: m.propiedadIds ? String(m.propiedadIds).split(',').map(s=>s.trim()).filter(Boolean) : [],
+    intervaloMeses:m.intervaloMeses||'', ultimaFecha:m.ultimaFecha||'', maestroId:m.maestroId||'', comentarios:m.comentarios||''
   }));
 
   // Carpeta de Servicios: si ya quedó guardada en el propio Excel (por cualquier cuenta que la
@@ -1913,6 +1967,7 @@ async function exportWorkbookToGoogleSheets(wb, filenamePrefix){
 let properties = [], tenants = [], contracts = [], payments = [], readings = [], sectorBoletas = [];
 let maestros = [], trabajosMaestros = [];
 let gastosFijos = [], gastosPuntuales = [];
+let mantenimientos = [];
 const collapseState = { tenants:true, contracts:false };
 // Sube al inicio: en desktop scrollea la ventana; en mobile scrollea el contenedor .main
 // (que es donde ocurre el scroll para evitar el botón flotante nativo del navegador).
@@ -2267,6 +2322,7 @@ function renderAll(){
   renderMaestros();
   renderPresupuestosReferencia();
   renderGastosYFlujoCaja();
+  renderMantenimientos();
   refreshDateHints();
   buildQuickJumpBar(document.querySelector('.tab-section.active'));
   ajustarStickyFiltroArrendatarios();
@@ -2501,10 +2557,12 @@ document.getElementById('maestros-subtabs').addEventListener('click', e=>{
   const btn = e.target.closest('.subtab-btn');
   if(!btn) return;
   document.querySelectorAll('#maestros-subtabs .subtab-btn').forEach(b=> b.classList.toggle('active', b===btn));
-  const esLista = btn.dataset.subtab==='lista';
-  document.getElementById('maestros-lista-panel').style.display = esLista ? 'block' : 'none';
-  document.getElementById('maestros-presupuestos-panel').style.display = esLista ? 'none' : 'block';
-  if(!esLista) renderPresupuestosReferencia();
+  const sub = btn.dataset.subtab;
+  document.getElementById('maestros-lista-panel').style.display = sub==='lista' ? 'block' : 'none';
+  document.getElementById('maestros-presupuestos-panel').style.display = sub==='presupuestos' ? 'block' : 'none';
+  document.getElementById('maestros-mantenimientos-panel').style.display = sub==='mantenimientos' ? 'block' : 'none';
+  if(sub==='presupuestos') renderPresupuestosReferencia();
+  if(sub==='mantenimientos') renderMantenimientos();
   buildQuickJumpBar(document.getElementById('tab-maestros'));
 });
 
@@ -3062,12 +3120,15 @@ function buildAlerts(){
 }
 function renderAlertas(){
   const alerts = buildAlerts();
+  const mantAlerts = buildMantenimientoAlerts();
+  const totalAlerts = alerts.length + mantAlerts.length;
   ['alert-badge','alert-badge-top','alert-badge-sidebar'].forEach(id=>{
     const badge = document.getElementById(id);
     if(!badge) return;
-    if(alerts.length){ badge.style.display='inline-block'; badge.textContent = alerts.length; }
+    if(totalAlerts){ badge.style.display='inline-block'; badge.textContent = totalAlerts; }
     else { badge.style.display='none'; }
   });
+  renderMantenimientoAlertas();
   const el = document.getElementById('alertas-list');
   if(!alerts.length){ el.innerHTML='<div class="empty">No hay vencimientos ni ajustes de IPC dentro de los próximos 3 meses.</div>'; return; }
 
@@ -5516,6 +5577,163 @@ function renderGastosYFlujoCaja(){
   renderGastosFijosList();
   renderGastosPuntualesList();
   renderFlujoCajaTable();
+}
+
+// ---------- MANTENIMIENTOS PROGRAMADOS ----------
+function renderMantPropiedadChecks(){
+  const cont = document.getElementById('mant-propiedadId-checks');
+  cont.innerHTML = properties.length
+    ? properties.slice().sort((a,b)=> a.direccion.localeCompare(b.direccion)).map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.direccion)} ${esc(p.unidad||'')}</label>`).join('')
+    : '<div class="empty-note">No hay propiedades registradas todavía.</div>';
+}
+function renderMantMaestroSelect(){
+  const sel = document.getElementById('mant-maestroId');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Sin especificar —</option>' + maestros.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(m=>`<option value="${m.id}">${esc(m.nombre)}</option>`).join('');
+  sel.value = current;
+}
+
+function showMantenimientoForm(){
+  renderMantPropiedadChecks();
+  renderMantMaestroSelect();
+  document.getElementById('mantForm-wrap').style.display = 'block';
+  document.getElementById('mantForm-open-btn').style.display = 'none';
+}
+function hideMantenimientoForm(){
+  document.getElementById('mantForm-wrap').style.display = 'none';
+  document.getElementById('mantForm-open-btn').style.display = 'flex';
+  editingMantenimiento = null;
+  document.getElementById('form-mantenimiento').reset();
+  document.getElementById('mant-form-title').textContent = '🗓️ Nuevo mantenimiento programado';
+  document.getElementById('mant-cancel').style.display = 'none';
+}
+let editingMantenimiento = null;
+document.getElementById('mant-cancel').addEventListener('click', hideMantenimientoForm);
+
+document.getElementById('form-mantenimiento').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const descripcion = document.getElementById('mant-descripcion').value.trim();
+  const propiedadIds = Array.from(document.querySelectorAll('#mant-propiedadId-checks input:checked')).map(cb=>cb.value);
+  const intervaloMeses = Number(document.getElementById('mant-intervaloMeses').value);
+  if(!descripcion || !propiedadIds.length || !intervaloMeses){ alert('Completa la descripción, elige al menos una propiedad, e indica cada cuántos meses corresponde.'); return; }
+  const obj = {
+    id: editingMantenimiento || uid(),
+    descripcion,
+    propiedadIds,
+    intervaloMeses,
+    ultimaFecha: document.getElementById('mant-ultimaFecha').value,
+    maestroId: document.getElementById('mant-maestroId').value,
+    comentarios: document.getElementById('mant-comentarios').value.trim(),
+  };
+  mantenimientos = editingMantenimiento ? mantenimientos.map(m=> m.id===editingMantenimiento ? obj : m) : [...mantenimientos, obj];
+  await saveKey('mantenimientos', mantenimientos);
+  hideMantenimientoForm();
+  renderMantenimientos();
+  renderAlertas();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(ok ? `✅ Mantenimiento programado: ${descripcion} (cada ${intervaloMeses} meses)` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+});
+
+function editMantenimiento(id){
+  const m = mantenimientos.find(x=>x.id===id);
+  if(!m) return;
+  editingMantenimiento = id;
+  showMantenimientoForm();
+  document.getElementById('mant-descripcion').value = m.descripcion||'';
+  document.querySelectorAll('#mant-propiedadId-checks input').forEach(cb=>{ cb.checked = (m.propiedadIds||[]).includes(cb.value); });
+  document.getElementById('mant-intervaloMeses').value = m.intervaloMeses||'';
+  document.getElementById('mant-ultimaFecha').value = m.ultimaFecha||'';
+  document.getElementById('mant-maestroId').value = m.maestroId||'';
+  document.getElementById('mant-comentarios').value = m.comentarios||'';
+  document.getElementById('mant-form-title').textContent = '🗓️ Editar mantenimiento programado';
+  document.getElementById('mant-cancel').style.display = 'inline-block';
+  scrollAppToTop();
+}
+
+async function deleteMantenimiento(id){
+  const m = mantenimientos.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm(`¿Eliminar el mantenimiento "${m.descripcion}"?`)) return;
+  mantenimientos = mantenimientos.filter(x=>x.id!==id);
+  await saveKey('mantenimientos', mantenimientos);
+  renderMantenimientos();
+  renderAlertas();
+  pushToDriveIfConnected();
+}
+
+async function marcarMantenimientoRealizado(id){
+  const m = mantenimientos.find(x=>x.id===id);
+  if(!m) return;
+  const hoy = new Date().toISOString().slice(0,10);
+  if(!confirm(`¿Marcar "${m.descripcion}" como realizado hoy (${formatDate(hoy)})? Esto recalcula la próxima fecha.`)) return;
+  mantenimientos = mantenimientos.map(x=> x.id===id ? {...x, ultimaFecha: hoy} : x);
+  await saveKey('mantenimientos', mantenimientos);
+  renderMantenimientos();
+  renderAlertas();
+  pushToDriveIfConnected();
+}
+
+// Próxima fecha = última vez realizado + intervalo. Si nunca se ha hecho, se considera que ya
+// corresponde ahora mismo (fecha de hoy), para que aparezca de inmediato como pendiente.
+function proximaFechaMantenimiento(m){
+  if(!m.ultimaFecha) return new Date().toISOString().slice(0,10);
+  return toISO(addMonths(m.ultimaFecha, Number(m.intervaloMeses||0)));
+}
+
+function renderMantenimientos(){
+  const el = document.getElementById('mantenimientos-list');
+  if(!el) return;
+  if(!mantenimientos.length){ el.innerHTML = '<div class="empty">Aún no hay mantenimientos programados.</div>'; return; }
+
+  const conProxima = mantenimientos.map(m=>({ m, proxima: proximaFechaMantenimiento(m) }))
+    .sort((a,b)=> a.proxima.localeCompare(b.proxima));
+
+  el.innerHTML = conProxima.map(({m, proxima})=>{
+    const meses = monthsUntil(proxima);
+    const vencido = meses < 0;
+    const proximo = meses>=0 && meses<=1;
+    const estadoTag = vencido ? '<span class="tag tag-debt">Atrasado</span>' : (proximo ? '<span class="tag tag-pending">Próximo</span>' : '<span class="tag tag-ok">Al día</span>');
+    const direcciones = (m.propiedadIds||[]).map(pid=>{ const p = properties.find(x=>x.id===pid); return p ? `${p.direccion}${p.unidad?' '+p.unidad:''}` : null; }).filter(Boolean).join(', ');
+    const maestroNombre = m.maestroId ? (maestros.find(x=>x.id===m.maestroId)?.nombre) : null;
+    return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:220px;">
+        <div><strong>${esc(m.descripcion)}</strong> ${estadoTag}</div>
+        <div class="cell-stacked-sub">📍 ${esc(direcciones)}</div>
+        <div class="cell-stacked-sub">Cada ${m.intervaloMeses} meses · Próximo: ${formatDate(proxima)}${m.ultimaFecha?` · Último: ${formatDate(m.ultimaFecha)}`:' · nunca realizado'}${maestroNombre?` · 👷 ${esc(maestroNombre)}`:''}</div>
+        ${m.comentarios ? `<div class="cell-stacked-sub">${esc(m.comentarios)}</div>` : ''}
+      </div>
+      <button type="button" class="table-action-btn table-action-btn-lg" title="Marcar como realizado hoy" onclick="marcarMantenimientoRealizado('${m.id}')">✅</button>
+      <button type="button" class="table-action-btn" title="Editar" onclick="editMantenimiento('${m.id}')">✏️</button>
+      <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteMantenimiento('${m.id}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+// Alertas de mantenimiento: se muestran cuando falta 1 mes o menos, o ya están atrasados —
+// mismo criterio que las alertas de contrato.
+function buildMantenimientoAlerts(){
+  return mantenimientos.map(m=>{
+    const proxima = proximaFechaMantenimiento(m);
+    const meses = monthsUntil(proxima);
+    return { m, proxima, meses, vencido: meses<0 };
+  }).filter(a=> a.meses<=1);
+}
+
+function renderMantenimientoAlertas(){
+  const el = document.getElementById('alertas-mantenimientos-list');
+  if(!el) return;
+  const alerts = buildMantenimientoAlerts().sort((a,b)=> a.meses-b.meses);
+  if(!alerts.length){ el.innerHTML = '<div class="empty">No hay mantenimientos atrasados ni próximos dentro de 1 mes.</div>'; return; }
+  el.innerHTML = alerts.map(a=>{
+    const direcciones = (a.m.propiedadIds||[]).map(pid=>{ const p = properties.find(x=>x.id===pid); return p ? `${p.direccion}${p.unidad?' '+p.unidad:''}` : null; }).filter(Boolean).join(', ');
+    const urgencyClass = a.vencido ? 'u1' : ('u'+Math.max(a.meses,1));
+    const texto = a.vencido ? `Atrasado desde el ${formatDate(a.proxima)}` : (a.meses===0 ? `Corresponde este mes (${formatDate(a.proxima)})` : `En ${a.meses} mes${a.meses>1?'es':''} (${formatDate(a.proxima)})`);
+    return `<div class="alert-card ${urgencyClass}">
+      <div class="title">${esc(a.m.descripcion)}</div>
+      <div class="alert-line">📍 ${esc(direcciones)} — ${texto}</div>
+      <button type="button" class="btn btn-secondary" style="margin-top:8px;font-size:12px;padding:6px 12px;" onclick="marcarMantenimientoRealizado('${a.m.id}')">✅ Marcar como realizado hoy</button>
+    </div>`;
+  }).join('');
 }
 
 // ---------- ORDEN DE TABLAS (clic en encabezado) ----------
