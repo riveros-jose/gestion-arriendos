@@ -832,34 +832,110 @@
     <!-- RESUMEN -->
     <div class="tab-section active" id="tab-resumen">
       <h1>📊 Resumen &amp; Deudas</h1>
+
       <div class="card">
-        <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <div class="line-row form-compact" style="margin-bottom:8px;max-width:420px">
-          <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
+        <div class="subtabs subtabs-sticky" id="resumen-subtabs" style="justify-content:center;">
+          <button type="button" class="subtab-btn active" data-subtab="resumen">📊 Resumen</button>
+          <button type="button" class="subtab-btn" data-subtab="gastos">💰 Gastos y Flujo de Caja</button>
         </div>
-        <div class="line-row form-compact" id="chart-controls" style="margin-bottom:10px;max-width:420px">
-          <div class="field"><label>Año</label><select id="chart-year-filter"></select></div>
-          <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
+      </div>
+
+      <div id="resumen-panel-resumen">
+        <div class="card">
+          <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+          <div class="line-row form-compact" style="margin-bottom:8px;max-width:420px">
+            <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
+          </div>
+          <div class="line-row form-compact" id="chart-controls" style="margin-bottom:10px;max-width:420px">
+            <div class="field"><label>Año</label><select id="chart-year-filter"></select></div>
+            <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
+          </div>
+          <div id="resumen-chart"></div>
         </div>
-        <div id="resumen-chart"></div>
-      </div>
-      <div class="card">
-        <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <select class="filter" id="resumen-filter"></select>
-        <div id="resumen-table" class="table-wrap"></div>
-      </div>
-      <div class="card">
-        <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-        <div class="line-row form-compact" style="margin-bottom:10px;max-width:520px">
-          <div class="field"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0"></select></div>
-          <div class="field"><label>Año</label><select id="matrix-year-filter"></select></div>
+        <div class="card">
+          <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+          <select class="filter" id="resumen-filter"></select>
+          <div id="resumen-table" class="table-wrap"></div>
         </div>
-        <div id="resumen-matrix" class="table-wrap"></div>
+        <div class="card">
+          <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+          <div class="line-row form-compact" style="margin-bottom:10px;max-width:520px">
+            <div class="field"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0"></select></div>
+            <div class="field"><label>Año</label><select id="matrix-year-filter"></select></div>
+          </div>
+          <div id="resumen-matrix" class="table-wrap"></div>
+        </div>
+        <div class="card">
+          <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
+          <select class="filter" id="impagos-tenant-filter"></select>
+          <div id="resumen-impagos" class="table-wrap"></div>
+        </div>
       </div>
-      <div class="card">
-        <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
-        <select class="filter" id="impagos-tenant-filter"></select>
-        <div id="resumen-impagos" class="table-wrap"></div>
+
+      <div id="resumen-panel-gastos" style="display:none">
+        <div class="card">
+          <button type="button" class="btn-add-new" id="gastoFijoForm-open-btn" onclick="showGastoFijoForm()"><span class="plus-icon">+</span> Registrar gasto fijo (mensual recurrente)</button>
+          <div id="gastoFijoForm-wrap" style="display:none">
+            <div class="toggle-form">
+              <h2 id="gastoFijo-form-title">💰 Nuevo gasto fijo</h2>
+              <button type="button" class="btn btn-secondary" onclick="hideGastoFijoForm()">Ocultar formulario</button>
+            </div>
+            <form id="form-gastoFijo" class="form-compact">
+              <input type="hidden" id="gf-id">
+              <div class="grid">
+                <div class="field"><label>Descripción</label><input id="gf-descripcion" required placeholder="Ej: Sueldo administración"></div>
+                <div class="field"><label>Categoría</label><input id="gf-categoria" placeholder="Ej: Sueldos, Honorarios, Seguros…"></div>
+                <div class="field"><label>Monto mensual ($)</label><input type="text" inputmode="numeric" class="money-mask" id="gf-monto" required></div>
+                <div class="field"><label>Desde</label><input type="date" id="gf-fechaInicio" required></div>
+                <div class="field"><label>Hasta (si ya terminó)</label><input type="date" id="gf-fechaTermino"></div>
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn btn-primary">Guardar gasto fijo</button>
+                <button type="button" class="btn btn-secondary" id="gastoFijo-cancel" style="display:none">Cancelar edición</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>💼 Gastos fijos registrados</h2>
+          <div id="gastos-fijos-list"></div>
+        </div>
+
+        <div class="card">
+          <button type="button" class="btn-add-new" id="gastoPuntualForm-open-btn" onclick="showGastoPuntualForm()"><span class="plus-icon">+</span> Registrar gasto puntual</button>
+          <div id="gastoPuntualForm-wrap" style="display:none">
+            <div class="toggle-form">
+              <h2 id="gastoPuntual-form-title">🧾 Nuevo gasto puntual</h2>
+              <button type="button" class="btn btn-secondary" onclick="hideGastoPuntualForm()">Ocultar formulario</button>
+            </div>
+            <div class="subtitle" style="margin:-8px 0 14px;">Para gastos de maestros, mejor regístralos directamente en la tarjeta del maestro (sección Maestros y Arreglos) — de ahí se suman solos al flujo de caja. Usa esto para otros gastos puntuales (materiales, trámites, etc.).</div>
+            <form id="form-gastoPuntual" class="form-compact">
+              <input type="hidden" id="gp-id">
+              <div class="grid">
+                <div class="field"><label>Descripción</label><input id="gp-descripcion" required placeholder="Ej: Compra de pintura"></div>
+                <div class="field"><label>Categoría</label><input id="gp-categoria" placeholder="Ej: Materiales, Trámites…"></div>
+                <div class="field"><label>Monto ($)</label><input type="text" inputmode="numeric" class="money-mask" id="gp-monto" required></div>
+                <div class="field"><label>Fecha</label><input type="date" id="gp-fecha" required></div>
+              </div>
+              <div class="btn-row">
+                <button type="submit" class="btn btn-primary">Guardar gasto puntual</button>
+                <button type="button" class="btn btn-secondary" id="gastoPuntual-cancel" style="display:none">Cancelar edición</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>🧾 Gastos puntuales registrados</h2>
+          <div id="gastos-puntuales-list"></div>
+        </div>
+
+        <div class="card">
+          <h2>💵 Flujo de Caja Mensual</h2>
+          <div class="subtitle" style="margin-bottom:14px">Ingresos = arriendos efectivamente cobrados ese mes. Egresos = gastos fijos vigentes + gastos puntuales + gastos de maestros (según su fecha de pago) de ese mes.</div>
+          <div id="flujo-caja-table" class="table-wrap"></div>
+        </div>
       </div>
     </div>
 
@@ -1530,6 +1606,22 @@ function buildWorkbook(){
   styleWorksheet(wsCfg, [28,40]);
   XLSX.utils.book_append_sheet(wb, wsCfg, 'Config');
 
+  const gastoFijoRows = gastosFijos.length ? gastosFijos.map(g=>({
+    id: g.id, descripcion: g.descripcion, categoria: g.categoria||'', monto: g.monto||'', fechaInicio: g.fechaInicio||'', fechaTermino: g.fechaTermino||''
+  })) : [{}];
+  const wsGF = XLSX.utils.json_to_sheet(gastoFijoRows);
+  applyColumnFormats(wsGF, ['id','descripcion','categoria','monto','fechaInicio','fechaTermino']);
+  styleWorksheet(wsGF, [10,30,18,14,12,12]);
+  XLSX.utils.book_append_sheet(wb, wsGF, 'GastosFijos');
+
+  const gastoPuntualRows = gastosPuntuales.length ? gastosPuntuales.map(g=>({
+    id: g.id, descripcion: g.descripcion, categoria: g.categoria||'', monto: g.monto||'', fecha: g.fecha||''
+  })) : [{}];
+  const wsGP = XLSX.utils.json_to_sheet(gastoPuntualRows);
+  applyColumnFormats(wsGP, ['id','descripcion','categoria','monto','fecha']);
+  styleWorksheet(wsGP, [10,30,18,14,12]);
+  XLSX.utils.book_append_sheet(wb, wsGP, 'GastosPuntuales');
+
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
@@ -1542,7 +1634,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -1585,6 +1677,8 @@ function loadFromWorkbook(arrayBuffer){
   const boletaSheet = wb.Sheets['BoletasSector'];
   const maestroSheet = wb.Sheets['Maestros'];
   const trabajoSheet = wb.Sheets['TrabajosMaestros'];
+  const gastoFijoSheet = wb.Sheets['GastosFijos'];
+  const gastoPuntualSheet = wb.Sheets['GastosPuntuales'];
   properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
 
@@ -1594,6 +1688,8 @@ function loadFromWorkbook(arrayBuffer){
   const rawBoletas = boletaSheet ? XLSX.utils.sheet_to_json(boletaSheet).filter(r=>r.id) : [];
   const rawMaestros = maestroSheet ? XLSX.utils.sheet_to_json(maestroSheet).filter(r=>r.id) : [];
   const rawTrabajos = trabajoSheet ? XLSX.utils.sheet_to_json(trabajoSheet).filter(r=>r.id) : [];
+  const rawGastosFijos = gastoFijoSheet ? XLSX.utils.sheet_to_json(gastoFijoSheet).filter(r=>r.id) : [];
+  const rawGastosPuntuales = gastoPuntualSheet ? XLSX.utils.sheet_to_json(gastoPuntualSheet).filter(r=>r.id) : [];
   lastDateCorruptionCount = countDateTimeCorruption(rawContracts) + countDateTimeCorruption(rawPayments) + countDateTimeCorruption(rawReadings);
 
   contracts = rawContracts.map(c=> normalizeDates({
@@ -1620,6 +1716,12 @@ function loadFromWorkbook(arrayBuffer){
   trabajosMaestros = rawTrabajos.map(t=> normalizeDates({
     id:t.id, maestroId:t.maestroId, categoria:t.categoria||'', fecha:t.fecha||'', fechaPago:t.fechaPago||'', propiedadDireccion:t.propiedadDireccion||'',
     descripcion:t.descripcion||'', m2:t.m2||'', monto:t.monto||'', tipoPrecio:t.tipoPrecio||'Neto', precioM2:t.precioM2||''
+  }));
+  gastosFijos = rawGastosFijos.map(g=> normalizeDates({
+    id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', fechaInicio:g.fechaInicio||'', fechaTermino:g.fechaTermino||''
+  }));
+  gastosPuntuales = rawGastosPuntuales.map(g=> normalizeDates({
+    id:g.id, descripcion:g.descripcion||'', categoria:g.categoria||'', monto:g.monto||'', fecha:g.fecha||''
   }));
 
   // Carpeta de Servicios: si ya quedó guardada en el propio Excel (por cualquier cuenta que la
@@ -1810,6 +1912,7 @@ async function exportWorkbookToGoogleSheets(wb, filenamePrefix){
 
 let properties = [], tenants = [], contracts = [], payments = [], readings = [], sectorBoletas = [];
 let maestros = [], trabajosMaestros = [];
+let gastosFijos = [], gastosPuntuales = [];
 const collapseState = { tenants:true, contracts:false };
 // Sube al inicio: en desktop scrollea la ventana; en mobile scrollea el contenedor .main
 // (que es donde ocurre el scroll para evitar el botón flotante nativo del navegador).
@@ -2163,6 +2266,7 @@ function renderAll(){
   renderHistoricos();
   renderMaestros();
   renderPresupuestosReferencia();
+  renderGastosYFlujoCaja();
   refreshDateHints();
   buildQuickJumpBar(document.querySelector('.tab-section.active'));
   ajustarStickyFiltroArrendatarios();
@@ -2402,6 +2506,17 @@ document.getElementById('maestros-subtabs').addEventListener('click', e=>{
   document.getElementById('maestros-presupuestos-panel').style.display = esLista ? 'none' : 'block';
   if(!esLista) renderPresupuestosReferencia();
   buildQuickJumpBar(document.getElementById('tab-maestros'));
+});
+
+document.getElementById('resumen-subtabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.subtab-btn');
+  if(!btn) return;
+  document.querySelectorAll('#resumen-subtabs .subtab-btn').forEach(b=> b.classList.toggle('active', b===btn));
+  const esResumen = btn.dataset.subtab==='resumen';
+  document.getElementById('resumen-panel-resumen').style.display = esResumen ? 'block' : 'none';
+  document.getElementById('resumen-panel-gastos').style.display = esResumen ? 'none' : 'block';
+  if(!esResumen) renderGastosYFlujoCaja();
+  buildQuickJumpBar(document.getElementById('tab-resumen'));
 });
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
@@ -5175,6 +5290,232 @@ function renderPresupuestosReferencia(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ---------- GASTOS Y FLUJO DE CAJA ----------
+function showGastoFijoForm(){
+  document.getElementById('gastoFijoForm-wrap').style.display = 'block';
+  document.getElementById('gastoFijoForm-open-btn').style.display = 'none';
+}
+function hideGastoFijoForm(){
+  document.getElementById('gastoFijoForm-wrap').style.display = 'none';
+  document.getElementById('gastoFijoForm-open-btn').style.display = 'flex';
+  editingGastoFijo = null;
+  document.getElementById('form-gastoFijo').reset();
+  document.getElementById('gastoFijo-form-title').textContent = '💰 Nuevo gasto fijo';
+  document.getElementById('gastoFijo-cancel').style.display = 'none';
+}
+let editingGastoFijo = null;
+document.getElementById('gastoFijo-cancel').addEventListener('click', hideGastoFijoForm);
+
+document.getElementById('form-gastoFijo').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const descripcion = document.getElementById('gf-descripcion').value.trim();
+  const monto = Number(rawMoneyValue(document.getElementById('gf-monto').value));
+  const fechaInicio = document.getElementById('gf-fechaInicio').value;
+  if(!descripcion || !monto || !fechaInicio){ alert('Completa descripción, monto mensual y fecha de inicio.'); return; }
+  const obj = {
+    id: editingGastoFijo || uid(),
+    descripcion,
+    categoria: document.getElementById('gf-categoria').value.trim(),
+    monto,
+    fechaInicio,
+    fechaTermino: document.getElementById('gf-fechaTermino').value,
+  };
+  gastosFijos = editingGastoFijo ? gastosFijos.map(g=> g.id===editingGastoFijo ? obj : g) : [...gastosFijos, obj];
+  await saveKey('gastosFijos', gastosFijos);
+  hideGastoFijoForm();
+  renderGastosYFlujoCaja();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(ok ? `✅ Gasto fijo guardado: ${descripcion} — ${money(monto)}/mes` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+});
+
+function editGastoFijo(id){
+  const g = gastosFijos.find(x=>x.id===id);
+  if(!g) return;
+  editingGastoFijo = id;
+  showGastoFijoForm();
+  document.getElementById('gf-descripcion').value = g.descripcion||'';
+  document.getElementById('gf-categoria').value = g.categoria||'';
+  document.getElementById('gf-monto').value = g.monto ? formatThousandsCLP(String(g.monto)) : '';
+  document.getElementById('gf-fechaInicio').value = g.fechaInicio||'';
+  document.getElementById('gf-fechaTermino').value = g.fechaTermino||'';
+  document.getElementById('gastoFijo-form-title').textContent = '💰 Editar gasto fijo';
+  document.getElementById('gastoFijo-cancel').style.display = 'inline-block';
+  scrollAppToTop();
+}
+
+async function deleteGastoFijo(id){
+  const g = gastosFijos.find(x=>x.id===id);
+  if(!g) return;
+  if(!confirm(`¿Eliminar el gasto fijo "${g.descripcion}"?`)) return;
+  gastosFijos = gastosFijos.filter(x=>x.id!==id);
+  await saveKey('gastosFijos', gastosFijos);
+  renderGastosYFlujoCaja();
+  pushToDriveIfConnected();
+}
+
+function showGastoPuntualForm(){
+  document.getElementById('gastoPuntualForm-wrap').style.display = 'block';
+  document.getElementById('gastoPuntualForm-open-btn').style.display = 'none';
+  if(!document.getElementById('gp-id').value) document.getElementById('gp-fecha').value = new Date().toISOString().slice(0,10);
+}
+function hideGastoPuntualForm(){
+  document.getElementById('gastoPuntualForm-wrap').style.display = 'none';
+  document.getElementById('gastoPuntualForm-open-btn').style.display = 'flex';
+  editingGastoPuntual = null;
+  document.getElementById('form-gastoPuntual').reset();
+  document.getElementById('gastoPuntual-form-title').textContent = '🧾 Nuevo gasto puntual';
+  document.getElementById('gastoPuntual-cancel').style.display = 'none';
+}
+let editingGastoPuntual = null;
+document.getElementById('gastoPuntual-cancel').addEventListener('click', hideGastoPuntualForm);
+
+document.getElementById('form-gastoPuntual').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const descripcion = document.getElementById('gp-descripcion').value.trim();
+  const monto = Number(rawMoneyValue(document.getElementById('gp-monto').value));
+  const fecha = document.getElementById('gp-fecha').value;
+  if(!descripcion || !monto || !fecha){ alert('Completa descripción, monto y fecha.'); return; }
+  const obj = {
+    id: editingGastoPuntual || uid(),
+    descripcion,
+    categoria: document.getElementById('gp-categoria').value.trim(),
+    monto,
+    fecha,
+  };
+  gastosPuntuales = editingGastoPuntual ? gastosPuntuales.map(g=> g.id===editingGastoPuntual ? obj : g) : [...gastosPuntuales, obj];
+  await saveKey('gastosPuntuales', gastosPuntuales);
+  hideGastoPuntualForm();
+  renderGastosYFlujoCaja();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(ok ? `✅ Gasto puntual guardado: ${descripcion} — ${money(monto)}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+});
+
+function editGastoPuntual(id){
+  const g = gastosPuntuales.find(x=>x.id===id);
+  if(!g) return;
+  editingGastoPuntual = id;
+  showGastoPuntualForm();
+  document.getElementById('gp-descripcion').value = g.descripcion||'';
+  document.getElementById('gp-categoria').value = g.categoria||'';
+  document.getElementById('gp-monto').value = g.monto ? formatThousandsCLP(String(g.monto)) : '';
+  document.getElementById('gp-fecha').value = g.fecha||'';
+  document.getElementById('gastoPuntual-form-title').textContent = '🧾 Editar gasto puntual';
+  document.getElementById('gastoPuntual-cancel').style.display = 'inline-block';
+  scrollAppToTop();
+}
+
+async function deleteGastoPuntual(id){
+  const g = gastosPuntuales.find(x=>x.id===id);
+  if(!g) return;
+  if(!confirm(`¿Eliminar el gasto puntual "${g.descripcion}"?`)) return;
+  gastosPuntuales = gastosPuntuales.filter(x=>x.id!==id);
+  await saveKey('gastosPuntuales', gastosPuntuales);
+  renderGastosYFlujoCaja();
+  pushToDriveIfConnected();
+}
+
+function renderGastosFijosList(){
+  const el = document.getElementById('gastos-fijos-list');
+  if(!el) return;
+  if(!gastosFijos.length){ el.innerHTML = '<div class="empty">Aún no hay gastos fijos registrados.</div>'; return; }
+  const ordenados = gastosFijos.slice().sort((a,b)=> a.descripcion.localeCompare(b.descripcion));
+  el.innerHTML = ordenados.map(g=>{
+    const vigente = !g.fechaTermino;
+    return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div><strong>${esc(g.descripcion)}</strong>${g.categoria?` <span class="tag">${esc(g.categoria)}</span>`:''}${vigente?' <span class="tag tag-ok">Vigente</span>':' <span class="tag">Terminado</span>'}</div>
+        <div class="cell-stacked-sub">Desde ${formatDate(g.fechaInicio)}${g.fechaTermino?` hasta ${formatDate(g.fechaTermino)}`:' — indefinido'}</div>
+      </div>
+      <div style="font-weight:700;white-space:nowrap;">${money(g.monto)}/mes</div>
+      <button type="button" class="table-action-btn" title="Editar" onclick="editGastoFijo('${g.id}')">✏️</button>
+      <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteGastoFijo('${g.id}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+function renderGastosPuntualesList(){
+  const el = document.getElementById('gastos-puntuales-list');
+  if(!el) return;
+  if(!gastosPuntuales.length){ el.innerHTML = '<div class="empty">Aún no hay gastos puntuales registrados (fuera de los de maestros, que se ven en la sección Maestros y Arreglos).</div>'; return; }
+  const ordenados = gastosPuntuales.slice().sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
+  el.innerHTML = ordenados.map(g=>{
+    return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div><strong>${esc(g.descripcion)}</strong>${g.categoria?` <span class="tag">${esc(g.categoria)}</span>`:''}</div>
+        <div class="cell-stacked-sub">${formatDate(g.fecha)}</div>
+      </div>
+      <div style="font-weight:700;white-space:nowrap;">${money(g.monto)}</div>
+      <button type="button" class="table-action-btn" title="Editar" onclick="editGastoPuntual('${g.id}')">✏️</button>
+      <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteGastoPuntual('${g.id}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+// ¿Está vigente este gasto fijo al principio de este mes? (mismo criterio que un contrato)
+function gastoFijoVigenteEnMes(g, year, month){
+  const inicioMesIso = `${year}-${String(month+1).padStart(2,'0')}-01`;
+  if(g.fechaInicio && g.fechaInicio > inicioMesIso) return false;
+  if(g.fechaTermino && g.fechaTermino < inicioMesIso) return false;
+  return true;
+}
+
+// Arma el flujo de caja mes a mes: ingresos = arriendos efectivamente cobrados (serie global de
+// "pagado"), egresos = gastos fijos vigentes ese mes + gastos puntuales de ese mes + gastos de
+// maestros de ese mes (usando su fecha de pago si existe, o su fecha del trabajo si no — así un
+// trabajo que aún no se paga no aparece como egreso hasta que efectivamente se pague).
+function computeFlujoCajaMensual(){
+  const serieIngresos = computeGlobalMonthlySeries(); // ya viene con {year,month,pagado,...}
+  return serieIngresos.map(({year,month,label})=>{
+    const ingresos = serieIngresos.find(s=>s.year===year&&s.month===month).pagado;
+
+    const gFijos = gastosFijos.filter(g=> gastoFijoVigenteEnMes(g, year, month));
+    const totalFijos = gFijos.reduce((s,g)=>s+Number(g.monto||0),0);
+
+    const gPuntuales = gastosPuntuales.filter(g=> sameYearMonth(g.fecha, year, month));
+    const totalPuntuales = gPuntuales.reduce((s,g)=>s+Number(g.monto||0),0);
+
+    const gMaestros = trabajosMaestros.filter(t=>{
+      const fechaRef = t.fechaPago || t.fecha;
+      return Number(t.monto||0)>0 && sameYearMonth(fechaRef, year, month);
+    });
+    const totalMaestros = gMaestros.reduce((s,t)=>s+Number(t.monto||0),0);
+
+    const totalEgresos = totalFijos + totalPuntuales + totalMaestros;
+    const utilidad = ingresos - totalEgresos;
+    return { year, month, label, ingresos, totalFijos, totalPuntuales, totalMaestros, totalEgresos, utilidad };
+  });
+}
+
+function renderFlujoCajaTable(){
+  const el = document.getElementById('flujo-caja-table');
+  if(!el) return;
+  const filas = computeFlujoCajaMensual().slice(0, 24); // últimos 24 meses, ya vienen del más reciente al más antiguo
+  if(!filas.length){ el.innerHTML = '<div class="empty">Aún no hay datos suficientes para calcular el flujo de caja.</div>'; return; }
+  el.innerHTML = `<div class="table-scroll"><table>
+    <thead><tr><th>Mes</th><th>Ingresos (cobrado)</th><th>Gastos fijos</th><th>Gastos puntuales</th><th>Gastos maestros</th><th>Total egresos</th><th>Utilidad / Caja</th></tr></thead>
+    <tbody>
+      ${filas.map(f=>{
+        const colorUtilidad = f.utilidad>=0 ? 'var(--teal-dark)' : 'var(--brick)';
+        return `<tr>
+          <td><strong>${esc(f.label)}</strong></td>
+          <td>${money(f.ingresos)}</td>
+          <td>${money(f.totalFijos)}</td>
+          <td>${money(f.totalPuntuales)}</td>
+          <td>${money(f.totalMaestros)}</td>
+          <td>${money(f.totalEgresos)}</td>
+          <td style="font-weight:700;color:${colorUtilidad}">${money(f.utilidad)}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function renderGastosYFlujoCaja(){
+  renderGastosFijosList();
+  renderGastosPuntualesList();
+  renderFlujoCajaTable();
 }
 
 // ---------- ORDEN DE TABLAS (clic en encabezado) ----------
