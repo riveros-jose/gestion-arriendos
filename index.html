@@ -922,8 +922,8 @@
             <form id="form-gastoPuntual" class="form-compact">
               <input type="hidden" id="gp-id">
               <div class="grid">
-                <div class="field full"><label>Foto o PDF de la boleta (opcional)</label><input type="file" id="gp-boletaFile" accept="image/*,application/pdf" capture="environment">
-                  <span class="status-msg" id="gp-boleta-status">Si subes una foto, intentamos leer la tienda y el monto automáticamente (puedes corregirlos abajo si el OCR se equivoca).</span>
+                <div class="field full"><label>Foto o PDF de la boleta</label><input type="file" id="gp-boletaFile" accept="image/*,application/pdf" capture="environment">
+                  <span class="status-msg" id="gp-boleta-status">Obligatoria — sin boleta no se puede registrar el gasto. Al subir la foto, intentamos leer la tienda y el monto automáticamente (puedes corregirlos abajo si el OCR se equivoca).</span>
                 </div>
                 <div class="field"><label>Descripción / Tienda</label><input id="gp-descripcion" required placeholder="Ej: Compra de pintura, o el nombre de la tienda"></div>
                 <div class="field"><label>Categoría</label><input id="gp-categoria" placeholder="Ej: Materiales, Trámites…"></div>
@@ -946,6 +946,10 @@
         <div class="card">
           <h2>💵 Flujo de Caja Mensual</h2>
           <div class="subtitle" style="margin-bottom:14px">Ingresos = arriendos efectivamente cobrados ese mes. Egresos = gastos fijos vigentes + gastos puntuales + gastos de maestros (según su fecha de pago) de ese mes.</div>
+          <div class="line-row form-compact" style="margin-bottom:10px;max-width:420px">
+            <div class="field"><label>Año</label><select id="flujo-caja-year-filter"><option value="">Últimos 12 meses</option></select></div>
+            <div class="field" style="justify-content:flex-end;"><button type="button" class="btn btn-secondary" id="flujo-caja-vertodo-btn">Ver todo</button></div>
+          </div>
           <div id="flujo-caja-table" class="table-wrap"></div>
         </div>
       </div>
@@ -5567,7 +5571,9 @@ document.getElementById('form-gastoPuntual').addEventListener('submit', async e=
 
   const statusEl = document.getElementById('gp-boleta-status');
   const file = document.getElementById('gp-boletaFile').files[0];
-  let boletaUrl = editingGastoPuntual ? (gastosPuntuales.find(g=>g.id===editingGastoPuntual)?.boletaUrl || '') : '';
+  const boletaExistente = editingGastoPuntual ? (gastosPuntuales.find(g=>g.id===editingGastoPuntual)?.boletaUrl || '') : '';
+  if(!file && !boletaExistente){ alert('Sube la foto o PDF de la boleta — un gasto puntual solo se puede registrar a partir de su boleta.'); return; }
+  let boletaUrl = boletaExistente;
   if(file){
     if(!driveToken){ alert('Necesitas estar conectado a Google Drive para subir la foto de la boleta.'); return; }
     statusEl.textContent = 'Subiendo boleta a Drive…';
@@ -5702,10 +5708,28 @@ function computeFlujoCajaMensual(){
   });
 }
 
+let flujoCajaVerTodo = false;
+
+function renderFlujoCajaYearFilter(todasLasFilas){
+  const sel = document.getElementById('flujo-caja-year-filter');
+  const current = sel.value;
+  const anios = [...new Set(todasLasFilas.map(f=>f.year))].sort((a,b)=>b-a);
+  sel.innerHTML = '<option value="">Últimos 12 meses</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+  if(anios.map(String).includes(current)) sel.value = current;
+}
+
 function renderFlujoCajaTable(){
   const el = document.getElementById('flujo-caja-table');
   if(!el) return;
-  const filas = computeFlujoCajaMensual().slice(0, 24); // últimos 24 meses, ya vienen del más reciente al más antiguo
+  const todasLasFilas = computeFlujoCajaMensual(); // ya vienen del más reciente al más antiguo
+  renderFlujoCajaYearFilter(todasLasFilas);
+  const anioFiltro = document.getElementById('flujo-caja-year-filter').value;
+
+  let filas;
+  if(flujoCajaVerTodo){ filas = todasLasFilas; }
+  else if(anioFiltro){ filas = todasLasFilas.filter(f=> String(f.year)===anioFiltro); }
+  else { filas = todasLasFilas.slice(0, 12); }
+
   if(!filas.length){ el.innerHTML = '<div class="empty">Aún no hay datos suficientes para calcular el flujo de caja.</div>'; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>Mes</th><th>Ingresos (cobrado)</th><th>Gastos fijos</th><th>Gastos puntuales</th><th>Gastos maestros</th><th>Total egresos</th><th>Utilidad / Caja</th></tr></thead>
@@ -5725,6 +5749,13 @@ function renderFlujoCajaTable(){
     </tbody>
   </table></div>`;
 }
+document.getElementById('flujo-caja-year-filter').addEventListener('change', ()=>{ flujoCajaVerTodo=false; renderFlujoCajaTable(); });
+document.getElementById('flujo-caja-vertodo-btn').addEventListener('click', ()=>{
+  flujoCajaVerTodo = !flujoCajaVerTodo;
+  document.getElementById('flujo-caja-vertodo-btn').textContent = flujoCajaVerTodo ? 'Ver menos' : 'Ver todo';
+  if(flujoCajaVerTodo) document.getElementById('flujo-caja-year-filter').value = '';
+  renderFlujoCajaTable();
+});
 
 function renderGastosYFlujoCaja(){
   renderGastosFijosList();
@@ -6052,8 +6083,17 @@ function computeGlobalMonthlySeries(){
   // descuentos, en cambio, siempre dependen de los pagos realmente registrados.
   const todos = contracts;
   const starts = todos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
-  if(!starts.length) return [];
-  const minStart = starts.slice().sort()[0];
+  // El rango de meses no puede basarse solo en los contratos: si un gasto (fijo, puntual, o un
+  // trabajo de maestro) tiene una fecha anterior al contrato más antiguo, necesita igual
+  // aparecer en el flujo de caja de ese mes — de lo contrario quedaría excluido por completo.
+  const otrasFechas = [
+    ...gastosFijos.map(g=>g.fechaInicio),
+    ...gastosPuntuales.map(g=>g.fecha),
+    ...trabajosMaestros.map(t=> t.fechaPago || t.fecha),
+  ].filter(Boolean);
+  const todasLasFechas = [...starts, ...otrasFechas];
+  if(!todasLasFechas.length) return [];
+  const minStart = todasLasFechas.slice().sort()[0];
   const months = monthsBetween(minStart).slice().reverse();
   return months.map(({year,month})=>{
     let monto=0, pagado=0, descuento=0;
