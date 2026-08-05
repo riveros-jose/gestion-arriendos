@@ -182,11 +182,22 @@
      grande y claro, con un solo botón de "Aceptar" para cerrarlo. En desktop se ve como una
      tarjeta centrada normal (no ocupa toda la pantalla, no hace falta). */
   .result-modal-overlay{position:fixed;inset:0;background:var(--card);z-index:10001;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;}
-  .result-modal-card{max-width:380px;}
+  .result-modal-card{max-width:380px;width:100%;}
   .result-modal-icon{font-size:56px;margin-bottom:18px;}
-  .result-modal-message{font-size:16px;line-height:1.5;color:var(--ink);margin-bottom:28px;white-space:pre-line;}
+  .result-modal-spinner{width:56px;height:56px;margin:0 auto 18px;border-radius:50%;border:5px solid var(--teal-soft);border-top-color:var(--teal-dark);animation:result-modal-spin .8s linear infinite;}
+  @keyframes result-modal-spin{to{transform:rotate(360deg);}}
+  .result-modal-title{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--ink);margin-bottom:16px;line-height:1.35;}
+  .result-modal-overlay.result-modal-error .result-modal-title{color:var(--brick);}
+  /* Cada detalle (arrendatario, fecha, monto, etc.) va en su propia línea tipo "boleta", con la
+     etiqueta chica arriba y el valor grande abajo — mucho más fácil de leer de un vistazo que
+     una sola oración larga con todo junto separado por guiones. */
+  .result-modal-details{text-align:left;background:var(--paper);border-radius:10px;padding:14px 16px;margin-bottom:24px;}
+  .result-modal-details:empty{display:none;margin-bottom:0;}
+  .result-modal-detail-row{padding:7px 0;border-bottom:1px solid var(--border);}
+  .result-modal-detail-row:last-child{border-bottom:none;}
+  .result-modal-detail-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);margin-bottom:2px;}
+  .result-modal-detail-value{font-size:15px;color:var(--ink);font-weight:600;}
   .result-modal-accept-btn{width:100%;padding:14px;font-size:15px;}
-  .result-modal-overlay.result-modal-error .result-modal-message{color:var(--brick);}
   @media (min-width: 861px){
     .result-modal-overlay{background:rgba(22,38,31,0.72);backdrop-filter:blur(2px);}
     .result-modal-card{background:var(--card);border-radius:14px;padding:32px;box-shadow:0 16px 40px rgba(22,38,31,0.3);}
@@ -464,9 +475,11 @@
 
 <div id="result-modal-overlay" class="result-modal-overlay" style="display:none">
   <div class="result-modal-card">
-    <div class="result-modal-icon" id="result-modal-icon">✅</div>
-    <div class="result-modal-message" id="result-modal-message"></div>
-    <button type="button" class="btn btn-primary result-modal-accept-btn" onclick="closeResultModal()">Aceptar</button>
+    <div class="result-modal-spinner" id="result-modal-spinner" style="display:none"></div>
+    <div class="result-modal-icon" id="result-modal-icon" style="display:none">✅</div>
+    <div class="result-modal-title" id="result-modal-title"></div>
+    <div class="result-modal-details" id="result-modal-details"></div>
+    <button type="button" class="btn btn-primary result-modal-accept-btn" id="result-modal-accept-btn" onclick="closeResultModal()">Aceptar</button>
   </div>
 </div>
 
@@ -1151,8 +1164,6 @@ let driveFolderId = null;
 let driveFileId = null;
 let hasLoadedFromDrive = false;
 let tokenRefreshTimer = null;
-let driveSyncBusy = false;
-let driveSyncQueued = false;
 
 function driveConfigured(){
   return GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.startsWith('PEGA_AQUI');
@@ -1813,10 +1824,8 @@ function loadFromWorkbook(arrayBuffer){
   }
 }
 
-async function driveSync(isInitialLoad){
+async function driveSyncInterno(isInitialLoad){
   if(!driveToken){ showDriveGate(); setGateChecking(false); return false; }
-  if(driveSyncBusy){ driveSyncQueued = true; return false; }
-  driveSyncBusy = true;
   let ok = false;
   try{
     if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
@@ -1859,13 +1868,11 @@ async function driveSync(isInitialLoad){
       // selector; crear un archivo vacío requiere una segunda confirmación explícita aparte.
       const usarPicker = confirm('No encontramos "registros-arriendos.xlsx" automáticamente en tu carpeta RentaPro.\n\nAceptar = buscarlo tú mismo con el selector de Google Drive (recomendado, por ejemplo si lo subiste a mano).\nCancelar = ver más opciones.');
       if(usarPicker){
-        driveSyncBusy = false;
         openFilePicker();
         return false;
       }
       const confirmarCreacion = confirm('⚠️ Estás a punto de crear un archivo NUEVO y VACÍO — no tus datos existentes.\n\nEsto solo tiene sentido si es la primera vez que usas RentaPro y todavía no existe ningún archivo de datos.\n\nSi ya tienes datos guardados en otro lado, presiona Cancelar ahora y usa el selector de Google Drive para encontrarlos.\n\n¿Confirmas que quieres crear un archivo vacío nuevo?');
       if(!confirmarCreacion){
-        driveSyncBusy = false;
         openFilePicker();
         return false;
       }
@@ -1879,7 +1886,6 @@ async function driveSync(isInitialLoad){
         // Este caso es anormal (ya se había cargado un archivo antes en esta sesión) — mejor
         // avisar y detenerse que crear en silencio un archivo nuevo que no es el real.
         alert('⚠️ Se perdió la referencia al archivo de datos en esta sesión. Para evitar crear uno nuevo por error, recarga la página y vuelve a conectar con Google Drive antes de seguir guardando cambios.');
-        driveSyncBusy = false;
         return false;
       } else {
         await driveUpdateXlsxFile(driveFileId, buf);
@@ -1906,10 +1912,21 @@ async function driveSync(isInitialLoad){
       alert('No se pudo cargar el archivo desde Google Drive.\n\n'+(e.message||'Error desconocido')+'\n\nVerifica que el archivo esté compartido contigo con permiso de Editor, e intenta elegirlo de nuevo con el selector (📂).');
     }
   } finally {
-    driveSyncBusy = false;
-    if(driveSyncQueued){ driveSyncQueued = false; driveSync(false); }
   }
   return ok;
+}
+
+// driveSync() es la función que realmente llama el resto de la app. En vez de "rechazar" una
+// sincronización que llega mientras otra está en curso (lo que antes devolvía un falso "no se
+// pudo guardar" aunque los datos SÍ se hubieran agregado en memoria), se encolan en una cadena de
+// promesas: cada llamada espera a que termine la anterior y luego hace SU PROPIA sincronización,
+// capturando el estado más reciente — así cada quien recibe el resultado real de su propio
+// guardado, sin perder cambios que llegaron mientras Drive estaba ocupado con otro.
+let driveSyncChain = Promise.resolve();
+function driveSync(isInitialLoad){
+  const resultado = driveSyncChain.then(()=> driveSyncInterno(isInitialLoad));
+  driveSyncChain = resultado.catch(()=>false);
+  return resultado;
 }
 
 // Devuelve si el guardado en Google Drive (la persistencia REAL de esta app) fue exitoso — a
@@ -2281,11 +2298,37 @@ const mesActualKey = ()=>{ const d=new Date(); return d.getFullYear()+'-'+String
 // ---------- MODAL DE RESULTADO (éxito/error) ----------
 // En mobile se muestra de pantalla completa para que el mensaje se lea grande y claro, con un
 // solo botón de "Aceptar" para cerrarlo. En desktop se ve como una tarjeta centrada normal.
-function showResultModal(message, ok){
+// "mensaje" acepta dos formas: un texto simple (se muestra como título, sin detalles separados),
+// o un objeto {titulo, detalles:[{label,value}]} para desglosar la información en líneas
+// separadas tipo "boleta" — mucho más fácil de leer que una sola oración larga con guiones.
+function showResultModal(mensaje, ok){
   const overlay = document.getElementById('result-modal-overlay');
+  document.getElementById('result-modal-spinner').style.display = 'none';
+  document.getElementById('result-modal-icon').style.display = 'block';
   document.getElementById('result-modal-icon').textContent = ok ? '✅' : '⚠️';
-  document.getElementById('result-modal-message').textContent = message;
+  document.getElementById('result-modal-accept-btn').style.display = 'block';
+
+  const esObjeto = mensaje && typeof mensaje === 'object';
+  const titulo = esObjeto ? (mensaje.titulo||'') : mensaje;
+  const detalles = esObjeto ? (mensaje.detalles||[]) : [];
+  document.getElementById('result-modal-title').textContent = titulo;
+  document.getElementById('result-modal-details').innerHTML = detalles.filter(d=>d && d.value).map(d=>
+    `<div class="result-modal-detail-row"><div class="result-modal-detail-label">${esc(d.label)}</div><div class="result-modal-detail-value">${esc(d.value)}</div></div>`
+  ).join('');
+
   overlay.classList.toggle('result-modal-error', !ok);
+  overlay.style.display = 'flex';
+}
+// Se muestra mientras se está esperando la confirmación de Google Drive — así queda claro que
+// algo está pasando en vez de que la pantalla se quede sin reaccionar unos segundos.
+function showLoadingModal(mensaje){
+  const overlay = document.getElementById('result-modal-overlay');
+  document.getElementById('result-modal-spinner').style.display = 'block';
+  document.getElementById('result-modal-icon').style.display = 'none';
+  document.getElementById('result-modal-title').textContent = mensaje || 'Guardando…';
+  document.getElementById('result-modal-details').innerHTML = '';
+  document.getElementById('result-modal-accept-btn').style.display = 'none';
+  overlay.classList.remove('result-modal-error');
   overlay.style.display = 'flex';
 }
 function closeResultModal(){
@@ -2301,7 +2344,7 @@ function showFormStatus(elId, message, ok, timeoutMs){
   }
   const el = document.getElementById(elId);
   if(!el) return;
-  el.textContent = message;
+  el.textContent = (message && typeof message==='object') ? message.titulo : message;
   setTimeout(()=>{ el.textContent=''; }, timeoutMs || (ok?1500:4000));
 }
 
@@ -2930,10 +2973,16 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   await saveKey('payments',payments);
   resetPayForm();
   renderAll();
+  if(window.innerWidth<=860) showLoadingModal('Guardando pago…');
   const driveOk = await pushToDriveIfConnected();
-  const resumenPago = `${contractLabel(obj.contratoId)} — ${formatDate(obj.fechaPago)} — ${money(Number(obj.montoPagado||0))}${Number(obj.descuentos||0)>0 ? ` (+ ${money(obj.descuentos)} descuento)` : ''}`;
+  const detallesPago = [
+    { label:'Arrendatario', value: contractLabel(obj.contratoId) },
+    { label:'Fecha de pago', value: formatDate(obj.fechaPago) },
+    { label:'Monto pagado', value: money(Number(obj.montoPagado||0)) },
+  ];
+  if(Number(obj.descuentos||0)>0) detallesPago.push({ label:'Descuento', value: money(obj.descuentos) });
   showFormStatus('pay-status',
-    driveOk ? `✅ Guardado en Google Drive: ${resumenPago}` : `⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo. ${resumenPago}`,
+    { titulo: driveOk ? '✅ Pago guardado en Google Drive' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.', detalles: detallesPago },
     driveOk, driveOk?3500:6000);
 });
 document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
@@ -4156,10 +4205,15 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
   await saveKey('readings',readings);
   resetReadingForm();
   renderAll();
+  if(window.innerWidth<=860) showLoadingModal('Guardando lectura…');
   const driveOk = await pushToDriveIfConnected();
-  const resumenLectura = `${contractLabel(obj.contratoId)} — ${obj.servicio} — Lectura: ${formatNumber(obj.lecturaActual)}`;
+  const detallesLectura = [
+    { label:'Arrendatario', value: contractLabel(obj.contratoId) },
+    { label:'Servicio', value: obj.servicio },
+    { label:'Lectura actual', value: formatNumber(obj.lecturaActual) },
+  ];
   showFormStatus('r-status',
-    driveOk ? `✅ Guardado en Google Drive: ${resumenLectura}` : `⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo. ${resumenLectura}`,
+    { titulo: driveOk ? '✅ Lectura guardada en Google Drive' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.', detalles: detallesLectura },
     driveOk);
 });
 document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
@@ -5368,8 +5422,14 @@ async function guardarTrabajoMaestro(maestroId){
   await saveKey('trabajosMaestros', trabajosMaestros);
   document.getElementById('tra-editId-'+maestroId).value = '';
   renderMaestros();
+  if(window.innerWidth<=860) showLoadingModal('Guardando trabajo…');
   const ok = await pushToDriveIfConnected();
-  showResultModal(ok ? `✅ Trabajo guardado en Google Drive: ${descripcion}${monto?` — ${money(monto)}`:''}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.', ok);
+  const detallesTrabajo = [
+    { label:'Descripción', value: descripcion },
+    { label:'Monto', value: monto ? money(monto) : '' },
+    { label:'Categoría', value: obj.categoria },
+  ];
+  showResultModal({ titulo: ok ? '✅ Trabajo guardado en Google Drive' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.', detalles: detallesTrabajo }, ok);
 }
 
 function editTrabajoMaestro(id){
@@ -5492,9 +5552,14 @@ document.getElementById('form-gastoFijo').addEventListener('submit', async e=>{
   await saveKey('gastosFijos', gastosFijos);
   hideGastoFijoForm();
   renderGastosYFlujoCaja();
+  if(window.innerWidth<=860) showLoadingModal('Guardando gasto fijo…');
   const ok = await pushToDriveIfConnected();
   const frecTxt = frecuenciaMeses===1 ? '/mes' : ` cada ${frecuenciaMeses} meses`;
-  showResultModal(ok ? `✅ Gasto fijo guardado: ${descripcion} — ${money(monto)}${frecTxt}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+  showResultModal({ titulo: ok ? '✅ Gasto fijo guardado en Google Drive' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', detalles: [
+    { label:'Descripción', value: descripcion },
+    { label:'Monto', value: money(monto)+frecTxt },
+    { label:'Categoría', value: obj.categoria },
+  ]}, ok);
 });
 
 function editGastoFijo(id){
@@ -5600,8 +5665,13 @@ document.getElementById('form-gastoPuntual').addEventListener('submit', async e=
   await saveKey('gastosPuntuales', gastosPuntuales);
   hideGastoPuntualForm();
   renderGastosYFlujoCaja();
+  if(window.innerWidth<=860) showLoadingModal('Guardando gasto…');
   const ok = await pushToDriveIfConnected();
-  showResultModal(ok ? `✅ Gasto puntual guardado y reflejado en el flujo de caja: ${descripcion} — ${money(monto)}` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', ok);
+  showResultModal({ titulo: ok ? '✅ Gasto guardado y reflejado en el flujo de caja' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.', detalles: [
+    { label:'Descripción', value: descripcion },
+    { label:'Monto', value: money(monto) },
+    { label:'Fecha', value: formatDate(fecha) },
+  ]}, ok);
 });
 
 function editGastoPuntual(id){
