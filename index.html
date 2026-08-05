@@ -280,6 +280,11 @@
   .cell-tap-full{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
   .subtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
   .subtabs-sticky{position:sticky;top:0;z-index:20;background:var(--card);padding:10px 24px;margin:0 -24px 16px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.15);}
+  /* El subtab de Resumen/Gastos va directo en la sección (no dentro de una tarjeta chica) para
+     que el "sticky" se mantenga fijo mientras se hace scroll por TODO el contenido de abajo —
+     si quedara adentro de una tarjeta angosta (solo del alto de los botones), se soltaría apenas
+     se pasara esa tarjeta corta, en vez de seguir pegado mientras se recorren las demás tarjetas. */
+  .resumen-subtabs-sticky{position:sticky;top:0;z-index:20;background:var(--paper);padding:8px 0 10px;margin-bottom:14px;}
   /* El filtro de arrendatario queda "pegado" justo debajo del sub-tab (dentro de la misma
      tarjeta con padding, así que también necesita compensarlo con margen negativo). */
   .tenant-filter-sticky{position:sticky;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
@@ -877,11 +882,9 @@
     <div class="tab-section active" id="tab-resumen">
       <h1>📊 Resumen &amp; Deudas</h1>
 
-      <div class="card">
-        <div class="subtabs subtabs-sticky" id="resumen-subtabs" style="justify-content:center;">
-          <button type="button" class="subtab-btn active" data-subtab="resumen">📊 Resumen</button>
-          <button type="button" class="subtab-btn" data-subtab="gastos">💰 Gastos y Flujo de Caja</button>
-        </div>
+      <div class="subtabs resumen-subtabs-sticky" id="resumen-subtabs" style="justify-content:center;">
+        <button type="button" class="subtab-btn active" data-subtab="resumen">📊 Resumen</button>
+        <button type="button" class="subtab-btn" data-subtab="gastos">💰 Gastos y Flujo de Caja</button>
       </div>
 
       <div id="resumen-panel-resumen">
@@ -988,6 +991,12 @@
         </div>
 
         <div class="card">
+          <h2>🔨 Obras pagadas (maestros)</h2>
+          <div class="subtitle" style="margin-bottom:14px">Trabajos de maestros que ya se pagaron — son los que se están contando como gasto en el flujo de caja de abajo. Para agregar o editar una obra, hazlo desde la ficha del maestro en "Maestros y Arreglos".</div>
+          <div id="obras-pagadas-list"></div>
+        </div>
+
+        <div class="card">
           <h2>💵 Flujo de Caja Mensual</h2>
           <div class="subtitle" style="margin-bottom:14px">Ingresos = arriendos efectivamente cobrados + garantías recibidas ese mes. Egresos = gastos fijos vigentes + gastos puntuales + gastos de maestros (según su fecha de pago) + garantías devueltas ese mes.</div>
           <div class="line-row form-compact" style="margin-bottom:10px;max-width:420px">
@@ -1086,12 +1095,10 @@
     <div class="tab-section" id="tab-maestros">
       <h1>🛠️ Maestros y Arreglos</h1>
 
-      <div class="card">
-        <div class="subtabs subtabs-sticky" id="maestros-subtabs">
-          <button type="button" class="subtab-btn active" data-subtab="lista">🛠️ Maestros</button>
-          <button type="button" class="subtab-btn" data-subtab="presupuestos">📊 Presupuestos de Referencia</button>
-          <button type="button" class="subtab-btn" data-subtab="mantenimientos">🗓️ Mantenimientos Programados</button>
-        </div>
+      <div class="subtabs resumen-subtabs-sticky" id="maestros-subtabs">
+        <button type="button" class="subtab-btn active" data-subtab="lista">🛠️ Maestros</button>
+        <button type="button" class="subtab-btn" data-subtab="presupuestos">📊 Presupuestos de Referencia</button>
+        <button type="button" class="subtab-btn" data-subtab="mantenimientos">🗓️ Mantenimientos Programados</button>
       </div>
 
       <div id="maestros-lista-panel">
@@ -6019,9 +6026,28 @@ document.getElementById('flujo-caja-vertodo-btn').addEventListener('click', ()=>
   renderFlujoCajaTable();
 });
 
+function renderObrasPagadasList(){
+  const el = document.getElementById('obras-pagadas-list');
+  if(!el) return;
+  const pagadas = trabajosMaestros.filter(t=> t.fechaPago && Number(t.monto||0)>0)
+    .slice().sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
+  if(!pagadas.length){ el.innerHTML = '<div class="empty">Aún no hay obras de maestros marcadas como pagadas — cuando le pongas fecha de pago a un trabajo, va a aparecer acá.</div>'; return; }
+  el.innerHTML = pagadas.map(t=>{
+    const maestro = maestros.find(m=>m.id===t.maestroId);
+    return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:220px;">
+        <div><strong>${esc(t.descripcion)}</strong>${t.categoria?` <span class="tag">${esc(t.categoria)}</span>`:''}</div>
+        <div class="cell-stacked-sub">👷 ${esc(maestro ? maestro.nombre : 'Maestro eliminado')}${t.propiedadDireccion?` · 📍 ${esc(t.propiedadDireccion)}`:''} · 💰 Pagado: ${formatDate(t.fechaPago)}</div>
+      </div>
+      <div style="font-weight:700;white-space:nowrap;">${money(t.monto)}</div>
+    </div>`;
+  }).join('');
+}
+
 function renderGastosYFlujoCaja(){
   renderGastosFijosList();
   renderGastosPuntualesList();
+  renderObrasPagadasList();
   renderFlujoCajaTable();
 }
 
