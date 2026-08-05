@@ -198,6 +198,9 @@
   .result-modal-detail-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);margin-bottom:2px;}
   .result-modal-detail-value{font-size:15px;color:var(--ink);font-weight:600;}
   .result-modal-accept-btn{width:100%;padding:14px;font-size:15px;}
+  .confirm-modal-btn-row{display:flex;gap:10px;}
+  .confirm-modal-btn-row .btn{flex:1;padding:14px;font-size:15px;}
+  #confirm-modal-accept-btn{background:var(--brick);color:#fff;}
   @media (min-width: 861px){
     .result-modal-overlay{background:rgba(22,38,31,0.72);backdrop-filter:blur(2px);}
     .result-modal-card{background:var(--card);border-radius:14px;padding:32px;box-shadow:0 16px 40px rgba(22,38,31,0.3);}
@@ -480,6 +483,18 @@
     <div class="result-modal-title" id="result-modal-title"></div>
     <div class="result-modal-details" id="result-modal-details"></div>
     <button type="button" class="btn btn-primary result-modal-accept-btn" id="result-modal-accept-btn" onclick="closeResultModal()">Aceptar</button>
+  </div>
+</div>
+
+<div id="confirm-modal-overlay" class="result-modal-overlay" style="display:none">
+  <div class="result-modal-card">
+    <div class="result-modal-icon" id="confirm-modal-icon">🗑️</div>
+    <div class="result-modal-title" id="confirm-modal-title"></div>
+    <div class="result-modal-details" id="confirm-modal-details"></div>
+    <div class="confirm-modal-btn-row">
+      <button type="button" class="btn btn-secondary" id="confirm-modal-cancel-btn">Cancelar</button>
+      <button type="button" class="btn" id="confirm-modal-accept-btn">Eliminar</button>
+    </div>
   </div>
 </div>
 
@@ -2334,6 +2349,35 @@ function showLoadingModal(mensaje){
 function closeResultModal(){
   document.getElementById('result-modal-overlay').style.display = 'none';
 }
+
+// Reemplaza a confirm() nativo del navegador: muestra los datos de lo que se va a eliminar (u
+// otra acción importante) de forma clara, con botones de Cancelar y Confirmar. Devuelve una
+// promesa que resuelve a true/false según lo que elija la persona — se usa con `await`.
+// options: { icono, titulo, detalles:[{label,value}], textoConfirmar, textoCancelar }
+function showConfirmModal(options){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById('confirm-modal-overlay');
+    document.getElementById('confirm-modal-icon').textContent = options.icono || '🗑️';
+    document.getElementById('confirm-modal-title').textContent = options.titulo || '¿Confirmas esta acción?';
+    const detalles = options.detalles || [];
+    document.getElementById('confirm-modal-details').innerHTML = detalles.filter(d=>d && d.value).map(d=>
+      `<div class="result-modal-detail-row"><div class="result-modal-detail-label">${esc(d.label)}</div><div class="result-modal-detail-value">${esc(d.value)}</div></div>`
+    ).join('');
+    const acceptBtn = document.getElementById('confirm-modal-accept-btn');
+    const cancelBtn = document.getElementById('confirm-modal-cancel-btn');
+    acceptBtn.textContent = options.textoConfirmar || 'Eliminar';
+    cancelBtn.textContent = options.textoCancelar || 'Cancelar';
+    const cerrar = (resultado)=>{
+      overlay.style.display = 'none';
+      acceptBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(resultado);
+    };
+    acceptBtn.onclick = ()=> cerrar(true);
+    cancelBtn.onclick = ()=> cerrar(false);
+    overlay.style.display = 'flex';
+  });
+}
 // Para los mensajes que antes se mostraban como texto chico junto al formulario (guardado ✓):
 // en mobile ahora usan el modal de pantalla completa; en desktop se mantiene el texto discreto
 // de siempre, para no interrumpir el flujo en una pantalla donde ya se lee bien.
@@ -2504,9 +2548,16 @@ function editProperty(id){
   scrollAppToTop();
 }
 async function deleteProperty(id){
+  const p = properties.find(x=>x.id===id);
   if(contracts.some(c=>contractPropertyIds(c).includes(id))){ alert('Esta propiedad tiene contratos asociados. Elimina primero esos contratos.'); return; }
-  if(!confirm('¿Eliminar esta propiedad?')) return;
-  properties = properties.filter(p=>p.id!==id);
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar esta propiedad?',
+    detalles: [
+      { label:'Dirección', value: p ? `${p.direccion}${p.unidad?' '+p.unidad:''}` : '' },
+    ],
+  });
+  if(!ok) return;
+  properties = properties.filter(x=>x.id!==id);
   await saveKey('properties',properties);
   renderAll();
   await pushToDriveAndWarn();
@@ -2747,7 +2798,13 @@ function editTenantContract(tenantId, contractId){
 
 async function deleteTenantContract(tenantId, contractId){
   if(payments.some(p=>p.contratoId===contractId)){ alert('Este contrato tiene pagos asociados. Elimina primero esos pagos.'); return; }
-  if(!confirm('¿Eliminar este arrendatario y su contrato?')) return;
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar este arrendatario y su contrato?',
+    detalles: [
+      { label:'Arrendatario', value: contractLabel(contractId) },
+    ],
+  });
+  if(!ok) return;
   const otrosContratos = contracts.filter(c=>c.tenantId===tenantId && c.id!==contractId);
   contracts = contracts.filter(c=>c.id!==contractId);
   await saveKey('contracts',contracts);
@@ -3012,8 +3069,17 @@ function editPayment(id){
   scrollAppToTop();
 }
 async function deletePayment(id){
-  if(!confirm('¿Eliminar este pago?')) return;
-  payments = payments.filter(p=>p.id!==id);
+  const p = payments.find(x=>x.id===id);
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar este pago?',
+    detalles: p ? [
+      { label:'Arrendatario', value: contractLabel(p.contratoId) },
+      { label:'Fecha de pago', value: formatDate(p.fechaPago) },
+      { label:'Monto pagado', value: money(p.montoPagado) },
+    ] : [],
+  });
+  if(!ok) return;
+  payments = payments.filter(x=>x.id!==id);
   await saveKey('payments',payments);
   renderAll();
   await pushToDriveAndWarn();
@@ -3971,8 +4037,20 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
 });
 
 async function deleteSectorBoleta(id){
-  if(!confirm('¿Eliminar esta boleta del sector? (el archivo seguirá en tu Drive, solo se quita de la app)')) return;
-  sectorBoletas = sectorBoletas.filter(b=>b.id!==id);
+  const b = sectorBoletas.find(x=>x.id===id);
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar esta boleta del sector?',
+    detalles: b ? [
+      { label:'Servicio', value: b.servicio },
+      { label:'Sector', value: SECTOR_NOMBRES[b.sector] || `Sector ${b.sector}` },
+      { label:'Mes', value: b.mes },
+      { label:'Total', value: b.total ? money(b.total) : '' },
+      { label:'Nota', value: 'El archivo PDF seguirá en tu Drive — solo se quita de la app.' },
+    ] : [],
+    textoConfirmar: 'Eliminar de la app',
+  });
+  if(!ok) return;
+  sectorBoletas = sectorBoletas.filter(x=>x.id!==id);
   await saveKey('sectorBoletas', sectorBoletas);
   renderSectorBoletasList();
   renderFlujoCobro();
@@ -4255,8 +4333,18 @@ function editReading(id){
   scrollAppToTop();
 }
 async function deleteReading(id){
-  if(!confirm('¿Eliminar esta lectura?')) return;
-  readings = readings.filter(r=>r.id!==id);
+  const r = readings.find(x=>x.id===id);
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar esta lectura?',
+    detalles: r ? [
+      { label:'Arrendatario', value: contractLabel(r.contratoId) },
+      { label:'Servicio', value: r.servicio },
+      { label:'Lectura actual', value: formatNumber(r.lecturaActual) },
+      { label:'Fecha', value: formatDate(r.fechaLectura) },
+    ] : [],
+  });
+  if(!ok) return;
+  readings = readings.filter(x=>x.id!==id);
   await saveKey('readings',readings);
   renderAll();
   await pushToDriveAndWarn();
@@ -5236,8 +5324,15 @@ function editMaestro(id){
 async function deleteMaestro(id){
   const m = maestros.find(x=>x.id===id);
   if(!m) return;
-  const tieneTrabajos = trabajosMaestros.some(t=>t.maestroId===id);
-  if(!confirm(`¿Eliminar a ${m.nombre}?${tieneTrabajos ? ' Esto también eliminará su historial de trabajos y presupuestos registrados.' : ''}`)) return;
+  const trabajosDelMaestro = trabajosMaestros.filter(t=>t.maestroId===id);
+  const ok = await showConfirmModal({
+    titulo: `¿Eliminar a ${m.nombre}?`,
+    detalles: [
+      { label:'Especialidades', value: (m.especialidades||[]).join(', ') },
+      { label:'Trabajos registrados', value: trabajosDelMaestro.length ? `${trabajosDelMaestro.length} — se eliminarán también` : '' },
+    ],
+  });
+  if(!ok) return;
   maestros = maestros.filter(x=>x.id!==id);
   trabajosMaestros = trabajosMaestros.filter(t=>t.maestroId!==id);
   await saveKey('maestros', maestros);
@@ -5456,8 +5551,16 @@ function editTrabajoMaestro(id){
 }
 
 async function deleteTrabajoMaestro(id){
-  if(!confirm('¿Eliminar este trabajo/presupuesto?')) return;
-  trabajosMaestros = trabajosMaestros.filter(t=>t.id!==id);
+  const t = trabajosMaestros.find(x=>x.id===id);
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar este trabajo/presupuesto?',
+    detalles: t ? [
+      { label:'Descripción', value: t.descripcion },
+      { label:'Monto', value: t.monto ? money(t.monto) : '' },
+    ] : [],
+  });
+  if(!ok) return;
+  trabajosMaestros = trabajosMaestros.filter(x=>x.id!==id);
   await saveKey('trabajosMaestros', trabajosMaestros);
   renderMaestros();
   await pushToDriveAndWarn();
@@ -5581,7 +5684,15 @@ function editGastoFijo(id){
 async function deleteGastoFijo(id){
   const g = gastosFijos.find(x=>x.id===id);
   if(!g) return;
-  if(!confirm(`¿Eliminar el gasto fijo "${g.descripcion}"?`)) return;
+  const frecuencia = Number(g.frecuenciaMeses||1);
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar este gasto fijo?',
+    detalles: [
+      { label:'Descripción', value: g.descripcion },
+      { label:'Monto', value: money(g.monto) + (frecuencia===1?'/mes':` cada ${frecuencia} meses`) },
+    ],
+  });
+  if(!ok) return;
   gastosFijos = gastosFijos.filter(x=>x.id!==id);
   await saveKey('gastosFijos', gastosFijos);
   renderGastosYFlujoCaja();
@@ -5691,7 +5802,16 @@ function editGastoPuntual(id){
 async function deleteGastoPuntual(id){
   const g = gastosPuntuales.find(x=>x.id===id);
   if(!g) return;
-  if(!confirm(`¿Eliminar el gasto puntual "${g.descripcion}"?`)) return;
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar este gasto puntual?',
+    detalles: [
+      { label:'Descripción', value: g.descripcion },
+      { label:'Monto', value: money(g.monto) },
+      { label:'Fecha', value: formatDate(g.fecha) },
+      { label:'Nota', value: g.boletaUrl ? 'La boleta seguirá en tu Drive — solo se quita de la app.' : '' },
+    ],
+  });
+  if(!ok) return;
   gastosPuntuales = gastosPuntuales.filter(x=>x.id!==id);
   await saveKey('gastosPuntuales', gastosPuntuales);
   renderGastosYFlujoCaja();
@@ -5907,7 +6027,14 @@ function editMantenimiento(id){
 async function deleteMantenimiento(id){
   const m = mantenimientos.find(x=>x.id===id);
   if(!m) return;
-  if(!confirm(`¿Eliminar el mantenimiento "${m.descripcion}"?`)) return;
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar este mantenimiento programado?',
+    detalles: [
+      { label:'Descripción', value: m.descripcion },
+      { label:'Frecuencia', value: `Cada ${m.intervaloMeses} meses` },
+    ],
+  });
+  if(!ok) return;
   mantenimientos = mantenimientos.filter(x=>x.id!==id);
   await saveKey('mantenimientos', mantenimientos);
   renderMantenimientos();
@@ -5919,7 +6046,17 @@ async function marcarMantenimientoRealizado(id){
   const m = mantenimientos.find(x=>x.id===id);
   if(!m) return;
   const hoy = new Date().toISOString().slice(0,10);
-  if(!confirm(`¿Marcar "${m.descripcion}" como realizado hoy (${formatDate(hoy)})? Esto recalcula la próxima fecha.`)) return;
+  const ok = await showConfirmModal({
+    icono: '✅',
+    titulo: '¿Marcar como realizado hoy?',
+    detalles: [
+      { label:'Mantenimiento', value: m.descripcion },
+      { label:'Fecha', value: formatDate(hoy) },
+      { label:'Nota', value: 'Esto recalcula automáticamente la próxima fecha.' },
+    ],
+    textoConfirmar: 'Marcar realizado',
+  });
+  if(!ok) return;
   mantenimientos = mantenimientos.map(x=> x.id===id ? {...x, ultimaFecha: hoy} : x);
   await saveKey('mantenimientos', mantenimientos);
   renderMantenimientos();
@@ -6306,14 +6443,19 @@ function renderChartAtScale(rows, layout, scaleRows){
     const saldo = d.monto - (d.pagado + d.descuento); // >0 = deuda del periodo, <0 = saldo a favor
 
     bars += `<rect x="${x}" y="${zeroY-hPagado}" width="${colW}" height="${hPagado}" fill="var(--azul)" rx="1.5"><title>Pagado: ${formatMM(d.pagado)}</title></rect>`;
-    if(d.pagado>0 && zeroY-hPagado <= yLabelPagadoFija){
+    if(d.pagado>0){
       // Sin el sufijo "MM" en la etiqueta visible (se aclara una sola vez abajo del gráfico).
       // Con fondo azul oscuro (píldora), igual que la etiqueta de arriendo pactado.
       const numTxt = formatMM(d.pagado).replace('MM','');
       const wPagado = numTxt.length*fontPagado*0.62 + 8;
       const hPillPagado = fontPagado + 5;
-      bars += `<rect x="${cx-wPagado/2}" y="${yLabelPagadoFija-hPillPagado/2-2}" width="${wPagado}" height="${hPillPagado}" rx="3" fill="var(--azul-oscuro)"/>`;
-      bars += `<text x="${cx}" y="${yLabelPagadoFija+3.5}" font-size="${fontPagado}" text-anchor="middle" fill="#fff" font-weight="700">${numTxt}</text>`;
+      const barTopY = zeroY - hPagado;
+      // Si la barra alcanza la altura fija de la etiqueta, se pone ahí (todas quedan alineadas
+      // entre sí); si la barra es más corta que eso, la etiqueta se dibuja justo arriba del
+      // tope de ESA barra en particular, para que no desaparezca simplemente por ser bajita.
+      const yEtiqueta = (barTopY <= yLabelPagadoFija) ? yLabelPagadoFija : (barTopY - hPillPagado/2 - 3);
+      bars += `<rect x="${cx-wPagado/2}" y="${yEtiqueta-hPillPagado/2-2}" width="${wPagado}" height="${hPillPagado}" rx="3" fill="var(--azul-oscuro)"/>`;
+      bars += `<text x="${cx}" y="${yEtiqueta+3.5}" font-size="${fontPagado}" text-anchor="middle" fill="#fff" font-weight="700">${numTxt}</text>`;
     }
     bars += `<rect x="${x}" y="${zeroY-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--azul-claro)" rx="1.5"><title>Descuento: ${formatMM(d.descuento)}</title></rect>`;
 
