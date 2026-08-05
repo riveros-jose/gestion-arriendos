@@ -1732,7 +1732,16 @@ async function driveSync(isInitialLoad){
   return ok;
 }
 
-function pushToDriveIfConnected(){ if(driveToken) driveSync(false); }
+// Devuelve si el guardado en Google Drive (la persistencia REAL de esta app) fue exitoso — a
+// diferencia de saveKey(), que solo indica si el caché local/de sesión (window.storage, propio
+// del entorno de artefactos de Claude) está disponible. Una vez publicada en GitHub Pages,
+// window.storage nunca existe ahí, así que basarse en eso mostraría "guardado temporal" siempre,
+// sin importar si Drive funcionó bien o no — por eso el mensaje de éxito/error debe basarse en
+// ESTE resultado, no en el de saveKey().
+async function pushToDriveIfConnected(){
+  if(!driveToken) return false;
+  return await driveSync(false);
+}
 
 // ---- Exportar un workbook auxiliar (pagos / meses con deuda) directo a Google Drive ----
 async function exportWorkbookToDrive(wb, filenamePrefix){
@@ -2234,12 +2243,11 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   if(editingProp){ properties = properties.map(p=> p.id===editingProp ? obj : p); }
   else { properties.push(obj); }
   await saveKey('properties',properties);
-  const ok = !!driveToken;
-  showResultModal(ok ? 'Propiedad guardada con éxito ✓' : '⚠ No estás conectado a Google Drive, así que este cambio no quedará guardado de forma permanente. Conéctate (ícono 🔄) e intenta de nuevo.', ok);
   resetPropForm();
-  if(ok) hidePropForm();
   renderAll();
-  pushToDriveIfConnected();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(ok ? 'Propiedad guardada con éxito en Google Drive ✓' : '⚠ No se pudo confirmar el guardado en Google Drive. Revisa tu conexión (ícono 🔄) e intenta de nuevo.', ok);
+  if(ok) hidePropForm();
 });
 document.getElementById('p-cancel').addEventListener('click', resetPropForm);
 
@@ -2448,12 +2456,11 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
 
   await saveKey('tenants',tenants);
   await saveKey('contracts',contracts);
-  const ok = !!driveToken;
-  showResultModal(ok ? 'Arrendatario y contrato guardados con éxito ✓' : '⚠ No estás conectado a Google Drive, así que este cambio no quedará guardado de forma permanente. Conéctate (ícono 🔄) e intenta de nuevo.', ok);
   resetTenantContractForm();
-  if(ok) hideTenantForm();
   renderAll();
-  pushToDriveIfConnected();
+  const ok = await pushToDriveIfConnected();
+  showResultModal(ok ? 'Arrendatario y contrato guardados con éxito en Google Drive ✓' : '⚠ No se pudo confirmar el guardado en Google Drive. Revisa tu conexión (ícono 🔄) e intenta de nuevo.', ok);
+  if(ok) hideTenantForm();
 });
 document.getElementById('tc-cancel').addEventListener('click', resetTenantContractForm);
 
@@ -2714,14 +2721,14 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
 
   if(editingPay){ payments = payments.map(p=> p.id===editingPay ? obj : p); }
   else { payments.push(obj); }
-  const ok = await saveKey('payments',payments);
-  const resumenPago = `${contractLabel(obj.contratoId)} — ${formatDate(obj.fechaPago)} — ${money(Number(obj.montoPagado||0))}${Number(obj.descuentos||0)>0 ? ` (+ ${money(obj.descuentos)} descuento)` : ''}`;
-  showFormStatus('pay-status',
-    ok ? `✅ Guardado: ${resumenPago}` : `⚠ Guardado solo temporal (no se detectó almacenamiento persistente) — ${resumenPago}`,
-    ok, ok?3500:6000);
+  await saveKey('payments',payments);
   resetPayForm();
   renderAll();
-  pushToDriveIfConnected();
+  const driveOk = await pushToDriveIfConnected();
+  const resumenPago = `${contractLabel(obj.contratoId)} — ${formatDate(obj.fechaPago)} — ${money(Number(obj.montoPagado||0))}${Number(obj.descuentos||0)>0 ? ` (+ ${money(obj.descuentos)} descuento)` : ''}`;
+  showFormStatus('pay-status',
+    driveOk ? `✅ Guardado en Google Drive: ${resumenPago}` : `⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo. ${resumenPago}`,
+    driveOk, driveOk?3500:6000);
 });
 document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
 document.getElementById('pay-fechaPago').value = new Date().toISOString().slice(0,10);
@@ -3620,12 +3627,15 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   sectorBoletas = existente ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
   statusEl.textContent = '';
-  showFormStatus('bs-status', `✓ Boleta de ${servicio} guardada — Sector ${sector}${datos.sector?' (detectado automáticamente)':' (elegido manualmente, no se detectó en la boleta)'}, mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.`, true, 8000);
   document.getElementById('form-boleta-sector').reset();
   document.getElementById('bs-sector').disabled = false;
   renderSectorBoletasList();
   renderFlujoCobro();
-  pushToDriveIfConnected();
+  const driveOk = await pushToDriveIfConnected();
+  const resumenBoleta = `Boleta de ${servicio} — Sector ${sector}${datos.sector?' (detectado automáticamente)':' (elegido manualmente, no se detectó en la boleta)'}, mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.`;
+  showFormStatus('bs-status',
+    driveOk ? `✓ ${resumenBoleta}` : `⚠ El PDF se subió, pero no se pudo confirmar el registro en Google Drive — revisa tu conexión. ${resumenBoleta}`,
+    driveOk, 8000);
 
   if(datos.total && datos.consumo){
     const valorBoleta = Math.round(datos.total / datos.consumo);
@@ -3865,14 +3875,14 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
 
   if(editingReading){ readings = readings.map(r=> r.id===editingReading ? obj : r); }
   else { readings.push(obj); }
-  const ok = await saveKey('readings',readings);
-  const resumenLectura = `${contractLabel(obj.contratoId)} — ${obj.servicio} — Lectura: ${formatNumber(obj.lecturaActual)}`;
-  showFormStatus('r-status',
-    ok ? `✅ Guardado: ${resumenLectura}` : `⚠ Guardado solo temporal (no se detectó almacenamiento persistente) — ${resumenLectura}`,
-    ok);
+  await saveKey('readings',readings);
   resetReadingForm();
   renderAll();
-  pushToDriveIfConnected();
+  const driveOk = await pushToDriveIfConnected();
+  const resumenLectura = `${contractLabel(obj.contratoId)} — ${obj.servicio} — Lectura: ${formatNumber(obj.lecturaActual)}`;
+  showFormStatus('r-status',
+    driveOk ? `✅ Guardado en Google Drive: ${resumenLectura}` : `⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo. ${resumenLectura}`,
+    driveOk);
 });
 document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
 document.getElementById('r-fechaLectura').value = new Date().toISOString().slice(0,10);
@@ -4869,11 +4879,11 @@ document.getElementById('form-maestro').addEventListener('submit', async e=>{
     descripcionGeneral: document.getElementById('mae-descripcionGeneral').value.trim(),
   };
   maestros = editingMaestro ? maestros.map(m=> m.id===editingMaestro ? obj : m) : [...maestros, obj];
-  const ok = await saveKey('maestros', maestros);
-  showFormStatus('maestro-status', ok ? `✅ Maestro guardado: ${nombre} (${especialidades.join(', ')})` : '⚠ Guardado solo temporal (no se detectó almacenamiento persistente)', ok);
+  await saveKey('maestros', maestros);
   hideMaestroForm();
   renderMaestros();
-  pushToDriveIfConnected();
+  const ok = await pushToDriveIfConnected();
+  showFormStatus('maestro-status', ok ? `✅ Maestro guardado en Google Drive: ${nombre} (${especialidades.join(', ')})` : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión e inténtalo de nuevo.', ok);
 });
 
 function editMaestro(id){
