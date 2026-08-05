@@ -556,6 +556,21 @@
         <label>Deuda pactada ($)</label>
         <input type="text" inputmode="numeric" class="money-mask" id="cu-deuda" value="0">
       </div>
+      <div class="field" style="margin-bottom:14px;text-align:left;">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;">
+          <input type="checkbox" id="cu-devuelveGarantia"> ¿Se devuelve la garantía?
+        </label>
+      </div>
+      <div id="cu-garantiaDevuelta-fields" style="display:none;">
+        <div class="field" style="margin-bottom:14px;text-align:left;">
+          <label>Monto de garantía a devolver ($)</label>
+          <input type="text" inputmode="numeric" class="money-mask" id="cu-garantiaDevueltaMonto">
+        </div>
+        <div class="field" style="margin-bottom:14px;text-align:left;">
+          <label>Fecha de devolución</label>
+          <input type="date" id="cu-garantiaDevueltaFecha">
+        </div>
+      </div>
       <p class="drive-gate-fine" style="text-align:left;margin:0 0 14px;">Pasará a "Arrendatarios Históricos" y dejará de contar en la deuda vigente y en las alertas.</p>
     </div>
     <div class="field" style="margin-bottom:6px;text-align:left;">
@@ -771,6 +786,7 @@
               <div class="field"><label>Tipo ajuste IPC</label><select id="c-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select></div>
               <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="text" inputmode="numeric" class="money-mask" required></div>
               <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="text" inputmode="numeric" class="money-mask"></div>
+              <div class="field"><label>Fecha de pago de la garantía (si ya se pagó)</label><input id="c-garantiaFechaPago" type="date"></div>
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field full"><label>Información general</label><textarea id="c-infoGeneral"></textarea></div>
@@ -973,7 +989,7 @@
 
         <div class="card">
           <h2>💵 Flujo de Caja Mensual</h2>
-          <div class="subtitle" style="margin-bottom:14px">Ingresos = arriendos efectivamente cobrados ese mes. Egresos = gastos fijos vigentes + gastos puntuales + gastos de maestros (según su fecha de pago) de ese mes.</div>
+          <div class="subtitle" style="margin-bottom:14px">Ingresos = arriendos efectivamente cobrados + garantías recibidas ese mes. Egresos = gastos fijos vigentes + gastos puntuales + gastos de maestros (según su fecha de pago) + garantías devueltas ese mes.</div>
           <div class="line-row form-compact" style="margin-bottom:10px;max-width:420px">
             <div class="field"><label>Año</label><select id="flujo-caja-year-filter"><option value="">Últimos 12 meses</option></select></div>
             <div class="field" style="justify-content:flex-end;"><button type="button" class="btn btn-secondary" id="flujo-caja-vertodo-btn">Ver todo</button></div>
@@ -1618,16 +1634,17 @@ function buildWorkbook(){
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
     fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'', mesesGracia: c.mesesGracia||0,
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
-    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', infoGeneral: c.infoGeneral,
+    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
+    garantiaDevueltaMonto: c.garantiaDevueltaMonto||'', garantiaDevueltaFecha: c.garantiaDevueltaFecha||'',
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
     proximaDecisionMonto: c.proximaDecisionMonto||'', proximaDecisionComentarios: c.proximaDecisionComentarios||'',
     proximaDecisionRegistrada: c.proximaDecisionRegistrada||'', recordatorioLecturaMes: c.recordatorioLecturaMes||'',
     ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral','activo','fechaTermino','deudaPactada','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,16,14,32,8,14,14,18,16,14,32,16,16,16,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -1728,7 +1745,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio','ultimaFecha'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio','ultimaFecha','garantiaFechaPago','garantiaDevueltaFecha'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -2706,7 +2723,7 @@ document.getElementById('resumen-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','whatsappNombreContacto','whatsappContacto'];
-const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','garantiaFechaPago','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -3398,6 +3415,10 @@ function populateUpdateContractForm(id){
   document.getElementById('cu-conDeuda').checked = false;
   document.getElementById('cu-deuda-field').style.display = 'none';
   document.getElementById('cu-deuda').value = '0';
+  document.getElementById('cu-devuelveGarantia').checked = false;
+  document.getElementById('cu-garantiaDevuelta-fields').style.display = 'none';
+  document.getElementById('cu-garantiaDevueltaMonto').value = '';
+  document.getElementById('cu-garantiaDevueltaFecha').value = '';
   cuIpcCalculado = null;
   document.getElementById('cu-ipc-resultado').innerHTML = '';
   updateContractModalUI();
@@ -3510,11 +3531,22 @@ function updateContractModalUI(){
     document.getElementById('cu-conDeuda').checked = false;
     document.getElementById('cu-deuda-field').style.display = 'none';
     document.getElementById('cu-deuda').value = '0';
+    document.getElementById('cu-devuelveGarantia').checked = false;
+    document.getElementById('cu-garantiaDevuelta-fields').style.display = 'none';
+    document.getElementById('cu-garantiaDevueltaMonto').value = '';
+    document.getElementById('cu-garantiaDevueltaFecha').value = '';
     refreshDateHints();
   }
 }
 document.getElementById('cu-conDeuda').addEventListener('change', ()=>{
   document.getElementById('cu-deuda-field').style.display = document.getElementById('cu-conDeuda').checked ? 'block' : 'none';
+});
+document.getElementById('cu-devuelveGarantia').addEventListener('change', ()=>{
+  const marcado = document.getElementById('cu-devuelveGarantia').checked;
+  document.getElementById('cu-garantiaDevuelta-fields').style.display = marcado ? 'block' : 'none';
+  if(marcado && !document.getElementById('cu-garantiaDevueltaFecha').value){
+    document.getElementById('cu-garantiaDevueltaFecha').value = new Date().toISOString().slice(0,10);
+  }
 });
 
 const CU_MOTIVO_LABELS = {
@@ -3581,16 +3613,39 @@ async function submitContractUpdate(){
       deuda = Number(rawMoneyValue(document.getElementById('cu-deuda').value));
       if(isNaN(deuda) || deuda<=0){ alert('Ingresa un monto de deuda pactada válido.'); return; }
     }
-    if(!confirm(`Vas a finalizar el contrato de:\n${nemo} — ${propAddresses(c)}\n\nPasará a "Arrendatarios Históricos", dejará de contar en la deuda vigente y en las alertas.${conDeuda?` Queda con una deuda pactada de ${money(deuda)}.`:''} ¿Continuar?`)) return;
+    const devuelveGarantia = document.getElementById('cu-devuelveGarantia').checked;
+    let garantiaDevueltaMonto = 0, garantiaDevueltaFecha = '';
+    if(devuelveGarantia){
+      garantiaDevueltaMonto = Number(rawMoneyValue(document.getElementById('cu-garantiaDevueltaMonto').value));
+      garantiaDevueltaFecha = document.getElementById('cu-garantiaDevueltaFecha').value;
+      if(isNaN(garantiaDevueltaMonto) || garantiaDevueltaMonto<=0 || !garantiaDevueltaFecha){ alert('Ingresa el monto y la fecha de la devolución de garantía.'); return; }
+    }
+    const detallesConfirmar = [
+      { label:'Arrendatario', value: `${nemo} — ${propAddresses(c)}` },
+      { label:'Fecha de término', value: formatDate(fechaTermino) },
+      { label:'Deuda pactada', value: conDeuda ? money(deuda) : '' },
+      { label:'Garantía a devolver', value: devuelveGarantia ? `${money(garantiaDevueltaMonto)} — ${formatDate(garantiaDevueltaFecha)}` : '' },
+    ];
+    const confirmado = await showConfirmModal({
+      icono: '📄',
+      titulo: 'Vas a finalizar este contrato',
+      detalles: detallesConfirmar,
+      textoConfirmar: 'Finalizar contrato',
+    });
+    if(!confirmado) return;
     c.activo = false;
     c.fechaTermino = fechaTermino;
     c.deudaPactada = deuda;
+    if(devuelveGarantia){
+      c.garantiaDevueltaMonto = garantiaDevueltaMonto;
+      c.garantiaDevueltaFecha = garantiaDevueltaFecha;
+    }
     c.proximaDecisionMotivo = '';
     c.proximaDecisionFecha = '';
     c.proximaDecisionMonto = '';
     c.proximaDecisionComentarios = '';
     c.proximaDecisionRegistrada = '';
-    resumen = `Contrato finalizado el ${formatDate(fechaTermino)}${conDeuda?` — deuda pactada: ${money(deuda)}`:''} — pasó a Arrendatarios Históricos.`;
+    resumen = `Contrato finalizado el ${formatDate(fechaTermino)}${conDeuda?` — deuda pactada: ${money(deuda)}`:''}${devuelveGarantia?` — garantía a devolver: ${money(garantiaDevueltaMonto)}`:''} — pasó a Arrendatarios Históricos.`;
   }
   if(nota) c.infoGeneral = [c.infoGeneral, `[${formatDate(hoy)}] ${nota}`].filter(Boolean).join(' | ');
 
@@ -5877,8 +5932,8 @@ function gastoFijoVigenteEnMes(g, year, month){
 // trabajo que aún no se paga no aparece como egreso hasta que efectivamente se pague).
 function computeFlujoCajaMensual(){
   const serieIngresos = computeGlobalMonthlySeries(); // ya viene con {year,month,pagado,...}
-  return serieIngresos.map(({year,month,label})=>{
-    const ingresos = serieIngresos.find(s=>s.year===year&&s.month===month).pagado;
+  const filas = serieIngresos.map(({year,month,label})=>{
+    let ingresos = serieIngresos.find(s=>s.year===year&&s.month===month).pagado;
 
     const gFijos = gastosFijos.filter(g=> gastoFijoVigenteEnMes(g, year, month));
     const totalFijos = gFijos.reduce((s,g)=>s+Number(g.monto||0),0);
@@ -5892,10 +5947,26 @@ function computeFlujoCajaMensual(){
     });
     const totalMaestros = gMaestros.reduce((s,t)=>s+Number(t.monto||0),0);
 
-    const totalEgresos = totalFijos + totalPuntuales + totalMaestros;
+    // Garantías recibidas ese mes: ingreso. Garantías devueltas ese mes (al finalizar un
+    // contrato): egreso — ambas usan la fecha específica en que efectivamente se movió la plata,
+    // no la fecha del contrato en sí.
+    const totalGarantiasRecibidas = contracts
+      .filter(c=> Number(c.garantia||0)>0 && sameYearMonth(c.garantiaFechaPago, year, month))
+      .reduce((s,c)=>s+Number(c.garantia||0),0);
+    ingresos += totalGarantiasRecibidas;
+
+    const totalGarantiasDevueltas = contracts
+      .filter(c=> Number(c.garantiaDevueltaMonto||0)>0 && sameYearMonth(c.garantiaDevueltaFecha, year, month))
+      .reduce((s,c)=>s+Number(c.garantiaDevueltaMonto||0),0);
+
+    const totalEgresos = totalFijos + totalPuntuales + totalMaestros + totalGarantiasDevueltas;
     const utilidad = ingresos - totalEgresos;
-    return { year, month, label, ingresos, totalFijos, totalPuntuales, totalMaestros, totalEgresos, utilidad };
+    return { year, month, label, ingresos, totalFijos, totalPuntuales, totalMaestros, totalGarantiasDevueltas, totalEgresos, utilidad };
   });
+  // computeGlobalMonthlySeries() viene ordenada de más antiguo a más reciente (así la necesita
+  // el histograma, que se lee de izquierda a derecha en el tiempo) — pero una tabla de flujo de
+  // caja se lee al revés, del mes más reciente hacia atrás, así que se invierte acá.
+  return filas.reverse();
 }
 
 let flujoCajaVerTodo = false;
@@ -5922,7 +5993,7 @@ function renderFlujoCajaTable(){
 
   if(!filas.length){ el.innerHTML = '<div class="empty">Aún no hay datos suficientes para calcular el flujo de caja.</div>'; return; }
   el.innerHTML = `<div class="table-scroll"><table>
-    <thead><tr><th>Mes</th><th>Ingresos (cobrado)</th><th>Gastos fijos</th><th>Gastos puntuales</th><th>Gastos maestros</th><th>Total egresos</th><th>Utilidad / Caja</th></tr></thead>
+    <thead><tr><th>Mes</th><th>Ingresos (cobrado + garantías)</th><th>Gastos fijos</th><th>Gastos puntuales</th><th>Gastos maestros</th><th>Garantías devueltas</th><th>Total egresos</th><th>Utilidad / Caja</th></tr></thead>
     <tbody>
       ${filas.map(f=>{
         const colorUtilidad = f.utilidad>=0 ? 'var(--teal-dark)' : 'var(--brick)';
@@ -5932,6 +6003,7 @@ function renderFlujoCajaTable(){
           <td>${money(f.totalFijos)}</td>
           <td>${money(f.totalPuntuales)}</td>
           <td>${money(f.totalMaestros)}</td>
+          <td>${money(f.totalGarantiasDevueltas)}</td>
           <td>${money(f.totalEgresos)}</td>
           <td style="font-weight:700;color:${colorUtilidad}">${money(f.utilidad)}</td>
         </tr>`;
@@ -6297,6 +6369,8 @@ function computeGlobalMonthlySeries(){
     ...gastosFijos.map(g=>g.fechaInicio),
     ...gastosPuntuales.map(g=>g.fecha),
     ...trabajosMaestros.map(t=> t.fechaPago || t.fecha),
+    ...todos.map(c=>c.garantiaFechaPago),
+    ...todos.map(c=>c.garantiaDevueltaFecha),
   ].filter(Boolean);
   const todasLasFechas = [...starts, ...otrasFechas];
   if(!todasLasFechas.length) return [];
@@ -6424,6 +6498,7 @@ function renderChartAtScale(rows, layout, scaleRows){
   const scaleYNeg = v => maxNeg>0 ? Math.min(v,maxNeg)/maxNeg*chartHNeg : 0;
 
   let bars = '';
+  let pagadoLabels = ''; // se agregan al final (después de todas las barras) para que siempre queden por encima, sin que una barra vecina las tape
   const linePoints = [];
   // Altura fija (no por barra) para las etiquetas de "Pagado" en MM — así quedan todas alineadas
   // a la misma altura, más fácil de leer de un vistazo que si cada una quedara a su propia mitad.
@@ -6454,8 +6529,8 @@ function renderChartAtScale(rows, layout, scaleRows){
       // entre sí); si la barra es más corta que eso, la etiqueta se dibuja justo arriba del
       // tope de ESA barra en particular, para que no desaparezca simplemente por ser bajita.
       const yEtiqueta = (barTopY <= yLabelPagadoFija) ? yLabelPagadoFija : (barTopY - hPillPagado/2 - 3);
-      bars += `<rect x="${cx-wPagado/2}" y="${yEtiqueta-hPillPagado/2-2}" width="${wPagado}" height="${hPillPagado}" rx="3" fill="var(--azul-oscuro)"/>`;
-      bars += `<text x="${cx}" y="${yEtiqueta+3.5}" font-size="${fontPagado}" text-anchor="middle" fill="#fff" font-weight="700">${numTxt}</text>`;
+      pagadoLabels += `<rect x="${cx-wPagado/2}" y="${yEtiqueta-hPillPagado/2-2}" width="${wPagado}" height="${hPillPagado}" rx="3" fill="var(--azul-oscuro)"/>`;
+      pagadoLabels += `<text x="${cx}" y="${yEtiqueta+3.5}" font-size="${fontPagado}" text-anchor="middle" fill="#fff" font-weight="700">${numTxt}</text>`;
     }
     bars += `<rect x="${x}" y="${zeroY-hPagado-hDesc}" width="${colW}" height="${hDesc}" fill="var(--azul-claro)" rx="1.5"><title>Descuento: ${formatMM(d.descuento)}</title></rect>`;
 
@@ -6473,6 +6548,7 @@ function renderChartAtScale(rows, layout, scaleRows){
     const yPactado = zeroY - scaleYPos(d.monto);
     linePoints.push({x:cx, y:yPactado, monto:d.monto});
   });
+  bars += pagadoLabels; // recién ahora, después de TODAS las barras, para que ninguna las tape
 
   const linePath = linePoints.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
   const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="#fff" stroke="var(--gris-linea)" stroke-width="1.8"><title>Arriendo pactado: ${formatMM(p.monto)}</title></circle>`).join('');
