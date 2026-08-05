@@ -5937,10 +5937,20 @@ function gastoFijoVigenteEnMes(g, year, month){
 // "pagado"), egresos = gastos fijos vigentes ese mes + gastos puntuales de ese mes + gastos de
 // maestros de ese mes (usando su fecha de pago si existe, o su fecha del trabajo si no — así un
 // trabajo que aún no se paga no aparece como egreso hasta que efectivamente se pague).
+
+// Contratos que, por ahora, no forman parte de la empresa — no se consideran en los ingresos del
+// flujo de caja (pero sí siguen apareciendo normalmente en el resto de la app: histograma,
+// deudas, alertas, etc., que no se ven afectados por esto).
+function esContratoExcluidoDeIngresos(c){
+  const nombre = (tenantNemo(c.tenantId) || tenantName(c.tenantId) || '').toLowerCase();
+  const direccion = propAddresses(c).toLowerCase();
+  return nombre.includes('carmen') || direccion.includes('namur') || nombre.includes('namur');
+}
+
 function computeFlujoCajaMensual(){
-  const serieIngresos = computeGlobalMonthlySeries(); // ya viene con {year,month,pagado,...}
+  const serieIngresos = computeGlobalMonthlySeries(esContratoExcluidoDeIngresos); // ya viene con {year,month,pagado,...}
   const filas = serieIngresos.map(({year,month,label})=>{
-    let ingresos = serieIngresos.find(s=>s.year===year&&s.month===month).pagado;
+    const ingresos = serieIngresos.find(s=>s.year===year&&s.month===month).pagado;
 
     const gFijos = gastosFijos.filter(g=> gastoFijoVigenteEnMes(g, year, month));
     const totalFijos = gFijos.reduce((s,g)=>s+Number(g.monto||0),0);
@@ -5953,22 +5963,23 @@ function computeFlujoCajaMensual(){
       return Number(t.monto||0)>0 && sameYearMonth(fechaRef, year, month);
     });
     const totalMaestros = gMaestros.reduce((s,t)=>s+Number(t.monto||0),0);
+    // Gastos puntuales y de maestros van juntos en una sola columna (se suman entre sí).
+    const totalPuntualesYMaestros = totalPuntuales + totalMaestros;
 
-    // Garantías recibidas ese mes: ingreso. Garantías devueltas ese mes (al finalizar un
-    // contrato): egreso — ambas usan la fecha específica en que efectivamente se movió la plata,
-    // no la fecha del contrato en sí.
+    // La garantía es su PROPIA columna, aparte del ingreso por arriendo — positiva cuando se
+    // recibe (contrato nuevo), negativa cuando se devuelve (término de contrato). Ambas usan la
+    // fecha específica en que efectivamente se movió la plata, no la fecha del contrato en sí.
     const totalGarantiasRecibidas = contracts
-      .filter(c=> Number(c.garantia||0)>0 && sameYearMonth(c.garantiaFechaPago, year, month))
+      .filter(c=> !esContratoExcluidoDeIngresos(c) && Number(c.garantia||0)>0 && sameYearMonth(c.garantiaFechaPago, year, month))
       .reduce((s,c)=>s+Number(c.garantia||0),0);
-    ingresos += totalGarantiasRecibidas;
-
     const totalGarantiasDevueltas = contracts
-      .filter(c=> Number(c.garantiaDevueltaMonto||0)>0 && sameYearMonth(c.garantiaDevueltaFecha, year, month))
+      .filter(c=> !esContratoExcluidoDeIngresos(c) && Number(c.garantiaDevueltaMonto||0)>0 && sameYearMonth(c.garantiaDevueltaFecha, year, month))
       .reduce((s,c)=>s+Number(c.garantiaDevueltaMonto||0),0);
+    const garantiaNeta = totalGarantiasRecibidas - totalGarantiasDevueltas;
 
-    const totalEgresos = totalFijos + totalPuntuales + totalMaestros + totalGarantiasDevueltas;
-    const utilidad = ingresos - totalEgresos;
-    return { year, month, label, ingresos, totalFijos, totalPuntuales, totalMaestros, totalGarantiasDevueltas, totalEgresos, utilidad };
+    const totalEgresos = totalFijos + totalPuntualesYMaestros;
+    const utilidad = ingresos + garantiaNeta - totalEgresos;
+    return { year, month, label, ingresos, garantiaNeta, totalFijos, totalPuntualesYMaestros, totalEgresos, utilidad };
   });
   // computeGlobalMonthlySeries() viene ordenada de más antiguo a más reciente (así la necesita
   // el histograma, que se lee de izquierda a derecha en el tiempo) — pero una tabla de flujo de
@@ -5977,13 +5988,21 @@ function computeFlujoCajaMensual(){
 }
 
 let flujoCajaVerTodo = false;
+let flujoCajaDefaultAplicado = false;
 
 function renderFlujoCajaYearFilter(todasLasFilas){
   const sel = document.getElementById('flujo-caja-year-filter');
   const current = sel.value;
   const anios = [...new Set(todasLasFilas.map(f=>f.year))].sort((a,b)=>b-a);
   sel.innerHTML = '<option value="">Últimos 12 meses</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
-  if(anios.map(String).includes(current)) sel.value = current;
+  if(anios.map(String).includes(current)){
+    sel.value = current;
+  } else if(!flujoCajaDefaultAplicado && anios.includes(2026)){
+    // Por defecto se filtra en 2026 (si hay datos de ese año) — el usuario puede cambiarlo
+    // libremente después, esto solo aplica la primera vez que se arma el filtro.
+    sel.value = '2026';
+  }
+  flujoCajaDefaultAplicado = true;
 }
 
 function renderFlujoCajaTable(){
@@ -6000,17 +6019,18 @@ function renderFlujoCajaTable(){
 
   if(!filas.length){ el.innerHTML = '<div class="empty">Aún no hay datos suficientes para calcular el flujo de caja.</div>'; return; }
   el.innerHTML = `<div class="table-scroll"><table>
-    <thead><tr><th>Mes</th><th>Ingresos (cobrado + garantías)</th><th>Gastos fijos</th><th>Gastos puntuales</th><th>Gastos maestros</th><th>Garantías devueltas</th><th>Total egresos</th><th>Utilidad / Caja</th></tr></thead>
+    <thead><tr><th>Mes</th><th>Ingresos (arriendo cobrado)</th><th>Garantía (neta)</th><th>Gastos fijos</th><th>Gastos puntuales + maestros</th><th>Total egresos</th><th>Utilidad / Caja</th></tr></thead>
     <tbody>
       ${filas.map(f=>{
         const colorUtilidad = f.utilidad>=0 ? 'var(--teal-dark)' : 'var(--brick)';
+        const colorGarantia = f.garantiaNeta>0 ? 'var(--teal-dark)' : (f.garantiaNeta<0 ? 'var(--brick)' : 'var(--ink-soft)');
+        const garantiaTxt = f.garantiaNeta===0 ? money(0) : `${f.garantiaNeta>0?'+':''}${money(f.garantiaNeta)}`;
         return `<tr>
           <td><strong>${esc(f.label)}</strong></td>
           <td>${money(f.ingresos)}</td>
+          <td style="color:${colorGarantia};font-weight:${f.garantiaNeta!==0?'700':'400'}">${garantiaTxt}</td>
           <td>${money(f.totalFijos)}</td>
-          <td>${money(f.totalPuntuales)}</td>
-          <td>${money(f.totalMaestros)}</td>
-          <td>${money(f.totalGarantiasDevueltas)}</td>
+          <td>${money(f.totalPuntualesYMaestros)}</td>
           <td>${money(f.totalEgresos)}</td>
           <td style="font-weight:700;color:${colorUtilidad}">${money(f.utilidad)}</td>
         </tr>`;
@@ -6382,11 +6402,14 @@ function correspondeAlPactado(c, year, month, vigenteEseMes, tuvoPagoEseMes){
   return vigenteEseMes || tuvoPagoEseMes;
 }
 
-function computeGlobalMonthlySeries(){
-  // Se consideran TODOS los contratos (activos e históricos). Ver correspondeAlPactado() para la
-  // definición completa de qué meses cuentan como "pactado" de cada contrato. Lo pagado y los
-  // descuentos, en cambio, siempre dependen de los pagos realmente registrados.
-  const todos = contracts;
+function computeGlobalMonthlySeries(excluirContrato){
+  // Se consideran TODOS los contratos (activos e históricos), salvo que se pase una función
+  // "excluirContrato" para dejar fuera algunos específicos (usado por el flujo de caja, para no
+  // contar contratos que no forman parte de la empresa por ahora — ver más abajo).
+  // Ver correspondeAlPactado() para la definición completa de qué meses cuentan como "pactado"
+  // de cada contrato. Lo pagado y los descuentos, en cambio, siempre dependen de los pagos
+  // realmente registrados.
+  const todos = excluirContrato ? contracts.filter(c=> !excluirContrato(c)) : contracts;
   const starts = todos.map(c=>effectiveDebtStartDate(c.id)).filter(Boolean);
   // El rango de meses no puede basarse solo en los contratos: si un gasto (fijo, puntual, o un
   // trabajo de maestro) tiene una fecha anterior al contrato más antiguo, necesita igual
