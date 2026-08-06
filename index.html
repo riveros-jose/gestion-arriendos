@@ -1994,7 +1994,7 @@ async function exportWorkbookToDrive(wb, filenamePrefix){
   try{
     if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
     const buf = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
-    const fecha = new Date().toISOString().slice(0,10);
+    const fecha = fechaHoyChile();
     const filename = `${filenamePrefix}-${fecha}.xlsx`;
     const metadata = { name: filename, mimeType: XLSX_MIME, parents: [driveFolderId] };
     const boundary = 'rentapro_export_' + Date.now();
@@ -2027,7 +2027,7 @@ async function exportWorkbookToGoogleSheets(wb, filenamePrefix){
   try{
     if(driveFolderId===null){ driveFolderId = await driveFindOrCreateFolder(); }
     const buf = XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles:true });
-    const fecha = new Date().toISOString().slice(0,10);
+    const fecha = fechaHoyChile();
     const filename = `${filenamePrefix}-${fecha}`;
     const metadata = { name: filename, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [driveFolderId] };
     const boundary = 'rentapro_export_' + Date.now();
@@ -2170,8 +2170,15 @@ const formatDate = iso => {
   if(!iso) return '';
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(!m) return esc(iso);
-  return `${m[3]}-${m[2]}-${m[1]}`;
+  return `${m[3]}/${m[2]}/${m[1]}`;
 };
+
+// "Hoy" según la hora de Santiago de Chile (America/Santiago) — no la del dispositivo. Si
+// alguien usa la app desde otro huso horario, o cerca de la medianoche, Date().toISOString()
+// (que usa UTC) podía dar el día equivocado; esto siempre calcula el día correcto en Chile.
+function fechaHoyChile(){
+  return new Intl.DateTimeFormat('en-CA', { timeZone:'America/Santiago', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+}
 
 // El selector nativo de fecha (calendario) ya lo da el propio input type="date", pero el
 // FORMATO que muestra el navegador dentro del campo depende del idioma/sistema operativo de
@@ -2221,7 +2228,7 @@ function renderCalendarPicker(){
   const min = calPickerTarget.min || '';
   const max = calPickerTarget.max || '';
   const valorActual = calPickerTarget.value || '';
-  const hoyIso = new Date().toISOString().slice(0,10);
+  const hoyIso = fechaHoyChile();
 
   let celdas = '';
   for(let i=0;i<offsetLunes;i++) celdas += '<span class="cal-day cal-day-empty"></span>';
@@ -2332,7 +2339,7 @@ const formatMM = n => {
   return mm.toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1})+'MM';
 };
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-const mesActualKey = ()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+const mesActualKey = ()=> fechaHoyChile().slice(0,7);
 
 // ---------- MODAL DE RESULTADO (éxito/error) ----------
 // En mobile se muestra de pantalla completa para que el mensaje se lea grande y claro, con un
@@ -3067,12 +3074,12 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
     driveOk, driveOk?3500:6000);
 });
 document.getElementById('pay-cancel').addEventListener('click', resetPayForm);
-document.getElementById('pay-fechaPago').value = new Date().toISOString().slice(0,10);
+document.getElementById('pay-fechaPago').value = fechaHoyChile();
 
 function resetPayForm(){
   editingPay = null;
   document.getElementById('form-pago').reset();
-  document.getElementById('pay-fechaPago').value = new Date().toISOString().slice(0,10);
+  document.getElementById('pay-fechaPago').value = fechaHoyChile();
   document.getElementById('pay-form-title').textContent='💵 Nuevo pago';
   document.getElementById('pay-cancel').style.display='none';
   document.getElementById('pay-valorArriendo-actual').textContent = '';
@@ -3469,7 +3476,7 @@ document.getElementById('cu-calcular-ipc-btn').addEventListener('click', async (
   btn.textContent = '🔎 Consultando UF…';
   resultado.innerHTML = '';
   try{
-    const hoyISO = new Date().toISOString().slice(0,10);
+    const hoyISO = fechaHoyChile();
     const haceUnAnio = new Date();
     haceUnAnio.setFullYear(haceUnAnio.getFullYear()-1);
     const haceUnAnioISO = haceUnAnio.toISOString().slice(0,10);
@@ -3529,7 +3536,7 @@ function updateContractModalUI(){
   const esTermino = motivo==='termino';
   document.getElementById('cu-termino-fields').style.display = esTermino ? 'block' : 'none';
   if(esTermino){
-    const hoy = new Date().toISOString().slice(0,10);
+    const hoy = fechaHoyChile();
     const fechaInput = document.getElementById('cu-fechaTermino');
     // La fecha de término no puede ser futura — no tiene sentido finalizar un contrato "a partir
     // de mañana" desde este flujo (para eso está "No se renovará").
@@ -3552,7 +3559,7 @@ document.getElementById('cu-devuelveGarantia').addEventListener('change', ()=>{
   const marcado = document.getElementById('cu-devuelveGarantia').checked;
   document.getElementById('cu-garantiaDevuelta-fields').style.display = marcado ? 'block' : 'none';
   if(marcado && !document.getElementById('cu-garantiaDevueltaFecha').value){
-    document.getElementById('cu-garantiaDevueltaFecha').value = new Date().toISOString().slice(0,10);
+    document.getElementById('cu-garantiaDevueltaFecha').value = fechaHoyChile();
   }
 });
 
@@ -3573,7 +3580,7 @@ async function submitContractUpdate(){
   const comentarios = document.getElementById('cu-comentarios').value.trim();
   const esFuturo = (motivo==='solo_fecha' || motivo==='ipc' || motivo==='valor');
   const esTermino = motivo==='termino';
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaHoyChile();
   const motivoLabel = CU_MOTIVO_LABELS[motivo] || '';
   const pctIPCTxt = (motivo==='ipc' && cuIpcCalculado) ? `Variación IPC (UF): ${cuIpcCalculado.porcentaje>=0?'+':''}${cuIpcCalculado.porcentaje.toFixed(2)}%` : '';
   const nota = [motivoLabel, pctIPCTxt, comentarios].filter(Boolean).join(' — ');
@@ -4357,12 +4364,12 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
     driveOk);
 });
 document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
-document.getElementById('r-fechaLectura').value = new Date().toISOString().slice(0,10);
+document.getElementById('r-fechaLectura').value = fechaHoyChile();
 
 function resetReadingForm(){
   editingReading = null;
   document.getElementById('form-lectura').reset();
-  document.getElementById('r-fechaLectura').value = new Date().toISOString().slice(0,10);
+  document.getElementById('r-fechaLectura').value = fechaHoyChile();
   document.getElementById('r-form-title').textContent='🔧 Ingresar lectura o boleta';
   document.getElementById('r-cancel').style.display='none';
   document.getElementById('r-valorUnitario').readOnly = true;
@@ -5466,7 +5473,13 @@ function renderMaestros(){
           <div id="trabajo-form-${m.id}" style="display:none;margin-top:10px;padding:12px;background:var(--paper);border-radius:8px;">
             <input type="hidden" id="tra-editId-${m.id}">
             <div class="grid form-compact">
-              <div class="field"><label>Categoría / rubro</label><input id="tra-categoria-${m.id}" placeholder="Ej: Pintura, Electricidad, Cañerías…" value="${esc((m.especialidades||[])[0]||'')}"></div>
+              <div class="field"><label>Categoría / rubro</label>
+                <select id="tra-categoria-${m.id}" onchange="toggleCategoriaOtro('${m.id}')">
+                  ${Object.keys(MAESTRO_ESPECIALIDAD_STYLE).map(e=>`<option value="${esc(e)}">${maestroEstilo(e).icono} ${esc(e)}</option>`).join('')}
+                  <option value="__otro__">Otro (escribir)</option>
+                </select>
+                <input id="tra-categoriaOtro-${m.id}" placeholder="Escribe la categoría" style="display:none;margin-top:6px;">
+              </div>
               <div class="field"><label>Fecha del trabajo</label><input type="date" id="tra-fecha-${m.id}"></div>
               <div class="field"><label>Fecha de pago (si ya se pagó)</label><input type="date" id="tra-fechaPago-${m.id}"></div>
               <div class="field"><label>Propiedad / dirección (opcional)</label><input id="tra-propiedad-${m.id}" placeholder="Ej: San Diego 1712"></div>
@@ -5474,9 +5487,9 @@ function renderMaestros(){
               <div class="field"><label>Monto ($)</label><input type="text" inputmode="numeric" class="money-mask" id="tra-monto-${m.id}" oninput="actualizarPrecioM2(this,'${m.id}')"></div>
               <div class="field"><label>Tipo de precio</label>
                 <select id="tra-tipoPrecio-${m.id}" onchange="actualizarPrecioM2(this,'${m.id}')">
-                  <option value="Neto">Neto (sin impuesto)</option>
-                  <option value="+IVA">+ IVA (19%)</option>
-                  <option value="Honorarios">Honorarios (boleta)</option>
+                  <option value="Neto">No aplica IVA</option>
+                  <option value="+IVA">Aplica IVA (19%)</option>
+                  <option value="Honorarios">Aplica boleta de honorarios</option>
                 </select>
                 <span class="status-msg" id="tra-precioM2-hint-${m.id}" style="display:block;margin-top:2px;"></span>
               </div>
@@ -5525,8 +5538,8 @@ function toggleTrabajoForm(maestroId){
     // Limpiar el formulario cada vez que se abre para uno nuevo (a menos que se esté editando).
     if(!document.getElementById('tra-editId-'+maestroId).value){
       const m = maestros.find(x=>x.id===maestroId);
-      document.getElementById('tra-categoria-'+maestroId).value = m ? ((m.especialidades||[])[0]||'') : '';
-      document.getElementById('tra-fecha-'+maestroId).value = new Date().toISOString().slice(0,10);
+      setTrabajoCategoriaValue(maestroId, m ? ((m.especialidades||[])[0]||'') : '');
+      document.getElementById('tra-fecha-'+maestroId).value = fechaHoyChile();
       document.getElementById('tra-fechaPago-'+maestroId).value = '';
       document.getElementById('tra-propiedad-'+maestroId).value = '';
       document.getElementById('tra-m2-'+maestroId).value = '';
@@ -5536,6 +5549,35 @@ function toggleTrabajoForm(maestroId){
       document.getElementById('tra-descripcion-'+maestroId).value = '';
     }
   }
+}
+
+// La categoría de un trabajo puede ser una de las especialidades conocidas (mismo listado que
+// usan los maestros), o "Otro" con texto libre — esta función deja el select y el campo de
+// texto correctamente sincronizados para un valor guardado cualquiera.
+function setTrabajoCategoriaValue(maestroId, valor){
+  const sel = document.getElementById('tra-categoria-'+maestroId);
+  const otroInput = document.getElementById('tra-categoriaOtro-'+maestroId);
+  const esConocida = valor && Array.from(sel.options).some(o=>o.value===valor);
+  if(esConocida){
+    sel.value = valor;
+    otroInput.style.display = 'none';
+    otroInput.value = '';
+  } else {
+    sel.value = '__otro__';
+    otroInput.style.display = 'block';
+    otroInput.value = valor || '';
+  }
+}
+function toggleCategoriaOtro(maestroId){
+  const sel = document.getElementById('tra-categoria-'+maestroId);
+  const otroInput = document.getElementById('tra-categoriaOtro-'+maestroId);
+  otroInput.style.display = sel.value==='__otro__' ? 'block' : 'none';
+}
+// Valor real de la categoría a guardar: el del select, o el texto libre si eligió "Otro".
+function getTrabajoCategoriaValue(maestroId){
+  const sel = document.getElementById('tra-categoria-'+maestroId);
+  if(sel.value==='__otro__') return document.getElementById('tra-categoriaOtro-'+maestroId).value.trim();
+  return sel.value;
 }
 
 // Calcula y muestra el precio por m² en vivo, a partir del monto y los m² ingresados — solo
@@ -5548,6 +5590,9 @@ function actualizarPrecioM2(el, maestroId){
   const partes = [];
   if(tipoPrecio==='+IVA' && monto>0){
     partes.push(`Total c/IVA: ${money(Math.round(monto*1.19))}`);
+  }
+  if(tipoPrecio==='Honorarios' && monto>0){
+    partes.push(`Total c/boleta (+15%): ${money(Math.round(monto*1.15))}`);
   }
   if(m2>0 && monto>0){
     partes.push(`≈ ${money(Math.round(monto/m2))} / m²`);
@@ -5564,7 +5609,7 @@ async function guardarTrabajoMaestro(maestroId){
   const obj = {
     id: editId || uid(),
     maestroId,
-    categoria: document.getElementById('tra-categoria-'+maestroId).value.trim(),
+    categoria: getTrabajoCategoriaValue(maestroId),
     fecha: document.getElementById('tra-fecha-'+maestroId).value,
     fechaPago: document.getElementById('tra-fechaPago-'+maestroId).value,
     propiedadDireccion: document.getElementById('tra-propiedad-'+maestroId).value.trim(),
@@ -5599,7 +5644,7 @@ function editTrabajoMaestro(id){
     if(!wrap) return;
     wrap.style.display = 'block';
     document.getElementById('tra-editId-'+t.maestroId).value = t.id;
-    document.getElementById('tra-categoria-'+t.maestroId).value = t.categoria||'';
+    setTrabajoCategoriaValue(t.maestroId, t.categoria||'');
     document.getElementById('tra-fecha-'+t.maestroId).value = t.fecha||'';
     document.getElementById('tra-fechaPago-'+t.maestroId).value = t.fechaPago||'';
     document.getElementById('tra-propiedad-'+t.maestroId).value = t.propiedadDireccion||'';
@@ -5764,7 +5809,7 @@ async function deleteGastoFijo(id){
 function showGastoPuntualForm(){
   document.getElementById('gastoPuntualForm-wrap').style.display = 'block';
   document.getElementById('gastoPuntualForm-open-btn').style.display = 'none';
-  if(!document.getElementById('gp-id').value) document.getElementById('gp-fecha').value = new Date().toISOString().slice(0,10);
+  if(!document.getElementById('gp-id').value) document.getElementById('gp-fecha').value = fechaHoyChile();
 }
 function hideGastoPuntualForm(){
   document.getElementById('gastoPuntualForm-wrap').style.display = 'none';
@@ -6170,7 +6215,7 @@ async function deleteMantenimiento(id){
 async function marcarMantenimientoRealizado(id){
   const m = mantenimientos.find(x=>x.id===id);
   if(!m) return;
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaHoyChile();
   const ok = await showConfirmModal({
     icono: '✅',
     titulo: '¿Marcar como realizado hoy?',
@@ -6192,7 +6237,7 @@ async function marcarMantenimientoRealizado(id){
 // Próxima fecha = última vez realizado + intervalo. Si nunca se ha hecho, se considera que ya
 // corresponde ahora mismo (fecha de hoy), para que aparezca de inmediato como pendiente.
 function proximaFechaMantenimiento(m){
-  if(!m.ultimaFecha) return new Date().toISOString().slice(0,10);
+  if(!m.ultimaFecha) return fechaHoyChile();
   return toISO(addMonths(m.ultimaFecha, Number(m.intervaloMeses||0)));
 }
 
