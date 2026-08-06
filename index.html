@@ -100,6 +100,11 @@
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
   .tag-debt{background:var(--brick-soft);color:var(--brick);}
+  .deuda-acumulada-box{display:inline-flex;align-items:center;gap:10px;background:var(--brick-soft);border-radius:10px;padding:10px 16px;margin-bottom:14px;}
+  .deuda-acumulada-box.sin-deuda{background:var(--teal-soft);}
+  .deuda-acumulada-box .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);}
+  .deuda-acumulada-box .val{font-size:19px;font-weight:700;color:var(--brick);}
+  .deuda-acumulada-box.sin-deuda .val{color:var(--teal-dark);}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
   .estado-select-atrasado{background:#F2C4B8!important;color:var(--brick)!important;border-color:var(--brick)!important;}
@@ -897,6 +902,7 @@
             <div class="field"><label>Año</label><select id="chart-year-filter"></select></div>
             <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
           </div>
+          <div id="resumen-chart-deuda-box"></div>
           <div id="resumen-chart"></div>
         </div>
         <div class="card">
@@ -920,6 +926,11 @@
       </div>
 
       <div id="resumen-panel-gastos" style="display:none">
+        <div class="card">
+          <h2>📊 Histograma — Ingresos, Egresos y Utilidad mensual</h2>
+          <div id="flujo-caja-chart"></div>
+        </div>
+
         <div class="card">
           <button type="button" class="btn-add-new" id="gastoFijoForm-open-btn" onclick="showGastoFijoForm()"><span class="plus-icon">+</span> Registrar gasto fijo (mensual recurrente)</button>
           <div id="gastoFijoForm-wrap" style="display:none">
@@ -5812,6 +5823,7 @@ function showGastoPuntualForm(){
   if(!document.getElementById('gp-id').value) document.getElementById('gp-fecha').value = fechaHoyChile();
 }
 function hideGastoPuntualForm(){
+  if(typeof gpAutoGuardadoTimeout!=='undefined' && gpAutoGuardadoTimeout){ clearTimeout(gpAutoGuardadoTimeout); gpAutoGuardadoTimeout = null; }
   document.getElementById('gastoPuntualForm-wrap').style.display = 'none';
   document.getElementById('gastoPuntualForm-open-btn').style.display = 'flex';
   editingGastoPuntual = null;
@@ -5821,6 +5833,21 @@ function hideGastoPuntualForm(){
 }
 let editingGastoPuntual = null;
 document.getElementById('gastoPuntual-cancel').addEventListener('click', hideGastoPuntualForm);
+
+let gpAutoGuardadoTimeout = null;
+// Si el usuario toca cualquier campo del formulario (para revisar o corregir algo) mientras el
+// guardado automático está por dispararse, se cancela — así siempre puede tomar el control y
+// presionar "Guardar" él mismo cuando quiera, en vez de que la app decida por él.
+function cancelarGpAutoGuardado(mensaje){
+  if(gpAutoGuardadoTimeout){
+    clearTimeout(gpAutoGuardadoTimeout);
+    gpAutoGuardadoTimeout = null;
+    document.getElementById('gp-boleta-status').textContent = mensaje || 'Revisa los datos y presiona "Guardar gasto puntual" cuando quieras.';
+  }
+}
+['gp-descripcion','gp-categoria','gp-monto','gp-fecha'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', ()=> cancelarGpAutoGuardado());
+});
 
 document.getElementById('gp-boletaFile').addEventListener('change', async e=>{
   const file = e.target.files[0];
@@ -5836,17 +5863,32 @@ document.getElementById('gp-boletaFile').addEventListener('change', async e=>{
     const { tienda, monto } = extraerTiendaYMontoDeTexto(texto);
     if(tienda && !document.getElementById('gp-descripcion').value.trim()) document.getElementById('gp-descripcion').value = tienda;
     if(monto) document.getElementById('gp-monto').value = formatThousandsCLP(String(monto));
-    statusEl.textContent = (tienda||monto)
-      ? `Detectado automáticamente${tienda?`: "${tienda}"`:''}${monto?` — ${money(monto)}`:''}. Revisa y corrige si hace falta.`
-      : 'No se pudo leer con claridad — completa tienda y monto manualmente.';
+    if(!document.getElementById('gp-fecha').value) document.getElementById('gp-fecha').value = fechaHoyChile();
+
+    if(tienda && monto){
+      // Se detectaron ambos datos clave: por defecto se guarda solo (no hace falta tocar nada),
+      // pero con tiempo de sobra para revisar — si tocas cualquier campo, o presionas "Guardar"
+      // tú mismo antes de que se cumpla el tiempo, el guardado automático se cancela y queda
+      // completamente en tus manos.
+      statusEl.textContent = `✓ Detectado: "${tienda}" — ${money(monto)}. Se guarda solo en unos segundos — toca cualquier campo si quieres revisar o corregir antes, o presiona "Guardar" tú mismo.`;
+      gpAutoGuardadoTimeout = setTimeout(()=>{
+        gpAutoGuardadoTimeout = null;
+        document.getElementById('form-gastoPuntual').requestSubmit();
+      }, 4000);
+    } else {
+      statusEl.textContent = (tienda||monto)
+        ? `Detectado automáticamente${tienda?`: "${tienda}"`:''}${monto?` — ${money(monto)}`:''}. Falta completar el resto — revisa y presiona Guardar.`
+        : 'No se pudo leer con claridad — completa tienda y monto manualmente, y presiona Guardar.';
+    }
   }catch(err){
     console.error('Error leyendo boleta con OCR', err);
-    statusEl.textContent = 'No se pudo leer la boleta automáticamente — completa tienda y monto manualmente.';
+    statusEl.textContent = 'No se pudo leer la boleta automáticamente — completa tienda y monto manualmente, y presiona Guardar.';
   }
 });
 
 document.getElementById('form-gastoPuntual').addEventListener('submit', async e=>{
   e.preventDefault();
+  if(gpAutoGuardadoTimeout){ clearTimeout(gpAutoGuardadoTimeout); gpAutoGuardadoTimeout = null; }
   const descripcion = document.getElementById('gp-descripcion').value.trim();
   const monto = Number(rawMoneyValue(document.getElementById('gp-monto').value));
   const fecha = document.getElementById('gp-fecha').value;
@@ -6116,7 +6158,95 @@ function renderObrasPagadasList(){
   }).join('');
 }
 
+// Histograma del flujo de caja: barras de Ingresos hacia arriba, Egresos hacia abajo (mismo
+// estilo visual que el histograma de arriendos), con una línea de Utilidad neta encima. Reutiliza
+// computeChartLayout() (genérico, no depende de campos específicos de arriendo) para las medidas.
+function buildFlujoCajaChartSVG(rows, availableWidth){
+  const layout = computeChartLayout(rows, availableWidth);
+  const { padT, padB, padAxis, colGap, colW, chartH, h, barsSvgW } = layout;
+
+  const maxIngreso = Math.max(1, ...rows.map(d=>Math.max(d.ingresos, d.ingresos+Math.max(0,d.garantiaNeta))));
+  const maxEgreso = Math.max(1, ...rows.map(d=>Math.max(d.totalEgresos, d.totalEgresos+Math.max(0,-d.garantiaNeta))));
+  const totalRange = maxIngreso + maxEgreso;
+  const chartHPos = totalRange>0 ? chartH * (maxIngreso/totalRange) : chartH/2;
+  const chartHNeg = chartH - chartHPos;
+  const zeroY = padT + chartHPos;
+  const scaleYPos = v => Math.min(v,maxIngreso)/maxIngreso*chartHPos;
+  const scaleYNeg = v => maxEgreso>0 ? Math.min(v,maxEgreso)/maxEgreso*chartHNeg : 0;
+
+  const esMobileChart = window.innerWidth <= 860;
+  const fontSize = esMobileChart ? 9.5 : 12;
+  const yLabelIngresoFija = padT + chartHPos*0.4;
+  const yLabelEgresoFija = zeroY + chartHNeg*0.4;
+
+  let bars = '';
+  let labels = '';
+  const linePoints = [];
+
+  rows.forEach((d,i)=>{
+    const x = i*(colW+colGap);
+    const cx = x + colW/2;
+
+    const hIngreso = scaleYPos(d.ingresos);
+    bars += `<rect x="${x}" y="${zeroY-hIngreso}" width="${colW}" height="${hIngreso}" fill="var(--azul)" rx="1.5"><title>Ingresos: ${formatMM(d.ingresos)}</title></rect>`;
+    if(d.ingresos>0){
+      const txt = formatMM(d.ingresos).replace('MM','');
+      const w = txt.length*fontSize*0.62+8, hPill = fontSize+5;
+      const barTopY = zeroY-hIngreso;
+      const y = (barTopY<=yLabelIngresoFija) ? yLabelIngresoFija : (barTopY-hPill/2-3);
+      labels += `<rect x="${cx-w/2}" y="${y-hPill/2-2}" width="${w}" height="${hPill}" rx="3" fill="var(--azul-oscuro)"/><text x="${cx}" y="${y+3.5}" font-size="${fontSize}" text-anchor="middle" fill="#fff" font-weight="700">${txt}</text>`;
+    }
+
+    const hEgreso = scaleYNeg(d.totalEgresos);
+    bars += `<rect x="${x}" y="${zeroY}" width="${colW}" height="${hEgreso}" fill="var(--brick)" rx="1.5" opacity="0.88"><title>Egresos: ${formatMM(d.totalEgresos)}</title></rect>`;
+    if(d.totalEgresos>0){
+      const txt = formatMM(d.totalEgresos).replace('MM','');
+      const w = txt.length*fontSize*0.62+8, hPill = fontSize+5;
+      const barBottomY = zeroY+hEgreso;
+      const y = (barBottomY>=yLabelEgresoFija) ? yLabelEgresoFija : (barBottomY+hPill/2+3);
+      labels += `<rect x="${cx-w/2}" y="${y-hPill/2-2}" width="${w}" height="${hPill}" rx="3" fill="var(--brick)"/><text x="${cx}" y="${y+3.5}" font-size="${fontSize}" text-anchor="middle" fill="#fff" font-weight="700">${txt}</text>`;
+    }
+
+    bars += `<text x="${cx}" y="${h-padB+18}" font-size="10.5" text-anchor="middle" fill="var(--ink-soft)" transform="rotate(-40 ${cx} ${h-padB+18})">${esc(d.label)}</text>`;
+
+    const yUtilidad = d.utilidad>=0 ? zeroY - scaleYPos(d.utilidad) : zeroY + scaleYNeg(-d.utilidad);
+    linePoints.push({x:cx, y:yUtilidad, utilidad:d.utilidad});
+  });
+  bars += labels; // al final, para que ninguna barra vecina las tape
+
+  const linePath = linePoints.map((p,i)=> (i===0?'M':'L')+p.x+' '+p.y).join(' ');
+  const dots = linePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="#fff" stroke="var(--gris-linea)" stroke-width="1.8"><title>Utilidad: ${formatMM(p.utilidad)}</title></circle>`).join('');
+
+  const svg = `<svg viewBox="0 0 ${barsSvgW} ${h}" width="${barsSvgW}" height="${h}" style="display:block;">
+    <line x1="0" y1="${zeroY}" x2="${barsSvgW}" y2="${zeroY}" stroke="var(--gris-linea)" stroke-width="1"/>
+    ${bars}
+    <path d="${linePath}" fill="none" stroke="var(--gris-linea)" stroke-width="2"/>
+    ${dots}
+  </svg>`;
+
+  const html = `<div class="table-scroll" style="overflow-x:auto;">
+    <div style="min-width:${barsSvgW+padAxis}px;">${svg}</div>
+  </div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--ink-soft);">
+    <span>🟦 Ingresos</span><span>🟥 Egresos</span><span>⚪ Utilidad neta</span>
+  </div>`;
+
+  return { html, attach: ()=>{} };
+}
+
+function renderFlujoCajaChart(){
+  const container = document.getElementById('flujo-caja-chart');
+  if(!container) return;
+  const todasLasFilas = computeFlujoCajaMensual().slice().reverse(); // orden cronológico ascendente para el eje X
+  if(!todasLasFilas.length){ container.innerHTML = '<div class="empty">Aún no hay datos suficientes para el histograma.</div>'; return; }
+  const filas = todasLasFilas.slice(-12); // últimos 12 meses, igual que el resto del panel
+  const availableWidth = container.clientWidth || (container.parentElement && container.parentElement.clientWidth) || 600;
+  const chart = buildFlujoCajaChartSVG(filas, availableWidth);
+  container.innerHTML = chart.html;
+}
+
 function renderGastosYFlujoCaja(){
+  renderFlujoCajaChart();
   renderGastosFijosList();
   renderGastosPuntualesList();
   renderObrasPagadasList();
@@ -6526,6 +6656,7 @@ function histogramToggleHtml(total){
 
 function renderResumenChart(contratoId){
   const container = document.getElementById('resumen-chart');
+  const deudaBox = document.getElementById('resumen-chart-deuda-box');
   const yearSel = document.getElementById('chart-year-filter');
   const groupSel = document.getElementById('chart-group-filter');
   const chartControls = document.getElementById('chart-controls');
@@ -6537,10 +6668,12 @@ function renderResumenChart(contratoId){
     if(!series.length){
       yearSel.innerHTML = '<option value="">—</option>';
       container.innerHTML = '<div class="empty">Registra contratos y pagos para ver la evolución mensual.</div>';
+      deudaBox.innerHTML = '';
     } else {
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
+      renderDeudaAcumuladaBox(deudaBox, rows);
       const chart = buildStackedColumnChartSVG(rows, availableWidth);
       container.innerHTML = chart.html + histogramToggleHtml(total);
       chart.attach(container);
@@ -6554,6 +6687,7 @@ function renderResumenChart(contratoId){
   if(!series.length){
     yearSel.innerHTML = '<option value="">—</option>';
     container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>';
+    deudaBox.innerHTML = '';
     renderResumenImpagos(contratoId);
     return;
   }
@@ -6561,10 +6695,25 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
+  renderDeudaAcumuladaBox(deudaBox, rows);
   const chart = buildStackedColumnChartSVG(rows, availableWidth);
   container.innerHTML = chart.html + histogramToggleHtml(total);
   chart.attach(container);
   renderResumenImpagos(contratoId);
+}
+
+// Suma la deuda de todos los periodos que se están mostrando ACTUALMENTE en el gráfico (con los
+// filtros de arrendatario/año/agrupación/ver-todo ya aplicados) — no toda la historia completa,
+// solo lo que hay en pantalla en este momento. Se muestra como un cuadro aparte, no como una
+// barra más, para no mezclarla con la escala mensual del histograma.
+function renderDeudaAcumuladaBox(deudaBox, rows){
+  if(!deudaBox) return;
+  const deudaAcumulada = rows.reduce((s,d)=> s + Math.max(0, d.monto - (d.pagado + d.descuento)), 0);
+  if(deudaAcumulada<=0){
+    deudaBox.innerHTML = `<div class="deuda-acumulada-box sin-deuda"><span class="lbl">Deuda acumulada del periodo mostrado</span><span class="val">${money(0)}</span></div>`;
+  } else {
+    deudaBox.innerHTML = `<div class="deuda-acumulada-box"><span class="lbl">Deuda acumulada del periodo mostrado</span><span class="val">${money(deudaAcumulada)}</span></div>`;
+  }
 }
 
 // Calcula las medidas fijas del gráfico (posiciones X, ancho de columnas, etc.) — estas NO
