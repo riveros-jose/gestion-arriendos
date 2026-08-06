@@ -2316,7 +2316,34 @@ function convertDateInput(input){
   input.inputMode = 'none';
   input.autocomplete = 'off';
   input.classList.add('cal-input');
+
+  // El resto de la app entera lee/escribe estos campos como fecha ISO (AAAA-MM-DD) — cambiar
+  // eso significaría tocar cientos de lugares. En vez de eso, se redefine la propiedad "value"
+  // de ESTE input: por dentro (lo que devuelve .value a cualquier otro código) sigue siendo ISO
+  // como siempre, pero lo que se VE en pantalla se muestra en DD/MM/AAAA — sin que nadie más se
+  // entere del cambio.
+  const nativeDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const isoInicial = input.getAttribute('value') || '';
+  input.dataset.isoValue = isoInicial;
+  nativeDescriptor.set.call(input, formatDate(isoInicial));
+  Object.defineProperty(input, 'value', {
+    get(){ return input.dataset.isoValue || ''; },
+    set(v){
+      input.dataset.isoValue = v || '';
+      nativeDescriptor.set.call(input, v ? formatDate(v) : '');
+    },
+    configurable: true,
+  });
 }
+// Un formulario que hace .reset() nativo vuelve el campo a su value= original del HTML (siempre
+// vacío en estos casos) SIN pasar por el setter de arriba — se resincroniza acá para que
+// .value (ISO) no quede desactualizado respecto de lo que se ve.
+document.addEventListener('reset', e=>{
+  if(!(e.target instanceof HTMLFormElement)) return;
+  setTimeout(()=>{
+    e.target.querySelectorAll('input.cal-input').forEach(inp=>{ inp.dataset.isoValue = ''; });
+  }, 0);
+});
 function scanAndConvertDateInputs(root){
   (root||document).querySelectorAll('input[type="date"]').forEach(convertDateInput);
 }
