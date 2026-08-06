@@ -5116,32 +5116,15 @@ function renderHistorialSelects(){
   if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
   if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
 }
-// El contrato elegido en "Nuevo pago" y el filtro de "Historial de pagos" quedan sincronizados
-// en ambos sentidos, para no tener que elegirlo dos veces.
 document.getElementById('h-contratoId-activo').addEventListener('change', ()=>{
   const id = document.getElementById('h-contratoId-activo').value;
   if(id) setSearchableSelectValue('h-contratoId-historico', '');
-  const paySel = document.getElementById('pay-contratoId');
-  if(Array.from(paySel.options).some(o=>o.value===id)){ setSearchableSelectValue('pay-contratoId', id); actualizarValorArriendoInformativo(); }
   renderHistorial();
 });
 document.getElementById('h-contratoId-historico').addEventListener('change', ()=>{
   const id = document.getElementById('h-contratoId-historico').value;
   if(id) setSearchableSelectValue('h-contratoId-activo', '');
-  const paySel = document.getElementById('pay-contratoId');
-  if(Array.from(paySel.options).some(o=>o.value===id)){ setSearchableSelectValue('pay-contratoId', id); actualizarValorArriendoInformativo(); }
   renderHistorial();
-});
-document.getElementById('pay-contratoId').addEventListener('change', ()=>{
-  const id = document.getElementById('pay-contratoId').value;
-  if(!id) return;
-  const selActivo = document.getElementById('h-contratoId-activo');
-  const selHist = document.getElementById('h-contratoId-historico');
-  if(Array.from(selActivo.options).some(o=>o.value===id)){
-    setSearchableSelectValue('h-contratoId-activo', id); setSearchableSelectValue('h-contratoId-historico', ''); renderHistorial();
-  } else if(Array.from(selHist.options).some(o=>o.value===id)){
-    setSearchableSelectValue('h-contratoId-historico', id); setSearchableSelectValue('h-contratoId-activo', ''); renderHistorial();
-  }
 });
 
 function truncateText(str, n){
@@ -5198,7 +5181,11 @@ let historialTodosVerTodo = false;
 function renderHistorialTodos(){
   const el = document.getElementById('historial-table');
 
-  let list = payments.slice().sort((a,b)=> (b.fechaPago||'').localeCompare(a.fechaPago||''));
+  // Por defecto se muestra en el orden en que se fueron REGISTRANDO los pagos (el más reciente
+  // ingresado primero) — no por la fecha de pago, ya que un pago atrasado que recién se carga
+  // hoy debe aparecer arriba, aunque su fecha sea de hace tiempo. Si se hace clic en un
+  // encabezado de columna para ordenar por otra cosa, eso manda por sobre este orden por defecto.
+  let list = payments.slice().reverse();
   list = sortRows('payments-todos', list, {
     contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
     descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>Number(p.valorArriendo||0), comentarios: p=>p.comentarios||''
@@ -5488,12 +5475,16 @@ function renderMaestros(){
     {
       const filasTrabajos = trabajos.length ? trabajos.map((t,ti)=>{
         const detalleId = `trabajo-detalle-${t.id}`;
+        const tienePrecioEspecial = t.tipoPrecio && t.tipoPrecio!=='Neto';
+        const etiquetaPrecio = t.tipoPrecio==='+IVA' ? '+ IVA (19%)' : (t.tipoPrecio==='Honorarios' ? 'Boleta de honorarios (+15%)' : '');
+        const totalConImpuesto = t.tipoPrecio==='+IVA' ? Math.round(Number(t.monto||0)*1.19) : (t.tipoPrecio==='Honorarios' ? Math.round(Number(t.monto||0)*1.15) : null);
         return `<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
           <div style="flex:1;min-width:200px;">
             <div><strong>${esc(t.descripcion)}</strong></div>
             <div class="cell-stacked-sub" style="cursor:pointer;color:var(--teal-dark);font-weight:600;" onclick="document.getElementById('${detalleId}').style.display = document.getElementById('${detalleId}').style.display==='none' ? 'block' : 'none';">Ver detalle ▾</div>
             <div id="${detalleId}" style="display:none;margin-top:6px;">
-              ${t.categoria || (t.tipoPrecio && t.tipoPrecio!=='Neto') ? `<div>${t.categoria?`<span class="tag">${esc(t.categoria)}</span>`:''}${t.tipoPrecio && t.tipoPrecio!=='Neto' ? ` <span class="tag">${t.tipoPrecio==='+IVA'?'+ IVA':'Honorarios'}</span>` : ''}</div>` : ''}
+              ${t.categoria || tienePrecioEspecial ? `<div>${t.categoria?`<span class="tag">${esc(t.categoria)}</span>`:''}${tienePrecioEspecial ? ` <span class="tag">${etiquetaPrecio}</span>` : ''}</div>` : ''}
+              ${tienePrecioEspecial ? `<div class="cell-stacked-sub">Neto: ${money(t.monto)} → <strong>Total ${t.tipoPrecio==='+IVA'?'c/IVA':'c/boleta'}: ${money(totalConImpuesto)}</strong></div>` : ''}
               <div class="cell-stacked-sub">${t.fecha?formatDate(t.fecha):'Sin fecha'}${t.fechaPago?` · 💰 Pagado: ${formatDate(t.fechaPago)}`:''}${t.propiedadDireccion?` · 📍 ${esc(t.propiedadDireccion)}`:''}${t.m2?` · ${formatNumber(t.m2)} m²${t.precioM2?` (${money(t.precioM2)}/m²)`:''}`:''}</div>
             </div>
           </div>
