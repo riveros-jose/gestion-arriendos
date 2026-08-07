@@ -4745,8 +4745,11 @@ function renderReadings(){
   const el1 = document.getElementById('reading-table-sector1');
   const el2 = document.getElementById('reading-table-sector2');
   const all = computeReadingsWithConsumption();
-  let list = all.filter(r=> !filter || r.contratoId===filter)
-                .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
+  // Por defecto se muestra en el orden en que se fueron REGISTRANDO las lecturas (la más
+  // recientemente ingresada primero) — no por su fecha de lectura, ya que una lectura atrasada
+  // que recién se carga hoy debe aparecer arriba, aunque su fecha sea de hace tiempo. Si se hace
+  // clic en un encabezado de columna para ordenar por otra cosa, eso manda por sobre esto.
+  let list = all.filter(r=> !filter || r.contratoId===filter).slice().reverse();
   list = sortRows('readings', list, {
     contrato: r=>contractLabel(r.contratoId)||'', servicio: r=>r.servicio||'', fechaLectura: r=>r.fechaLectura||'',
     lecturaActual: r=>Number(r.lecturaActual||0), consumo: r=>(r.consumo===null?-Infinity:r.consumo),
