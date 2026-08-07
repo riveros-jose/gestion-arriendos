@@ -6694,7 +6694,7 @@ function renderResumenChart(contratoId){
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
-      renderDeudaAcumuladaBox(deudaBox, rows);
+      renderDeudaAcumuladaBox(deudaBox, contratoId);
       const chart = buildStackedColumnChartSVG(rows, availableWidth);
       container.innerHTML = chart.html + histogramToggleHtml(total);
       chart.attach(container);
@@ -6716,24 +6716,33 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
-  renderDeudaAcumuladaBox(deudaBox, rows);
+  renderDeudaAcumuladaBox(deudaBox, contratoId);
   const chart = buildStackedColumnChartSVG(rows, availableWidth);
   container.innerHTML = chart.html + histogramToggleHtml(total);
   chart.attach(container);
   renderResumenImpagos(contratoId);
 }
 
-// Suma la deuda de todos los periodos que se están mostrando ACTUALMENTE en el gráfico (con los
-// filtros de arrendatario/año/agrupación/ver-todo ya aplicados) — no toda la historia completa,
-// solo lo que hay en pantalla en este momento. Se muestra como un cuadro aparte, no como una
-// barra más, para no mezclarla con la escala mensual del histograma.
-function renderDeudaAcumuladaBox(deudaBox, rows){
+// Deuda acumulada TOTAL (no solo del periodo que se ve en el gráfico) — desde que empezó el
+// contrato, si hay un arrendatario filtrado; o la suma de todos, si no hay filtro. Usa
+// EXACTAMENTE la misma lógica que el bloque "Clientes con deuda o saldo a favor"
+// (computeResumenRows), para que ambos números sean siempre consistentes entre sí.
+function renderDeudaAcumuladaBox(deudaBox, contratoId){
   if(!deudaBox) return;
-  const deudaAcumulada = rows.reduce((s,d)=> s + Math.max(0, d.monto - (d.pagado + d.descuento)), 0);
-  if(deudaAcumulada<=0){
-    deudaBox.innerHTML = `<div class="deuda-acumulada-box sin-deuda"><span class="lbl">Deuda acumulada del periodo mostrado</span><span class="val">${money(0)}</span></div>`;
+  const filas = computeResumenRows();
+  let deudaAcumulada, etiqueta;
+  if(contratoId){
+    const fila = filas.find(f=>f.c.id===contratoId);
+    deudaAcumulada = fila ? Math.max(0, fila.saldo) : 0;
+    etiqueta = 'Deuda acumulada de este arrendatario (desde el inicio del contrato)';
   } else {
-    deudaBox.innerHTML = `<div class="deuda-acumulada-box"><span class="lbl">Deuda acumulada del periodo mostrado</span><span class="val">${money(deudaAcumulada)}</span></div>`;
+    deudaAcumulada = filas.reduce((s,f)=> s + Math.max(0, f.saldo), 0);
+    etiqueta = 'Deuda acumulada total (todos los arrendatarios)';
+  }
+  if(deudaAcumulada<=0){
+    deudaBox.innerHTML = `<div class="deuda-acumulada-box sin-deuda"><span class="lbl">${etiqueta}</span><span class="val">${money(0)}</span></div>`;
+  } else {
+    deudaBox.innerHTML = `<div class="deuda-acumulada-box"><span class="lbl">${etiqueta}</span><span class="val">${money(deudaAcumulada)}</span></div>`;
   }
 }
 
