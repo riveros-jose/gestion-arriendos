@@ -113,6 +113,7 @@
   .deuda-acumulada-box.sin-deuda .val{color:var(--teal-dark);}
   .deuda-acumulada-chevron-badge{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--brick);background:#fff;border:1px solid rgba(180,67,46,0.3);border-radius:20px;padding:6px 12px;white-space:nowrap;}
   .deuda-acumulada-box.sin-deuda .deuda-acumulada-chevron-badge{color:var(--teal-dark);border-color:rgba(43,111,92,0.3);}
+  .ver-desglose-btn{display:inline-block;font-size:11px;font-weight:700;color:var(--teal-dark);background:var(--teal-soft);border-radius:20px;padding:5px 10px;white-space:nowrap;}
   .deuda-acumulada-detalle{margin:-8px 0 14px;max-width:520px;}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
@@ -3356,7 +3357,7 @@ function buildDeudaListHtml(contratoId){
   });
   if(!rows.length) return '<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>';
   return `<div class="table-scroll"><table><thead><tr>
-    ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}
+    ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}<th></th>
   </tr></thead><tbody>
   ${rows.map(r=>{
     const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
@@ -3365,10 +3366,11 @@ function buildDeudaListHtml(contratoId){
     // Un histórico no tiene "meses" (ya terminó su contrato) — su desglose es la cobranza
     // posterior al término; un contrato activo sí tiene el desglose mensual normal.
     const detalleInterno = r.historico ? buildCobranzaHtml(r.c) : buildMesesConDeudaHtml(r.c.id);
-    const filaDetalle = expandido ? `<tr><td colspan="2" style="padding:8px 6px 14px;background:var(--paper);">${detalleInterno}</td></tr>` : '';
-    return `<tr style="cursor:pointer;" onclick="toggleDeudaListaContrato('${r.c.id}')" title="Tocar para ${expandido?'ocultar':'ver'} el desglose mes a mes">
-    <td class="cell-tap-full"><span class="cell-clamp-2">${expandido?'▾':'▸'} ${etiqueta}</span></td>
+    const filaDetalle = expandido ? `<tr><td colspan="3" style="padding:8px 6px 14px;background:var(--paper);">${detalleInterno}</td></tr>` : '';
+    return `<tr style="cursor:pointer;" onclick="toggleDeudaListaContrato('${r.c.id}')">
+    <td class="cell-tap-full"><span class="cell-clamp-2">${etiqueta}</span></td>
     <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
+    <td style="white-space:nowrap;"><span class="ver-desglose-btn">${expandido?'Ocultar ▲':'Ver desglose ▾'}</span></td>
   </tr>${filaDetalle}`;
   }).join('')}
   </tbody></table></div>`;
