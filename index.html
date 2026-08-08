@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Arriendos">
 <title>Gestión de Arriendos</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232B6F5C'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='white' stroke='%232B6F5C' stroke-width='4'/%3E%3Ctext x='50' y='74' font-size='72' text-anchor='middle'%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -806,6 +806,7 @@
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Tipo ajuste IPC</label><select id="c-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select></div>
               <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="text" inputmode="numeric" class="money-mask" required></div>
+              <div class="field"><label>Día de pago del arriendo</label><input id="c-diaPago" type="number" min="1" max="31" step="1" placeholder="1" value="1"></div>
               <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="text" inputmode="numeric" class="money-mask"></div>
               <div class="field"><label>Fecha de pago de la garantía (si ya se pagó)</label><input id="c-garantiaFechaPago" type="date"></div>
             </div>
@@ -1669,7 +1670,7 @@ function buildWorkbook(){
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
     fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'', mesesGracia: c.mesesGracia||0,
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
-    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
+    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, diaPago: c.diaPago||1, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
     garantiaDevueltaMonto: c.garantiaDevueltaMonto||'', garantiaDevueltaFecha: c.garantiaDevueltaFecha||'',
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
@@ -1678,8 +1679,8 @@ function buildWorkbook(){
     ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,10,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -1843,7 +1844,17 @@ function loadFromWorkbook(arrayBuffer){
   contracts = rawContracts.map(c=> normalizeDates({
     ...c,
     activo: !(c.activo===false || c.activo==='false' || c.activo==='FALSE' || c.activo===0 || c.activo==='0')
-  }));
+  })).map(c=>{
+    // Migración: contratos guardados antes de que existiera "día de pago" quedan con el valor
+    // por defecto (día 1), salvo estas tres excepciones acordadas que pagan el día 15.
+    if(c.diaPago===undefined || c.diaPago===null || c.diaPago===''){
+      const t = tenants.find(x=>x.id===c.tenantId);
+      const nombre = (t ? (t.nemoArrendatario||t.nombreSociedad||'') : '').toLowerCase();
+      const excepcionesDia15 = ['frutos secos','librería','libreria','mejías','mejias'];
+      c.diaPago = excepcionesDia15.some(ex=> nombre.includes(ex)) ? 15 : 1;
+    }
+    return c;
+  });
   payments = rawPayments.map(normalizeDates);
   readings = rawReadings.map(r=> normalizeDates({
     id:r.id, contratoId:r.contratoId, servicio:r.servicio, medidor:r.medidor||'', fechaLectura:r.fechaLectura,
@@ -2792,7 +2803,7 @@ document.getElementById('resumen-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','whatsappNombreContacto','whatsappContacto'];
-const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','garantia','garantiaFechaPago','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 function propiedadesDisponibles(excludeContratoId){
@@ -3218,18 +3229,27 @@ function effectiveDebtStartDate(contratoId){
   return c.fechaInicioContrato || '';
 }
 
+// El mes en curso solo se excluye de la deuda MIENTRAS estemos dentro del periodo de gracia:
+// hasta 5 días después del día de pago pactado de CADA contrato (campo "Día de pago del
+// arriendo"). Pasado ese plazo, el remanente sin pagar cuenta como deuda de inmediato — ya no
+// hay que esperar a que termine el mes completo. Si ya hay un pago (aunque sea parcial) ese mes,
+// nunca se excluye — el remanente sin cubrir cuenta igual, sin esperar ningún plazo.
+function debeExcluirseMesActual(c, d){
+  const hoyStr = fechaHoyChile();
+  const [hoyY, hoyM, hoyD] = hoyStr.split('-').map(Number);
+  const esMesActual = d.year===hoyY && (d.month+1)===hoyM;
+  if(!esMesActual) return false;
+  const sinPagoAun = d.pagado===0 && d.descuento===0;
+  if(!sinPagoAun) return false;
+  const diaPago = Number(c.diaPago||1);
+  return hoyD <= (diaPago + 5);
+}
+
 function computeResumenRows(){
-  // El mes en curso no se cuenta como deuda todavía — recién se considera "atrasado" una vez
-  // que pasó ese mes completo. Si ya se registró un pago para el mes en curso (por ejemplo, pagó
-  // adelantado), sí se contabiliza normalmente, para no esconder ese pago del cálculo.
-  const hoy = new Date();
-  const mesActualY = hoy.getFullYear(), mesActualM = hoy.getMonth();
   const activos = contracts.filter(isActiveContract).map(c=>{
-    const series = computeContratoMonthlySeries(c.id).map(d=>{
-      const esMesActual = d.year===mesActualY && d.month===mesActualM;
-      const sinPagoAun = d.pagado===0 && d.descuento===0;
-      return (esMesActual && sinPagoAun) ? {...d, monto:0} : d;
-    });
+    const series = computeContratoMonthlySeries(c.id).map(d=>
+      debeExcluirseMesActual(c, d) ? {...d, monto:0} : d
+    );
     const totalPagado = series.reduce((s,d)=>s+d.pagado,0);
     const totalDescuentos = series.reduce((s,d)=>s+d.descuento,0);
     const totalEsperado = series.reduce((s,d)=>s+d.monto,0);
@@ -6750,15 +6770,9 @@ function renderResumenChart(contratoId){
 // distintas: uno es para visualizar la evolución, el otro para saber la deuda real total.
 // Usa la misma lógica de negocio que "Clientes con deuda o saldo a favor" (mes en curso sin
 // pago aún no cuenta, etc.), para que los números sean consistentes entre ambos bloques.
-function computeSaldoConReglas(series, anioFiltro){
-  const hoy = new Date();
-  const mesActualY = hoy.getFullYear(), mesActualM = hoy.getMonth();
+function computeSaldoConReglas(c, series, anioFiltro){
   let s = anioFiltro ? series.filter(d=>d.year===Number(anioFiltro)) : series;
-  s = s.map(d=>{
-    const esMesActual = d.year===mesActualY && d.month===mesActualM;
-    const sinPagoAun = d.pagado===0 && d.descuento===0;
-    return (esMesActual && sinPagoAun) ? {...d, monto:0} : d;
-  });
+  s = s.map(d=> debeExcluirseMesActual(c, d) ? {...d, monto:0} : d);
   const totalPagado = s.reduce((sum,d)=>sum+d.pagado,0);
   const totalDescuentos = s.reduce((sum,d)=>sum+d.descuento,0);
   const totalEsperado = s.reduce((sum,d)=>sum+d.monto,0);
@@ -6773,7 +6787,7 @@ function renderDeudaAcumuladaBox(deudaBox, contratoId){
     const c = contracts.find(x=>x.id===contratoId);
     if(!c){ deudaBox.innerHTML=''; return; }
     if(isActiveContract(c)){
-      deudaAcumulada = Math.max(0, computeSaldoConReglas(computeContratoMonthlySeries(c.id), anioFiltro));
+      deudaAcumulada = Math.max(0, computeSaldoConReglas(c, computeContratoMonthlySeries(c.id), anioFiltro));
     } else {
       // La cobranza de un histórico no se desglosa por año (es un saldo pendiente único), así
       // que el filtro de año no le aplica — se muestra igual, completa.
@@ -6782,7 +6796,7 @@ function renderDeudaAcumuladaBox(deudaBox, contratoId){
     etiqueta = 'Deuda acumulada de este arrendatario';
   } else {
     deudaAcumulada = contracts.filter(isActiveContract)
-      .reduce((sum,c)=> sum + Math.max(0, computeSaldoConReglas(computeContratoMonthlySeries(c.id), anioFiltro)), 0);
+      .reduce((sum,c)=> sum + Math.max(0, computeSaldoConReglas(c, computeContratoMonthlySeries(c.id), anioFiltro)), 0);
     deudaAcumulada += contratosConCobranza().reduce((sum,c)=> sum + Math.max(0, computeCobranzaSaldo(c)), 0);
     etiqueta = 'Deuda total acumulada';
   }
@@ -7188,7 +7202,7 @@ function renderResumenMatrix(){
       const d = sumas[r.c.id][key];
       if(d){
         // Hay al menos un registro ese mes, aunque sea de $0.
-        if(d.pagado===0 && d.descuento===0) return '<td class="mono" style="text-align:center;color:var(--brick);opacity:0.7;">$0</td>';
+        if(d.pagado===0 && d.descuento===0) return '<td class="mono" style="text-align:center;background:var(--brick-soft);color:var(--brick);font-weight:700;" title="Pagó $0 este mes">$0</td>';
         // Se resalta en rojo claro cualquier mes (no solo el último) donde lo pagado haya
         // quedado bajo lo pactado ese mes en particular.
         let bgParcial = '';
