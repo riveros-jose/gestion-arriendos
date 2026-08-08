@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Arriendos">
 <title>Gestión de Arriendos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232B6F5C'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -294,6 +295,10 @@
      tarjeta con padding, así que también necesita compensarlo con margen negativo). */
   .tenant-filter-sticky{position:sticky;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
+  .chart-group-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .chart-group-btn{font-size:15px;padding:8px 10px;border:none;background:var(--card);color:var(--ink-soft);cursor:pointer;line-height:1;}
+  .chart-group-btn+.chart-group-btn{border-left:1px solid var(--border);}
+  .chart-group-btn.active{background:var(--teal-soft);color:var(--teal-dark);}
   .quick-jump-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;}
   .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
   .quick-jump-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
@@ -347,6 +352,12 @@
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
+    /* Filtro de Año y toggle de agrupar más compactos en mobile — el select más angosto y el
+       toggle de íconos un poco más chico, para que quepan cómodos uno junto al otro. */
+    #chart-controls{gap:8px;}
+    #chart-controls .field{max-width:110px!important;}
+    #chart-year-filter{padding:8px 6px;font-size:13px;}
+    .chart-group-btn{padding:7px 8px;font-size:13px;}
     /* El scroll ocurre dentro de .main (no en la página): así el navegador (p.ej. Samsung
        Internet) no muestra su botón flotante de "ir arriba" encima de nuestra barra inferior. */
     html,body{height:100%;overflow:hidden;}
@@ -898,10 +909,16 @@
           <div class="line-row form-compact" style="margin-bottom:8px;max-width:420px">
             <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
           </div>
-          <div class="line-row form-compact" id="chart-controls" style="margin-bottom:10px;max-width:420px">
-            <div class="field"><label>Año</label><select id="chart-year-filter"></select></div>
-            <div class="field"><label>Agrupar por</label><select id="chart-group-filter"><option value="mes">Mes</option><option value="anio">Año</option></select></div>
+          <div class="line-row form-compact" id="chart-controls" style="margin-bottom:10px;max-width:420px;align-items:flex-end;">
+            <div class="field" style="max-width:150px;"><label>Año</label><select id="chart-year-filter"></select></div>
+            <div class="field" style="flex:0 0 auto;">
+              <div class="chart-group-toggle" id="chart-group-toggle">
+                <button type="button" class="chart-group-btn active" data-group="mes" title="Agrupar por mes">📅</button>
+                <button type="button" class="chart-group-btn" data-group="anio" title="Agrupar por año">🗓️</button>
+              </div>
+            </div>
           </div>
+          <input type="hidden" id="chart-group-filter" value="mes">
           <div id="resumen-chart-deuda-box"></div>
           <div id="resumen-chart"></div>
         </div>
@@ -6525,7 +6542,11 @@ function computeContratoMonthlySeries(contratoId){
 document.getElementById('chart-year-filter').addEventListener('change', ()=>{
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
-document.getElementById('chart-group-filter').addEventListener('change', ()=>{
+document.getElementById('chart-group-toggle').addEventListener('click', e=>{
+  const btn = e.target.closest('.chart-group-btn');
+  if(!btn) return;
+  document.querySelectorAll('#chart-group-toggle .chart-group-btn').forEach(b=> b.classList.toggle('active', b===btn));
+  document.getElementById('chart-group-filter').value = btn.dataset.group;
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
 
@@ -6723,21 +6744,47 @@ function renderResumenChart(contratoId){
   renderResumenImpagos(contratoId);
 }
 
-// Deuda acumulada TOTAL (no solo del periodo que se ve en el gráfico) — desde que empezó el
-// contrato, si hay un arrendatario filtrado; o la suma de todos, si no hay filtro. Usa
-// EXACTAMENTE la misma lógica que el bloque "Clientes con deuda o saldo a favor"
-// (computeResumenRows), para que ambos números sean siempre consistentes entre sí.
+// Deuda acumulada — respeta el filtro de Año si se elige uno (solo considera esos meses), pero
+// por defecto (sin año elegido) muestra TODOS los periodos desde el inicio del contrato — no se
+// le aplica la restricción de "últimos 12 meses" que sí tiene el histograma, ya que son cosas
+// distintas: uno es para visualizar la evolución, el otro para saber la deuda real total.
+// Usa la misma lógica de negocio que "Clientes con deuda o saldo a favor" (mes en curso sin
+// pago aún no cuenta, etc.), para que los números sean consistentes entre ambos bloques.
+function computeSaldoConReglas(series, anioFiltro){
+  const hoy = new Date();
+  const mesActualY = hoy.getFullYear(), mesActualM = hoy.getMonth();
+  let s = anioFiltro ? series.filter(d=>d.year===Number(anioFiltro)) : series;
+  s = s.map(d=>{
+    const esMesActual = d.year===mesActualY && d.month===mesActualM;
+    const sinPagoAun = d.pagado===0 && d.descuento===0;
+    return (esMesActual && sinPagoAun) ? {...d, monto:0} : d;
+  });
+  const totalPagado = s.reduce((sum,d)=>sum+d.pagado,0);
+  const totalDescuentos = s.reduce((sum,d)=>sum+d.descuento,0);
+  const totalEsperado = s.reduce((sum,d)=>sum+d.monto,0);
+  return totalEsperado - (totalPagado + totalDescuentos);
+}
+
 function renderDeudaAcumuladaBox(deudaBox, contratoId){
   if(!deudaBox) return;
-  const filas = computeResumenRows();
+  const anioFiltro = document.getElementById('chart-year-filter').value;
   let deudaAcumulada, etiqueta;
   if(contratoId){
-    const fila = filas.find(f=>f.c.id===contratoId);
-    deudaAcumulada = fila ? Math.max(0, fila.saldo) : 0;
-    etiqueta = 'Deuda acumulada de este arrendatario (desde el inicio del contrato)';
+    const c = contracts.find(x=>x.id===contratoId);
+    if(!c){ deudaBox.innerHTML=''; return; }
+    if(isActiveContract(c)){
+      deudaAcumulada = Math.max(0, computeSaldoConReglas(computeContratoMonthlySeries(c.id), anioFiltro));
+    } else {
+      // La cobranza de un histórico no se desglosa por año (es un saldo pendiente único), así
+      // que el filtro de año no le aplica — se muestra igual, completa.
+      deudaAcumulada = Math.max(0, computeCobranzaSaldo(c));
+    }
+    etiqueta = 'Deuda acumulada de este arrendatario';
   } else {
-    deudaAcumulada = filas.reduce((s,f)=> s + Math.max(0, f.saldo), 0);
-    etiqueta = 'Deuda acumulada total (todos los arrendatarios)';
+    deudaAcumulada = contracts.filter(isActiveContract)
+      .reduce((sum,c)=> sum + Math.max(0, computeSaldoConReglas(computeContratoMonthlySeries(c.id), anioFiltro)), 0);
+    deudaAcumulada += contratosConCobranza().reduce((sum,c)=> sum + Math.max(0, computeCobranzaSaldo(c)), 0);
+    etiqueta = 'Deuda total acumulada';
   }
   if(deudaAcumulada<=0){
     deudaBox.innerHTML = `<div class="deuda-acumulada-box sin-deuda"><span class="lbl">${etiqueta}</span><span class="val">${money(0)}</span></div>`;
