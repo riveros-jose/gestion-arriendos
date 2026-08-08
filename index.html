@@ -100,6 +100,11 @@
   tbody tr:nth-child(odd) td{background:var(--card);}
   tbody tr:nth-child(even) td{background:var(--paper);}
   tr:hover td{background:#FAFBFA !important;}
+  /* Filas de "detalle anidado" dentro de una tabla (el desglose que se despliega al tocar un
+     arrendatario, la cobranza fusionada en el historial, etc.) — un color claramente distinto de
+     la alternancia normal par/impar, para que nunca se confundan con una fila de datos más.
+     Necesita !important porque la regla de alternancia de arriba también apunta a los <td>. */
+  .nested-detail-row td{background:#E1E4E8 !important;}
   table ::selection{background:var(--azul-oscuro);color:#fff;}
   .mono{font-family:'Inter',sans-serif;}
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
@@ -120,6 +125,7 @@
   .estado-select-atrasado{background:#F2C4B8!important;color:var(--brick)!important;border-color:var(--brick)!important;}
   .estado-select-pendiente{background:#FCE588!important;color:#6B4E00!important;border-color:#D9A800!important;}
   .row-actions{display:flex;gap:8px;}
+  .row-actions-always-visible{display:flex;gap:8px;}
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
   .cell-stacked{white-space:normal !important;line-height:1.4;}
@@ -465,6 +471,7 @@
 
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
     .row-actions{gap:6px;flex-wrap:wrap;}
+    .row-actions-always-visible{gap:6px;flex-wrap:wrap;}
     .row-actions button{
       background:var(--paper);border:1px solid var(--border);border-radius:16px;
       padding:6px 11px;font-size:12px;text-decoration:none;color:var(--ink);
@@ -534,6 +541,14 @@
       <button type="button" class="btn btn-secondary" id="confirm-modal-cancel-btn">Cancelar</button>
       <button type="button" class="btn" id="confirm-modal-accept-btn">Eliminar</button>
     </div>
+  </div>
+</div>
+
+<div id="table-modal-overlay" class="result-modal-overlay" style="display:none" onclick="if(event.target===this) closeTableModal();">
+  <div class="result-modal-card" style="max-width:720px;width:100%;text-align:left;">
+    <div class="result-modal-title" id="table-modal-title" style="text-align:left;"></div>
+    <div id="table-modal-content" style="max-height:60vh;overflow-y:auto;margin:12px 0 16px;"></div>
+    <button type="button" class="btn btn-primary result-modal-accept-btn" onclick="closeTableModal()">Cerrar</button>
   </div>
 </div>
 
@@ -941,20 +956,13 @@
         </div>
         <select class="filter" id="resumen-filter" style="display:none"></select>
         <div class="card">
-          <h2 class="matrix-title-mobile">🧮 Pagos de arrendatarios por mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+          <div class="toggle-form"><h2 class="matrix-title-mobile">🧮 Pagos de arrendatarios por mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-matrix-btn">Exportar a Google Drive</button></div>
+          <div class="subtitle" style="margin-bottom:10px;">Toca el nombre de un arrendatario para ver su historial completo de pagos, mes a mes.</div>
           <div class="form-compact" style="display:flex;gap:8px;margin-bottom:10px;max-width:480px;">
             <div class="field" style="flex:1;min-width:0;"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0;min-width:0;width:100%;"></select></div>
             <div class="field" style="max-width:92px;flex:0 0 auto;"><label>Año</label><select id="matrix-year-filter"></select></div>
           </div>
           <div id="resumen-matrix" class="table-wrap"></div>
-        </div>
-        <div class="card">
-          <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
-          <button type="button" class="btn-add-new" id="impagos-toggle-btn" onclick="toggleImpagosSection()"><span class="plus-icon">+</span> Ver meses con deuda o saldo a favor</button>
-          <div id="impagos-content-wrap" style="display:none">
-            <select class="filter" id="impagos-tenant-filter"></select>
-            <div id="resumen-impagos" class="table-wrap"></div>
-          </div>
         </div>
       </div>
 
@@ -2618,6 +2626,21 @@ document.querySelectorAll('.nav-item').forEach(item=>{
   item.addEventListener('click',()=> switchTab(item.dataset.tab));
 });
 
+// Lleva a la pestaña de Pagos con el historial completo de un arrendatario específico ya
+// filtrado — usado desde la matriz (y desde cualquier otro lugar que quiera este mismo atajo)
+// para ver el desglose completo mes a mes, con la misma lógica de colores de esa tabla.
+function verHistorialDeArrendatario(contratoId, historico){
+  switchTab('pagos');
+  if(historico){
+    setSearchableSelectValue('h-contratoId-historico', contratoId);
+    setSearchableSelectValue('h-contratoId-activo', '');
+  } else {
+    setSearchableSelectValue('h-contratoId-activo', contratoId);
+    setSearchableSelectValue('h-contratoId-historico', '');
+  }
+  renderHistorial();
+}
+
 function openAlertsTab(){
   switchTab('alertas');
 }
@@ -3041,8 +3064,10 @@ function renderTenantsContracts(){
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
-        <div class="row-actions" style="gap:6px;flex-wrap:wrap;align-items:center;">
+        <div class="row-actions-always-visible" style="gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="openUpdateContractModal('${c.id}')">Actualizar o finalizar contrato</button>
+        </div>
+        <div class="row-actions" style="gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="table-action-btn" title="Editar" onclick="editTenantContract('${c.tenantId}','${c.id}')">✏️</button>
           <button class="table-action-btn danger" title="Eliminar" onclick="deleteTenantContract('${c.tenantId}','${c.id}')">🗑️</button>
         </div>
@@ -3286,7 +3311,7 @@ function renderResumenSelect(){
   const optionsHtml = '<option value="">Todos los arrendatarios</option>'
     + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('')
     + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))} (Histórico)</option>`).join('');
-  ['resumen-filter','chart-tenant-filter','impagos-tenant-filter'].forEach(id=>{
+  ['resumen-filter','chart-tenant-filter'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
     sel.innerHTML = optionsHtml;
@@ -3296,29 +3321,30 @@ function renderResumenSelect(){
 document.getElementById('resumen-filter').addEventListener('change', ()=>{
   const v = document.getElementById('resumen-filter').value;
   document.getElementById('chart-tenant-filter').value = v;
-  document.getElementById('impagos-tenant-filter').value = v;
   renderResumen();
 });
 document.getElementById('chart-tenant-filter').addEventListener('change', ()=>{
   const v = document.getElementById('chart-tenant-filter').value;
   document.getElementById('resumen-filter').value = v;
-  document.getElementById('impagos-tenant-filter').value = v;
-  renderResumen();
-});
-document.getElementById('impagos-tenant-filter').addEventListener('change', ()=>{
-  const v = document.getElementById('impagos-tenant-filter').value;
-  document.getElementById('resumen-filter').value = v;
-  document.getElementById('chart-tenant-filter').value = v;
   renderResumen();
 });
 
-let deudaListaContratosExpandidos = new Set();
-function toggleDeudaListaContrato(contratoId){
-  if(deudaListaContratosExpandidos.has(contratoId)) deudaListaContratosExpandidos.delete(contratoId);
-  else deudaListaContratosExpandidos.add(contratoId);
-  renderResumenChart(document.getElementById('resumen-filter').value);
+function showTableModal(titulo, contenidoHtml){
+  document.getElementById('table-modal-title').textContent = titulo;
+  document.getElementById('table-modal-content').innerHTML = contenidoHtml;
+  document.getElementById('table-modal-overlay').style.display = 'flex';
 }
-
+function closeTableModal(){
+  document.getElementById('table-modal-overlay').style.display = 'none';
+}
+// Un histórico no tiene "meses" (ya terminó su contrato) — su desglose es la cobranza posterior
+// al término; un contrato activo sí tiene el desglose mensual normal.
+function mostrarDesgloseDeuda(contratoId, historico){
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c) return;
+  const contenido = historico ? buildCobranzaStandaloneHtml(c) : buildMesesConDeudaHtml(contratoId);
+  showTableModal(contractLabel(contratoId), contenido);
+}
 // El desglose mes a mes (mismo contenido que "Meses con deuda o con saldo a favor" para UN
 // arrendatario) — se usa tanto ahí como en el detalle desplegable de cada fila en la tabla de
 // deuda acumulada, para no mantener la misma lógica en dos lugares.
@@ -3348,6 +3374,30 @@ function buildMesesConDeudaHtml(contratoId){
   </tbody></table></div>`;
 }
 
+// Versión independiente (con su propia tabla mini) para contextos donde no hay una tabla de
+// pagos ya abierta para fusionarse — como el detalle desplegable de "Deuda total acumulada".
+function buildCobranzaStandaloneHtml(c){
+  if(!c.fechaTermino) return '';
+  const pagosCobranza = payments.filter(p=> p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+    .slice().sort((a,b)=> b.fechaPago.localeCompare(a.fechaPago));
+  if(!pagosCobranza.length && !Number(c.deudaPactada||0)) return '';
+  const saldo = computeCobranzaSaldo(c);
+  return `<div style="margin-bottom:10px;font-weight:700;">
+    💼 Cobranza posterior al término (${formatDate(c.fechaTermino)}) — Deuda pactada: ${money(c.deudaPactada||0)} — Saldo pendiente: <span style="color:${saldo>0?'var(--brick)':'var(--teal-dark)'}">${money(saldo)}</span>
+  </div>
+  ${pagosCobranza.length ? `<div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Pagado</th><th>Descuento</th><th>Comentario</th></tr></thead><tbody>
+    ${pagosCobranza.map(p=>`<tr>
+      <td>${formatDate(p.fechaPago)}</td>
+      <td class="mono">${money(Number(p.montoPagado||0))}</td>
+      <td class="mono">${money(Number(p.descuentos||0))}</td>
+      <td class="cell-comments">${p.comentarios?esc(p.comentarios):''}
+        <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
+        <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
+      </td>
+    </tr>`).join('')}
+  </tbody></table></div>` : '<div class="empty">Aún no hay abonos de cobranza registrados.</div>'}`;
+}
+
 function buildDeudaListHtml(contratoId){
   const allRows = computeResumenRows();
   const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
@@ -3362,16 +3412,11 @@ function buildDeudaListHtml(contratoId){
   ${rows.map(r=>{
     const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
     const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
-    const expandido = deudaListaContratosExpandidos.has(r.c.id);
-    // Un histórico no tiene "meses" (ya terminó su contrato) — su desglose es la cobranza
-    // posterior al término; un contrato activo sí tiene el desglose mensual normal.
-    const detalleInterno = r.historico ? buildCobranzaHtml(r.c) : buildMesesConDeudaHtml(r.c.id);
-    const filaDetalle = expandido ? `<tr><td colspan="3" style="padding:8px 6px 14px;background:var(--paper);">${detalleInterno}</td></tr>` : '';
-    return `<tr style="cursor:pointer;" onclick="toggleDeudaListaContrato('${r.c.id}')">
+    return `<tr style="cursor:pointer;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})">
     <td class="cell-tap-full"><span class="cell-clamp-2">${etiqueta}</span></td>
     <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
-    <td style="white-space:nowrap;"><span class="ver-desglose-btn">${expandido?'Ocultar ▲':'Ver desglose ▾'}</span></td>
-  </tr>${filaDetalle}`;
+    <td style="white-space:nowrap;"><span class="ver-desglose-btn">Ver desglose ▾</span></td>
+  </tr>`;
   }).join('')}
   </tbody></table></div>`;
 }
@@ -5328,6 +5373,7 @@ function renderHistorial(){
   el.innerHTML = `<div class="table-scroll"><table><thead><tr>
     <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
   </tr></thead><tbody>
+  ${buildCobranzaRowsHtml(c)}
   ${series.map(d=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
     const saldo = d.monto - (d.pagado+d.descuento);
@@ -5336,13 +5382,18 @@ function renderHistorial(){
     else if(pagosMes.length===0){ estado='Sin pago'; tagClass='tag-debt'; }
     else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
     else { estado='Pagado'; tagClass='tag-ok'; }
+    // Misma lógica de colores que la matriz: rojo fuerte para "sin pago" (equivalente a "Sin
+    // registro" ahí), rojo clarito para "parcial" — así ambas tablas se leen igual de un vistazo.
+    let rowStyle = '';
+    if(estado==='Sin pago') rowStyle = ' style="background:var(--brick-soft);"';
+    else if(estado==='Parcial') rowStyle = ' style="background:#FBEEEA;"';
     const detalle = pagosMes.length
       ? pagosMes.map(p=>`<div style="margin-bottom:3px">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''}${p.comentarios?(' · '+esc(p.comentarios)):''}
         <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
         <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
       </div>`).join('')
       : '—';
-    return `<tr>
+    return `<tr${rowStyle}>
       <td>${MESES_ES[d.month]} ${d.year}</td>
       <td class="mono">${money(d.monto)}</td>
       <td class="mono">${money(d.pagado)}</td>
@@ -5357,31 +5408,34 @@ function renderHistorial(){
     <button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">
       ${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}
     </button>
-  </div>` : ''}
-  ${buildCobranzaHtml(c)}`;
+  </div>` : ''}`;
 }
 
 // Los pagos con fecha POSTERIOR al término del contrato son abonos a la deuda pactada (cobranza),
-// no arriendo de ningún mes — por eso no aparecen en la tabla mensual de arriba (que solo cubre
-// los meses en que el contrato estuvo vigente). Se muestran acá aparte, con el saldo pendiente.
-function buildCobranzaHtml(c){
+// no arriendo de ningún mes — pero se muestran como filas más DENTRO DE LA MISMA TABLA (mismas
+// columnas que el resto), en vez de una tarjeta aparte, para que todo se lea de corrido.
+function buildCobranzaRowsHtml(c){
   if(!c.fechaTermino) return '';
   const pagosCobranza = payments.filter(p=> p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
     .slice().sort((a,b)=> b.fechaPago.localeCompare(a.fechaPago));
   if(!pagosCobranza.length && !Number(c.deudaPactada||0)) return '';
   const saldo = computeCobranzaSaldo(c);
-  return `<div class="card" style="margin-top:16px;box-shadow:none;border:1px solid var(--border);">
-    <h2 style="font-size:15px;">💼 Cobranza posterior al término (${formatDate(c.fechaTermino)})</h2>
-    <div class="subtitle" style="margin-bottom:12px;">Deuda pactada al finalizar: ${money(c.deudaPactada||0)} — Saldo pendiente: <strong style="color:${saldo>0?'var(--brick)':'var(--teal-dark)'}">${money(saldo)}</strong></div>
-    ${pagosCobranza.length ? pagosCobranza.map(p=>`<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;">
-        <div>${formatDate(p.fechaPago)}${p.comentarios?` · ${esc(p.comentarios)}`:''}</div>
-      </div>
-      <div style="font-weight:700;white-space:nowrap;">${money(Number(p.montoPagado||0))}${Number(p.descuentos)?` <span class="cell-stacked-sub">+ desc. ${money(p.descuentos)}</span>`:''}</div>
-      <button type="button" class="table-action-btn" title="Editar" onclick="editPayment('${p.id}')">✏️</button>
-      <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deletePayment('${p.id}')">🗑️</button>
-    </div>`).join('') : '<div class="empty">Aún no hay abonos de cobranza registrados.</div>'}
-  </div>`;
+  const headerRow = `<tr class="nested-detail-row"><td colspan="7" style="font-weight:700;">
+    💼 Cobranza posterior al término (${formatDate(c.fechaTermino)}) — Deuda pactada: ${money(c.deudaPactada||0)} — Saldo pendiente: <span style="color:${saldo>0?'var(--brick)':'var(--teal-dark)'}">${money(saldo)}</span>
+  </td></tr>`;
+  const rows = pagosCobranza.map(p=>`<tr class="nested-detail-row">
+    <td>${formatDate(p.fechaPago)}</td>
+    <td class="mono">—</td>
+    <td class="mono">${money(Number(p.montoPagado||0))}</td>
+    <td class="mono">${money(Number(p.descuentos||0))}</td>
+    <td class="mono">—</td>
+    <td><span class="tag tag-pending">Cobranza</span></td>
+    <td style="font-size:12px;color:var(--ink-soft)">${p.comentarios?esc(p.comentarios):''}
+      <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
+      <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
+    </td>
+  </tr>`).join('');
+  return headerRow + (rows || `<tr class="nested-detail-row"><td colspan="7"><div class="empty">Aún no hay abonos de cobranza registrados.</div></td></tr>`) + `<tr><td colspan="7" style="padding:0;border-bottom:2px solid var(--border);"></td></tr>`;
 }
 
 // ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
@@ -6837,7 +6891,6 @@ function renderResumenChart(contratoId){
       container.innerHTML = chart.html + histogramToggleHtml(total);
       chart.attach(container);
     }
-    renderResumenImpagos(contratoId);
     return;
   }
 
@@ -6845,7 +6898,6 @@ function renderResumenChart(contratoId){
   if(!series.length){
     yearSel.innerHTML = '<option value="">—</option>';
     container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>';
-    renderResumenImpagos(contratoId);
     return;
   }
 
@@ -6855,7 +6907,6 @@ function renderResumenChart(contratoId){
   const chart = buildStackedColumnChartSVG(rows, availableWidth);
   container.innerHTML = chart.html + histogramToggleHtml(total);
   chart.attach(container);
-  renderResumenImpagos(contratoId);
 }
 
 // Deuda acumulada — respeta el filtro de Año si se elige uno (solo considera esos meses), pero
@@ -7100,102 +7151,6 @@ function buildStackedColumnChartSVG(rows, availableWidth){
   return { html, attach };
 }
 
-// Detalle de meses con saldo, limitado a los últimos 12 (con botón para ver todo). Incluye comentarios.
-let impagosVerTodo = false;
-
-// Cuando no hay un arrendatario específico seleccionado ("Todos"), se arma la misma vista
-// mes a mes que la individual, pero sumando monto/pagado/descuento de TODOS los contratos
-// activos en cada mes (igual criterio que el histograma global), sin desglosar por arrendatario.
-function computeAllTenantsMonthlyImpagos(){
-  const series = computeGlobalMonthlySeries();
-  return series
-    .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => {
-      const comentarios = payments
-        .filter(p=> p.fechaPago && sameYearMonth(p.fechaPago,d.year,d.month) && p.comentarios)
-        .map(p=>p.comentarios).join(' · ');
-      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
-    })
-    .reverse();
-}
-
-function toggleImpagosSection(){
-  const wrap = document.getElementById('impagos-content-wrap');
-  const btn = document.getElementById('impagos-toggle-btn');
-  const abrir = wrap.style.display==='none';
-  wrap.style.display = abrir ? 'block' : 'none';
-  btn.innerHTML = abrir ? '<span class="plus-icon">−</span> Ocultar meses con deuda o saldo a favor' : '<span class="plus-icon">+</span> Ver meses con deuda o saldo a favor';
-}
-function renderResumenImpagos(contratoId){
-  const el = document.getElementById('resumen-impagos');
-
-  if(!contratoId){
-    const conSaldo = computeAllTenantsMonthlyImpagos();
-    const totalHistoricoCobranza = contratosConCobranza().reduce((s,c)=> s+computeCobranzaSaldo(c), 0);
-    if(!conSaldo.length && !totalHistoricoCobranza){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — sumando todos los arrendatarios, todo está al día.</div>'; return; }
-    const total = conSaldo.length;
-    const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
-
-    let tableHtml;
-    if(conSaldo.length){
-      const toggleHtml = total>12 ? `<div class="table-scroll-toggle">
-        <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos('');">
-          ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
-        </button>
-      </div>` : '';
-      tableHtml = `<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado (total)</th><th>Pagado (total)</th><th>Descuento (total)</th><th>Comentarios</th></tr></thead><tbody>
-      ${mostrar.map(d=>{
-        const esDeuda = d.saldo>0;
-        return `<tr>
-        <td>${MESES_ES[d.month]} ${d.year}</td>
-        <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
-        <td class="mono">${money(d.monto)}</td>
-        <td class="mono">${money(d.pagado)}</td>
-        <td class="mono">${money(d.descuento)}</td>
-        <td class="cell-comments">${commentCellHtml(d.comentarios)}</td>
-      </tr>`;
-      }).join('')}
-      </tbody></table></div>${toggleHtml}`;
-    } else {
-      tableHtml = '<div class="empty">No hay meses con saldo pendiente en contratos activos — la deuda mostrada arriba es de arrendatarios históricos (cobranza).</div>';
-    }
-
-    el.innerHTML = tableHtml;
-    return;
-  }
-
-  const series = computeContratoMonthlySeries(contratoId);
-  const conSaldo = series
-    .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => {
-      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
-      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
-      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
-    })
-    .reverse();
-  if(!conSaldo.length){ el.innerHTML = '<div class="empty">No hay meses con saldo pendiente ni a favor — este arrendatario está exactamente al día en toda su historia.</div>'; return; }
-  const total = conSaldo.length;
-  const mostrar = impagosVerTodo ? conSaldo : conSaldo.slice(0,12);
-  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Comentarios</th></tr></thead><tbody>
-  ${mostrar.map(d=>{
-    const esDeuda = d.saldo>0;
-    return `<tr>
-    <td>${MESES_ES[d.month]} ${d.year}</td>
-    <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
-    <td class="mono">${money(d.monto)}</td>
-    <td class="mono">${money(d.pagado)}</td>
-    <td class="mono">${money(d.descuento)}</td>
-    <td class="cell-comments">${commentCellHtml(d.comentarios)}</td>
-  </tr>`;
-  }).join('')}
-  </tbody></table></div>
-  ${total>12 ? `<div class="table-scroll-toggle">
-    <button type="button" class="btn btn-secondary" onclick="impagosVerTodo=!impagosVerTodo;renderResumenImpagos(document.getElementById('resumen-filter').value);">
-      ${impagosVerTodo ? 'Ver solo los últimos 12' : `Ver todo (${total})`}
-    </button>
-  </div>` : ''}`;
-}
-
 // ---------- MATRIZ DE PAGOS: Arrendatario × Mes ----------
 let matrixVerTodo = false;
 function renderResumenMatrix(){
@@ -7244,7 +7199,7 @@ function renderResumenMatrix(){
   const rows0 = tenantFiltro ? allRows.filter(r=> r.c.id===tenantFiltro) : allRows;
   let months = yearFiltro ? allMonths.filter(m=> String(m.year)===yearFiltro) : allMonths;
   const total = months.length;
-  const mostrarMonths = (yearFiltro || matrixVerTodo) ? months : months.slice(0,12);
+  const mostrarMonths = (yearFiltro || matrixVerTodo) ? months : months.slice(0,2);
   const clavesVisibles = new Set(mostrarMonths.map(({year,month})=> `${year}-${String(month+1).padStart(2,'0')}`));
 
   // Se pre-calculan las sumas por contrato+mes para no recorrer todos los pagos por cada celda.
@@ -7341,7 +7296,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr${rowStyle}><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})" title="Tocar para ver el historial completo de pagos"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
@@ -7359,47 +7314,41 @@ function renderResumenMatrix(){
   }).join('');
   const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}</tr>`;
 
-  const toggleHtml = (!yearFiltro && total>12) ? `<div class="table-scroll-toggle">
+  const toggleHtml = (!yearFiltro && total>2) ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
-      ${matrixVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${total} meses)`}
+      ${matrixVerTodo ? 'Ver solo los últimos 2 meses' : `Ver todo (${total} meses)`}
     </button>
   </div>` : '';
 
   el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
+
+  // Se guarda exactamente lo que se está mostrando ahora mismo (mismos meses, mismas filas, con
+  // el mismo filtro aplicado) para que "Exportar a Google Drive" exporte tal cual lo que se ve
+  // en pantalla, no otra cosa.
+  lastMatrixExportData = { rows, mostrarMonths, sumas };
 }
+let lastMatrixExportData = null;
+document.getElementById('export-matrix-btn').addEventListener('click', ()=>{
+  if(!lastMatrixExportData || !lastMatrixExportData.rows.length){ alert('No hay datos en la matriz para exportar todavía.'); return; }
+  const { rows, mostrarMonths, sumas } = lastMatrixExportData;
+  const exportRows = rows.map(r=>{
+    const fila = { Arrendatario: contractLabel(r.c.id) + (r.historico?' (Histórico)':'') };
+    mostrarMonths.forEach(({year,month})=>{
+      const key = `${year}-${String(month+1).padStart(2,'0')}`;
+      const etiquetaMes = `${MESES_ES[month].slice(0,3)} ${year}`;
+      const d = sumas[r.c.id][key];
+      fila[etiquetaMes] = d ? Number(d.pagado||0) : 0;
+      if(d && d.descuento) fila[etiquetaMes+' (desc.)'] = Number(d.descuento);
+    });
+    return fila;
+  });
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pagos por mes');
+  exportWorkbookToDrive(wb, 'pagos-arrendatarios-por-mes');
+});
 document.getElementById('matrix-tenant-filter').addEventListener('change', renderResumenMatrix);
 document.getElementById('matrix-year-filter').addEventListener('change', renderResumenMatrix);
-
-document.getElementById('export-impagos-btn').addEventListener('click', ()=>{
-  const contratoId = document.getElementById('resumen-filter').value;
-  if(!contratoId){ alert('Selecciona un arrendatario específico arriba antes de exportar.'); return; }
-  const series = computeContratoMonthlySeries(contratoId);
-  const conSaldo = series
-    .filter(d => (d.pagado + d.descuento) !== d.monto)
-    .map(d => {
-      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
-      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
-      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
-    })
-    .reverse();
-  if(!conSaldo.length){ alert('Este arrendatario no tiene meses con deuda ni con saldo a favor para exportar.'); return; }
-  const rows = conSaldo.map(d=>({
-    Mes: `${MESES_ES[d.month]} ${d.year}`,
-    monto: Number(d.monto),
-    pagado: Number(d.pagado),
-    descuento: Number(d.descuento),
-    saldo: Number(d.saldo),
-    Estado: d.saldo>0 ? 'Debe' : 'A favor',
-    Comentarios: d.comentarios
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  applyColumnFormats(ws, ['Mes','monto','pagado','descuento','saldo','Estado','Comentarios']);
-  styleWorksheet(ws, [16,14,14,14,14,12,28]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Meses con deuda');
-  const nombre = truncateText(contractLabel(contratoId), 40).replace(/[\\/:*?"<>|]/g,'');
-  exportWorkbookToDrive(wb, `meses-con-deuda-${nombre}`);
-});
 
 // ---------- COMBOBOX BUSCABLE (dropdown personalizado) ----------
 // Los combobox "buscables" (creados por makeSearchable) muestran su propio <input> de texto en
@@ -7498,7 +7447,7 @@ function makeSearchable(selectId){
   new MutationObserver(()=>{ syncFromSelect(); if(dropdown.style.display!=='none') buildList(input.value); }).observe(select, { childList:true });
 }
 
-['pay-contratoId','h-contratoId-activo','h-contratoId-historico','chart-tenant-filter','impagos-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select','matrix-tenant-filter']
+['pay-contratoId','h-contratoId-activo','h-contratoId-historico','chart-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select','matrix-tenant-filter']
   .forEach(makeSearchable);
 
 function esc(s){
