@@ -3311,6 +3311,42 @@ document.getElementById('impagos-tenant-filter').addEventListener('change', ()=>
   renderResumen();
 });
 
+let deudaListaContratosExpandidos = new Set();
+function toggleDeudaListaContrato(contratoId){
+  if(deudaListaContratosExpandidos.has(contratoId)) deudaListaContratosExpandidos.delete(contratoId);
+  else deudaListaContratosExpandidos.add(contratoId);
+  renderResumenChart(document.getElementById('resumen-filter').value);
+}
+
+// El desglose mes a mes (mismo contenido que "Meses con deuda o con saldo a favor" para UN
+// arrendatario) — se usa tanto ahí como en el detalle desplegable de cada fila en la tabla de
+// deuda acumulada, para no mantener la misma lógica en dos lugares.
+function buildMesesConDeudaHtml(contratoId){
+  const series = computeContratoMonthlySeries(contratoId);
+  const conSaldo = series
+    .filter(d => (d.pagado + d.descuento) !== d.monto)
+    .map(d => {
+      const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+      const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
+      return {...d, saldo: d.monto - d.pagado - d.descuento, comentarios};
+    })
+    .reverse();
+  if(!conSaldo.length) return '<div class="empty">No hay meses con saldo pendiente ni a favor — este arrendatario está exactamente al día en toda su historia.</div>';
+  return `<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Saldo</th><th>Monto pactado</th><th>Pagado</th><th>Descuento</th><th>Comentarios</th></tr></thead><tbody>
+  ${conSaldo.map(d=>{
+    const esDeuda = d.saldo>0;
+    return `<tr>
+    <td>${MESES_ES[d.month]} ${d.year}</td>
+    <td class="mono" style="color:${esDeuda?'var(--brick)':'var(--teal-dark)'};font-weight:600">${money(esDeuda?d.saldo:-d.saldo)}</td>
+    <td class="mono">${money(d.monto)}</td>
+    <td class="mono">${money(d.pagado)}</td>
+    <td class="mono">${money(d.descuento)}</td>
+    <td class="cell-comments">${commentCellHtml(d.comentarios)}</td>
+  </tr>`;
+  }).join('')}
+  </tbody></table></div>`;
+}
+
 function buildDeudaListHtml(contratoId){
   const allRows = computeResumenRows();
   const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
@@ -3325,10 +3361,15 @@ function buildDeudaListHtml(contratoId){
   ${rows.map(r=>{
     const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
     const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
-    return `<tr>
-    <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
+    const expandido = deudaListaContratosExpandidos.has(r.c.id);
+    // Un histórico no tiene "meses" (ya terminó su contrato) — su desglose es la cobranza
+    // posterior al término; un contrato activo sí tiene el desglose mensual normal.
+    const detalleInterno = r.historico ? buildCobranzaHtml(r.c) : buildMesesConDeudaHtml(r.c.id);
+    const filaDetalle = expandido ? `<tr><td colspan="2" style="padding:8px 6px 14px;background:var(--paper);">${detalleInterno}</td></tr>` : '';
+    return `<tr style="cursor:pointer;" onclick="toggleDeudaListaContrato('${r.c.id}')" title="Tocar para ${expandido?'ocultar':'ver'} el desglose mes a mes">
+    <td class="cell-tap-full"><span class="cell-clamp-2">${expandido?'▾':'▸'} ${etiqueta}</span></td>
     <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
-  </tr>`;
+  </tr>${filaDetalle}`;
   }).join('')}
   </tbody></table></div>`;
 }
