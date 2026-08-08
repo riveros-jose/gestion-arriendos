@@ -5314,7 +5314,31 @@ function renderHistorial(){
     <button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">
       ${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}
     </button>
-  </div>` : ''}`;
+  </div>` : ''}
+  ${buildCobranzaHtml(c)}`;
+}
+
+// Los pagos con fecha POSTERIOR al término del contrato son abonos a la deuda pactada (cobranza),
+// no arriendo de ningún mes — por eso no aparecen en la tabla mensual de arriba (que solo cubre
+// los meses en que el contrato estuvo vigente). Se muestran acá aparte, con el saldo pendiente.
+function buildCobranzaHtml(c){
+  if(!c.fechaTermino) return '';
+  const pagosCobranza = payments.filter(p=> p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+    .slice().sort((a,b)=> b.fechaPago.localeCompare(a.fechaPago));
+  if(!pagosCobranza.length && !Number(c.deudaPactada||0)) return '';
+  const saldo = computeCobranzaSaldo(c);
+  return `<div class="card" style="margin-top:16px;box-shadow:none;border:1px solid var(--border);">
+    <h2 style="font-size:15px;">💼 Cobranza posterior al término (${formatDate(c.fechaTermino)})</h2>
+    <div class="subtitle" style="margin-bottom:12px;">Deuda pactada al finalizar: ${money(c.deudaPactada||0)} — Saldo pendiente: <strong style="color:${saldo>0?'var(--brick)':'var(--teal-dark)'}">${money(saldo)}</strong></div>
+    ${pagosCobranza.length ? pagosCobranza.map(p=>`<div class="wa-compact-row" style="align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div>${formatDate(p.fechaPago)}${p.comentarios?` · ${esc(p.comentarios)}`:''}</div>
+      </div>
+      <div style="font-weight:700;white-space:nowrap;">${money(Number(p.montoPagado||0))}${Number(p.descuentos)?` <span class="cell-stacked-sub">+ desc. ${money(p.descuentos)}</span>`:''}</div>
+      <button type="button" class="table-action-btn" title="Editar" onclick="editPayment('${p.id}')">✏️</button>
+      <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deletePayment('${p.id}')">🗑️</button>
+    </div>`).join('') : '<div class="empty">Aún no hay abonos de cobranza registrados.</div>'}
+  </div>`;
 }
 
 // ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
