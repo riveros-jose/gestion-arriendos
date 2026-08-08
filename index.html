@@ -105,12 +105,14 @@
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
   .tag-debt{background:var(--brick-soft);color:var(--brick);}
-  .deuda-acumulada-box{display:inline-flex;align-items:center;gap:10px;background:var(--brick-soft);border-radius:10px;padding:10px 16px;margin-bottom:14px;cursor:pointer;user-select:none;}
-  .deuda-acumulada-box.sin-deuda{background:var(--teal-soft);}
+  .deuda-acumulada-box{display:inline-flex;align-items:center;gap:16px;background:var(--brick-soft);border:1px solid rgba(180,67,46,0.25);border-radius:10px;padding:10px 14px 10px 16px;margin-bottom:14px;cursor:pointer;user-select:none;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:box-shadow .15s;}
+  .deuda-acumulada-box:hover{box-shadow:0 2px 8px rgba(0,0,0,0.12);}
+  .deuda-acumulada-box.sin-deuda{background:var(--teal-soft);border-color:rgba(43,111,92,0.25);}
   .deuda-acumulada-box .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);}
   .deuda-acumulada-box .val{font-size:19px;font-weight:700;color:var(--brick);}
   .deuda-acumulada-box.sin-deuda .val{color:var(--teal-dark);}
-  .deuda-acumulada-chevron{font-size:9px;opacity:0.6;}
+  .deuda-acumulada-chevron-badge{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--brick);background:#fff;border:1px solid rgba(180,67,46,0.3);border-radius:20px;padding:6px 12px;white-space:nowrap;}
+  .deuda-acumulada-box.sin-deuda .deuda-acumulada-chevron-badge{color:var(--teal-dark);border-color:rgba(43,111,92,0.3);}
   .deuda-acumulada-detalle{margin:-8px 0 14px;max-width:480px;}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
@@ -930,11 +932,7 @@
             <div id="resumen-chart"></div>
           </div>
         </div>
-        <div class="card">
-          <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-          <select class="filter" id="resumen-filter"></select>
-          <div id="resumen-table" class="table-wrap"></div>
-        </div>
+        <select class="filter" id="resumen-filter" style="display:none"></select>
         <div class="card">
           <h2 class="matrix-title-mobile">🧮 Pagos de arrendatarios por mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
           <div class="line-row form-compact" style="margin-bottom:10px;max-width:520px">
@@ -945,8 +943,11 @@
         </div>
         <div class="card">
           <div class="toggle-form"><h2>⚠️ Meses con deuda o con saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2><button class="btn btn-secondary" id="export-impagos-btn">Exportar a Google Drive</button></div>
-          <select class="filter" id="impagos-tenant-filter"></select>
-          <div id="resumen-impagos" class="table-wrap"></div>
+          <button type="button" class="btn-add-new" id="impagos-toggle-btn" onclick="toggleImpagosSection()"><span class="plus-icon">+</span> Ver meses con deuda o saldo a favor</button>
+          <div id="impagos-content-wrap" style="display:none">
+            <select class="filter" id="impagos-tenant-filter"></select>
+            <div id="resumen-impagos" class="table-wrap"></div>
+          </div>
         </div>
       </div>
 
@@ -3329,7 +3330,6 @@ function buildDeudaListHtml(contratoId){
 function renderResumen(){
   renderResumenSelect();
   const filtro = document.getElementById('resumen-filter').value;
-  document.getElementById('resumen-table').innerHTML = buildDeudaListHtml(filtro);
   renderResumenChart(filtro);
 }
 
@@ -6574,48 +6574,6 @@ document.getElementById('chart-group-arrows').addEventListener('click', e=>{
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
 
-// Lunes de la semana a la que pertenece una fecha (para agrupar por semana usando esa fecha
-// como clave — evita la ambigüedad de los números de semana ISO cerca de fin de año).
-function lunesDeLaSemana(fechaStr){
-  const d = new Date(fechaStr+'T00:00:00');
-  const dia = d.getDay();
-  const diff = dia===0 ? -6 : 1-dia;
-  d.setDate(d.getDate()+diff);
-  return d.toISOString().slice(0,10);
-}
-
-// A nivel de semana o día ya no tiene sentido mostrar un "monto pactado" (el arriendo es un
-// concepto mensual) — así que estas series solo muestran lo efectivamente pagado, agrupado por
-// el momento exacto en que se pagó. Respetan los mismos filtros de arrendatario y año que el
-// resto del histograma.
-function computeGlobalDailySeries(contratoId, anioFiltro){
-  const pagos = payments.filter(p=> p.fechaPago && (!contratoId || p.contratoId===contratoId) && (!anioFiltro || p.fechaPago.slice(0,4)===String(anioFiltro)));
-  const porDia = {};
-  pagos.forEach(p=>{
-    if(!porDia[p.fechaPago]) porDia[p.fechaPago] = {pagado:0, descuento:0};
-    porDia[p.fechaPago].pagado += Number(p.montoPagado||0);
-    porDia[p.fechaPago].descuento += Number(p.descuentos||0);
-  });
-  return Object.keys(porDia).sort().map(key=>{
-    const total = porDia[key].pagado + porDia[key].descuento;
-    return { label: formatDate(key).slice(0,5), monto: total, pagado: porDia[key].pagado, descuento: porDia[key].descuento };
-  });
-}
-function computeGlobalWeeklySeries(contratoId, anioFiltro){
-  const pagos = payments.filter(p=> p.fechaPago && (!contratoId || p.contratoId===contratoId) && (!anioFiltro || p.fechaPago.slice(0,4)===String(anioFiltro)));
-  const porSemana = {};
-  pagos.forEach(p=>{
-    const key = lunesDeLaSemana(p.fechaPago);
-    if(!porSemana[key]) porSemana[key] = {pagado:0, descuento:0};
-    porSemana[key].pagado += Number(p.montoPagado||0);
-    porSemana[key].descuento += Number(p.descuentos||0);
-  });
-  return Object.keys(porSemana).sort().map(key=>{
-    const total = porSemana[key].pagado + porSemana[key].descuento;
-    return { label: 'Sem. '+formatDate(key).slice(0,5), monto: total, pagado: porSemana[key].pagado, descuento: porSemana[key].descuento };
-  });
-}
-
 function applyYearGroupFilter(series, yearSel, groupSel){
   const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>a-b);
   const currentYear = yearSel.value;
@@ -6762,7 +6720,7 @@ function histogramToggleHtml(total){
   </div>`;
 }
 
-const CHART_GROUP_LEVELS = ['anio','mes','semana','dia'];
+const CHART_GROUP_LEVELS = ['anio','mes'];
 let chartGroupLevel = 'mes';
 
 function actualizarFlechasAgrupacion(){
@@ -6790,24 +6748,6 @@ function renderResumenChart(contratoId){
 
   renderDeudaAcumuladaBox(deudaBox, contratoId);
   actualizarFlechasAgrupacion();
-
-  // A nivel de semana o día, el arriendo pactado deja de tener sentido (es un concepto
-  // mensual) — se arma directo desde los pagos, respetando el mismo filtro de año ya elegido.
-  if(chartGroupLevel==='semana' || chartGroupLevel==='dia'){
-    const anioFiltro = yearSel.value;
-    let rows = chartGroupLevel==='dia' ? computeGlobalDailySeries(contratoId, anioFiltro) : computeGlobalWeeklySeries(contratoId, anioFiltro);
-    if(!rows.length){
-      container.innerHTML = '<div class="empty">No hay pagos registrados en este periodo para desglosar a este nivel.</div>';
-    } else {
-      const total = rows.length;
-      if(!histogramaVerTodo) rows = rows.slice(-24);
-      const chart = buildStackedColumnChartSVG(rows, availableWidth);
-      container.innerHTML = chart.html + histogramToggleHtml(total);
-      chart.attach(container);
-    }
-    renderResumenImpagos(contratoId);
-    return;
-  }
 
   groupSel.value = chartGroupLevel;
 
@@ -6893,8 +6833,11 @@ function renderDeudaAcumuladaBox(deudaBox, contratoId){
     ? `<div class="deuda-acumulada-detalle">${buildDeudaListHtml(contratoId)}</div>` : '';
   const claseSinDeuda = deudaAcumulada<=0 ? ' sin-deuda' : '';
   deudaBox.innerHTML = `<div class="deuda-acumulada-box${claseSinDeuda}" onclick="toggleDeudaAcumuladaBox()" role="button" tabindex="0">
-    <span class="lbl">${etiqueta} <span class="deuda-acumulada-chevron">${deudaAcumuladaExpandida?'▲':'▼'}</span></span>
-    <span class="val">${money(Math.max(0,deudaAcumulada))}</span>
+    <div>
+      <span class="lbl">${etiqueta}</span>
+      <div class="val">${money(Math.max(0,deudaAcumulada))}</div>
+    </div>
+    <span class="deuda-acumulada-chevron-badge">${deudaAcumuladaExpandida?'Ocultar ▲':'Ver detalle ▼'}</span>
   </div>${detalleHtml}`;
 }
 
@@ -7103,6 +7046,13 @@ function computeAllTenantsMonthlyImpagos(){
     .reverse();
 }
 
+function toggleImpagosSection(){
+  const wrap = document.getElementById('impagos-content-wrap');
+  const btn = document.getElementById('impagos-toggle-btn');
+  const abrir = wrap.style.display==='none';
+  wrap.style.display = abrir ? 'block' : 'none';
+  btn.innerHTML = abrir ? '<span class="plus-icon">−</span> Ocultar meses con deuda o saldo a favor' : '<span class="plus-icon">+</span> Ver meses con deuda o saldo a favor';
+}
 function renderResumenImpagos(contratoId){
   const el = document.getElementById('resumen-impagos');
 
