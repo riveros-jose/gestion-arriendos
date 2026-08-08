@@ -91,6 +91,10 @@
   th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.02em;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--border);resize:horizontal;overflow:hidden;min-width:48px;white-space:normal;line-height:1.25;}
   th.sortable{cursor:pointer;user-select:none;}
   th.sortable:hover{color:var(--teal-dark);}
+  /* Encabezado de la matriz de pagos con más contraste (fondo azul oscuro, letras blancas) —
+     solo esta tabla, no afecta el resto de las tablas de la app. */
+  #resumen-matrix th{background:var(--azul-oscuro);color:#fff;}
+  #resumen-matrix th.sortable:hover{color:#fff;opacity:0.85;}
   td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap;}
   .truncate{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;}
   tbody tr:nth-child(odd) td{background:var(--card);}
@@ -101,11 +105,13 @@
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
   .tag-debt{background:var(--brick-soft);color:var(--brick);}
-  .deuda-acumulada-box{display:inline-flex;align-items:center;gap:10px;background:var(--brick-soft);border-radius:10px;padding:10px 16px;margin-bottom:14px;}
+  .deuda-acumulada-box{display:inline-flex;align-items:center;gap:10px;background:var(--brick-soft);border-radius:10px;padding:10px 16px;margin-bottom:14px;cursor:pointer;user-select:none;}
   .deuda-acumulada-box.sin-deuda{background:var(--teal-soft);}
   .deuda-acumulada-box .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);}
   .deuda-acumulada-box .val{font-size:19px;font-weight:700;color:var(--brick);}
   .deuda-acumulada-box.sin-deuda .val{color:var(--teal-dark);}
+  .deuda-acumulada-chevron{font-size:9px;opacity:0.6;}
+  .deuda-acumulada-detalle{margin:-8px 0 14px;max-width:480px;}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
   .estado-select-atrasado{background:#F2C4B8!important;color:var(--brick)!important;border-color:var(--brick)!important;}
@@ -295,11 +301,15 @@
      tarjeta con padding, así que también necesita compensarlo con margen negativo). */
   .tenant-filter-sticky{position:sticky;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
-  /* Flecha única (sin texto) para cambiar la agrupación del histograma — se posiciona flotando
-     dentro de la esquina del propio gráfico, como si fuera parte de él, en vez de un control
-     aparte con su propia fila y etiqueta. */
-  .chart-group-arrow-btn{position:absolute;top:2px;right:4px;z-index:5;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--ink-soft);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.12);}
-  .chart-group-arrow-btn:hover{background:var(--teal-soft);color:var(--teal-dark);}
+  /* Dos flechas (subir/bajar nivel de detalle: año → mes → semana → día) flotando en la esquina
+     del propio histograma, como si fueran parte de él. La que todavía se puede usar se ve en
+     azul; la que ya llegó al límite (el nivel más agregado o el más detallado) se ve en negro y
+     no responde al clic. Un poco más separadas del borde del gráfico para que no queden pegadas
+     a la primera barra, sobre todo en mobile. */
+  .chart-group-arrows{position:absolute;top:10px;right:10px;z-index:5;display:flex;flex-direction:column;gap:5px;}
+  .chart-group-arrow-btn{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--card);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.12);color:var(--ink);}
+  .chart-group-arrow-btn.enabled{color:var(--azul);border-color:var(--azul);}
+  .chart-group-arrow-btn:disabled{color:var(--ink);opacity:0.4;cursor:default;box-shadow:none;}
   .quick-jump-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;}
   .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
   .quick-jump-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
@@ -353,9 +363,10 @@
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
-    /* Año más compacto en mobile, y la flecha de agrupar un poco más chica. */
+    /* Año más compacto en mobile. */
     #chart-year-filter{padding:8px 6px;font-size:13px;}
-    .chart-group-arrow-btn{width:26px;height:26px;font-size:12px;}
+    /* Título de la matriz de pagos: reduce un poco el tamaño y evita que se corte en 2 líneas. */
+    .matrix-title-mobile{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     /* El scroll ocurre dentro de .main (no en la página): así el navegador (p.ej. Samsung
        Internet) no muestra su botón flotante de "ir arriba" encima de nuestra barra inferior. */
     html,body{height:100%;overflow:hidden;}
@@ -904,15 +915,18 @@
 
       <div id="resumen-panel-resumen">
         <div class="card">
-          <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-          <div class="line-row form-compact" style="margin-bottom:10px;max-width:480px;gap:8px;">
+          <h2>📈 Pago de Arriendos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+          <div class="form-compact" style="display:flex;gap:8px;margin-bottom:10px;max-width:480px;">
             <div class="field" style="flex:1;min-width:0;"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
-            <div class="field" style="max-width:96px;flex:0 0 auto;"><label>Año</label><select id="chart-year-filter"></select></div>
+            <div class="field" style="max-width:92px;flex:0 0 auto;"><label>Año</label><select id="chart-year-filter"></select></div>
           </div>
           <input type="hidden" id="chart-group-filter" value="mes">
           <div id="resumen-chart-deuda-box"></div>
           <div style="position:relative;">
-            <button type="button" id="chart-group-arrow-btn" class="chart-group-arrow-btn" data-group="mes" title="Ver agrupado por año">⬆️</button>
+            <div class="chart-group-arrows" id="chart-group-arrows">
+              <button type="button" class="chart-group-arrow-btn" data-dir="up" title="Ver agrupado por año">⬆️</button>
+              <button type="button" class="chart-group-arrow-btn" data-dir="down" title="Ver más detalle">⬇️</button>
+            </div>
             <div id="resumen-chart"></div>
           </div>
         </div>
@@ -922,7 +936,7 @@
           <div id="resumen-table" class="table-wrap"></div>
         </div>
         <div class="card">
-          <h2>🧮 Matriz de pagos — Arrendatario × Mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
+          <h2 class="matrix-title-mobile">🧮 Pagos de arrendatarios por mes <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
           <div class="line-row form-compact" style="margin-bottom:10px;max-width:520px">
             <div class="field"><label>Arrendatario</label><select class="filter" id="matrix-tenant-filter" style="margin-bottom:0"></select></div>
             <div class="field"><label>Año</label><select id="matrix-year-filter"></select></div>
@@ -3290,36 +3304,32 @@ document.getElementById('impagos-tenant-filter').addEventListener('change', ()=>
   renderResumen();
 });
 
-function renderResumen(){
-  renderResumenSelect();
+function buildDeudaListHtml(contratoId){
   const allRows = computeResumenRows();
-
-  // Solo se muestran clientes con deuda o saldo a favor (se excluyen los que están exactamente en $0).
   const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
-
-  const filtro = document.getElementById('resumen-filter').value;
-  let rows = filtro ? conSaldoDistintoDeCero.filter(r=>r.c.id===filtro) : conSaldoDistintoDeCero;
+  let rows = contratoId ? conSaldoDistintoDeCero.filter(r=>r.c.id===contratoId) : conSaldoDistintoDeCero;
   rows = sortRows('resumen', rows, {
     contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto, saldo: r=>r.saldo
   });
+  if(!rows.length) return '<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>';
+  return `<div class="table-scroll"><table><thead><tr>
+    ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}
+  </tr></thead><tbody>
+  ${rows.map(r=>{
+    const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
+    const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
+    return `<tr>
+    <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
+    <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
+  </tr>`;
+  }).join('')}
+  </tbody></table></div>`;
+}
 
-  const el = document.getElementById('resumen-table');
-  if(!rows.length){ el.innerHTML='<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>'; }
-  else {
-    el.innerHTML = `<div class="table-scroll"><table><thead><tr>
-      ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}
-    </tr></thead><tbody>
-    ${rows.map(r=>{
-      const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
-      const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
-      return `<tr>
-      <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
-      <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
-    </tr>`;
-    }).join('')}
-    </tbody></table></div>`;
-  }
-
+function renderResumen(){
+  renderResumenSelect();
+  const filtro = document.getElementById('resumen-filter').value;
+  document.getElementById('resumen-table').innerHTML = buildDeudaListHtml(filtro);
   renderResumenChart(filtro);
 }
 
@@ -6555,19 +6565,56 @@ function computeContratoMonthlySeries(contratoId){
 document.getElementById('chart-year-filter').addEventListener('change', ()=>{
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
-document.getElementById('chart-group-arrow-btn').addEventListener('click', ()=>{
-  const btn = document.getElementById('chart-group-arrow-btn');
-  const actual = btn.dataset.group;
-  const nuevo = actual==='mes' ? 'anio' : 'mes';
-  btn.dataset.group = nuevo;
-  // Cuando queda en "mes" (detalle), la flecha apunta hacia arriba, ofreciendo subir a año
-  // (agrupación mayor). Cuando queda en "año", apunta hacia abajo, ofreciendo bajar a mes (más
-  // detalle) — el ícono siempre indica hacia dónde lleva el próximo clic.
-  btn.textContent = nuevo==='mes' ? '⬆️' : '⬇️';
-  btn.title = nuevo==='mes' ? 'Ver agrupado por año' : 'Ver detalle por mes';
-  document.getElementById('chart-group-filter').value = nuevo;
+document.getElementById('chart-group-arrows').addEventListener('click', e=>{
+  const btn = e.target.closest('.chart-group-arrow-btn');
+  if(!btn || btn.disabled) return;
+  const idx = CHART_GROUP_LEVELS.indexOf(chartGroupLevel);
+  if(btn.dataset.dir==='up' && idx>0) chartGroupLevel = CHART_GROUP_LEVELS[idx-1];
+  if(btn.dataset.dir==='down' && idx<CHART_GROUP_LEVELS.length-1) chartGroupLevel = CHART_GROUP_LEVELS[idx+1];
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
+
+// Lunes de la semana a la que pertenece una fecha (para agrupar por semana usando esa fecha
+// como clave — evita la ambigüedad de los números de semana ISO cerca de fin de año).
+function lunesDeLaSemana(fechaStr){
+  const d = new Date(fechaStr+'T00:00:00');
+  const dia = d.getDay();
+  const diff = dia===0 ? -6 : 1-dia;
+  d.setDate(d.getDate()+diff);
+  return d.toISOString().slice(0,10);
+}
+
+// A nivel de semana o día ya no tiene sentido mostrar un "monto pactado" (el arriendo es un
+// concepto mensual) — así que estas series solo muestran lo efectivamente pagado, agrupado por
+// el momento exacto en que se pagó. Respetan los mismos filtros de arrendatario y año que el
+// resto del histograma.
+function computeGlobalDailySeries(contratoId, anioFiltro){
+  const pagos = payments.filter(p=> p.fechaPago && (!contratoId || p.contratoId===contratoId) && (!anioFiltro || p.fechaPago.slice(0,4)===String(anioFiltro)));
+  const porDia = {};
+  pagos.forEach(p=>{
+    if(!porDia[p.fechaPago]) porDia[p.fechaPago] = {pagado:0, descuento:0};
+    porDia[p.fechaPago].pagado += Number(p.montoPagado||0);
+    porDia[p.fechaPago].descuento += Number(p.descuentos||0);
+  });
+  return Object.keys(porDia).sort().map(key=>{
+    const total = porDia[key].pagado + porDia[key].descuento;
+    return { label: formatDate(key).slice(0,5), monto: total, pagado: porDia[key].pagado, descuento: porDia[key].descuento };
+  });
+}
+function computeGlobalWeeklySeries(contratoId, anioFiltro){
+  const pagos = payments.filter(p=> p.fechaPago && (!contratoId || p.contratoId===contratoId) && (!anioFiltro || p.fechaPago.slice(0,4)===String(anioFiltro)));
+  const porSemana = {};
+  pagos.forEach(p=>{
+    const key = lunesDeLaSemana(p.fechaPago);
+    if(!porSemana[key]) porSemana[key] = {pagado:0, descuento:0};
+    porSemana[key].pagado += Number(p.montoPagado||0);
+    porSemana[key].descuento += Number(p.descuentos||0);
+  });
+  return Object.keys(porSemana).sort().map(key=>{
+    const total = porSemana[key].pagado + porSemana[key].descuento;
+    return { label: 'Sem. '+formatDate(key).slice(0,5), monto: total, pagado: porSemana[key].pagado, descuento: porSemana[key].descuento };
+  });
+}
 
 function applyYearGroupFilter(series, yearSel, groupSel){
   const years = [...new Set(series.map(d=>d.year))].sort((a,b)=>a-b);
@@ -6715,6 +6762,25 @@ function histogramToggleHtml(total){
   </div>`;
 }
 
+const CHART_GROUP_LEVELS = ['anio','mes','semana','dia'];
+let chartGroupLevel = 'mes';
+
+function actualizarFlechasAgrupacion(){
+  const idx = CHART_GROUP_LEVELS.indexOf(chartGroupLevel);
+  const btnUp = document.querySelector('.chart-group-arrow-btn[data-dir="up"]');
+  const btnDown = document.querySelector('.chart-group-arrow-btn[data-dir="down"]');
+  if(!btnUp || !btnDown) return;
+  const nombres = {anio:'año', mes:'mes', semana:'semana', dia:'día'};
+  const puedeSubir = idx > 0;
+  const puedeBajar = idx < CHART_GROUP_LEVELS.length-1;
+  btnUp.disabled = !puedeSubir;
+  btnUp.classList.toggle('enabled', puedeSubir);
+  btnUp.title = puedeSubir ? `Ver agrupado por ${nombres[CHART_GROUP_LEVELS[idx-1]]}` : 'Ya estás en el nivel más agregado (año)';
+  btnDown.disabled = !puedeBajar;
+  btnDown.classList.toggle('enabled', puedeBajar);
+  btnDown.title = puedeBajar ? `Ver detalle por ${nombres[CHART_GROUP_LEVELS[idx+1]]}` : 'Ya estás en el nivel más detallado (día)';
+}
+
 function renderResumenChart(contratoId){
   const container = document.getElementById('resumen-chart');
   const deudaBox = document.getElementById('resumen-chart-deuda-box');
@@ -6722,17 +6788,38 @@ function renderResumenChart(contratoId){
   const groupSel = document.getElementById('chart-group-filter');
   const availableWidth = container.clientWidth || (container.parentElement && container.parentElement.clientWidth) || 600;
 
+  renderDeudaAcumuladaBox(deudaBox, contratoId);
+  actualizarFlechasAgrupacion();
+
+  // A nivel de semana o día, el arriendo pactado deja de tener sentido (es un concepto
+  // mensual) — se arma directo desde los pagos, respetando el mismo filtro de año ya elegido.
+  if(chartGroupLevel==='semana' || chartGroupLevel==='dia'){
+    const anioFiltro = yearSel.value;
+    let rows = chartGroupLevel==='dia' ? computeGlobalDailySeries(contratoId, anioFiltro) : computeGlobalWeeklySeries(contratoId, anioFiltro);
+    if(!rows.length){
+      container.innerHTML = '<div class="empty">No hay pagos registrados en este periodo para desglosar a este nivel.</div>';
+    } else {
+      const total = rows.length;
+      if(!histogramaVerTodo) rows = rows.slice(-24);
+      const chart = buildStackedColumnChartSVG(rows, availableWidth);
+      container.innerHTML = chart.html + histogramToggleHtml(total);
+      chart.attach(container);
+    }
+    renderResumenImpagos(contratoId);
+    return;
+  }
+
+  groupSel.value = chartGroupLevel;
+
   if(!contratoId){
     const series = computeGlobalMonthlySeries();
     if(!series.length){
       yearSel.innerHTML = '<option value="">—</option>';
       container.innerHTML = '<div class="empty">Registra contratos y pagos para ver la evolución mensual.</div>';
-      deudaBox.innerHTML = '';
     } else {
       let rows = applyYearGroupFilter(series, yearSel, groupSel);
       const total = rows.length;
       if(!histogramaVerTodo) rows = rows.slice(-12);
-      renderDeudaAcumuladaBox(deudaBox, contratoId);
       const chart = buildStackedColumnChartSVG(rows, availableWidth);
       container.innerHTML = chart.html + histogramToggleHtml(total);
       chart.attach(container);
@@ -6745,7 +6832,6 @@ function renderResumenChart(contratoId){
   if(!series.length){
     yearSel.innerHTML = '<option value="">—</option>';
     container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>';
-    deudaBox.innerHTML = '';
     renderResumenImpagos(contratoId);
     return;
   }
@@ -6753,7 +6839,6 @@ function renderResumenChart(contratoId){
   let rows = applyYearGroupFilter(series, yearSel, groupSel);
   const total = rows.length;
   if(!histogramaVerTodo) rows = rows.slice(-12);
-  renderDeudaAcumuladaBox(deudaBox, contratoId);
   const chart = buildStackedColumnChartSVG(rows, availableWidth);
   container.innerHTML = chart.html + histogramToggleHtml(total);
   chart.attach(container);
@@ -6775,6 +6860,11 @@ function computeSaldoConReglas(c, series, anioFiltro){
   return totalEsperado - (totalPagado + totalDescuentos);
 }
 
+let deudaAcumuladaExpandida = false;
+function toggleDeudaAcumuladaBox(){
+  deudaAcumuladaExpandida = !deudaAcumuladaExpandida;
+  renderResumenChart(document.getElementById('resumen-filter').value);
+}
 function renderDeudaAcumuladaBox(deudaBox, contratoId){
   if(!deudaBox) return;
   const anioFiltro = document.getElementById('chart-year-filter').value;
@@ -6796,11 +6886,16 @@ function renderDeudaAcumuladaBox(deudaBox, contratoId){
     deudaAcumulada += contratosConCobranza().reduce((sum,c)=> sum + Math.max(0, computeCobranzaSaldo(c)), 0);
     etiqueta = 'Deuda total acumulada';
   }
-  if(deudaAcumulada<=0){
-    deudaBox.innerHTML = `<div class="deuda-acumulada-box sin-deuda"><span class="lbl">${etiqueta}</span><span class="val">${money(0)}</span></div>`;
-  } else {
-    deudaBox.innerHTML = `<div class="deuda-acumulada-box"><span class="lbl">${etiqueta}</span><span class="val">${money(deudaAcumulada)}</span></div>`;
-  }
+  // El cuadro se puede tocar para desplegar la misma lista de "Clientes con deuda o saldo a
+  // favor" — respetando el filtro de arrendatario ya aplicado — sin tener que bajar hasta esa
+  // otra tarjeta para verla.
+  const detalleHtml = deudaAcumuladaExpandida
+    ? `<div class="deuda-acumulada-detalle">${buildDeudaListHtml(contratoId)}</div>` : '';
+  const claseSinDeuda = deudaAcumulada<=0 ? ' sin-deuda' : '';
+  deudaBox.innerHTML = `<div class="deuda-acumulada-box${claseSinDeuda}" onclick="toggleDeudaAcumuladaBox()" role="button" tabindex="0">
+    <span class="lbl">${etiqueta} <span class="deuda-acumulada-chevron">${deudaAcumuladaExpandida?'▲':'▼'}</span></span>
+    <span class="val">${money(Math.max(0,deudaAcumulada))}</span>
+  </div>${detalleHtml}`;
 }
 
 // Calcula las medidas fijas del gráfico (posiciones X, ancho de columnas, etc.) — estas NO
