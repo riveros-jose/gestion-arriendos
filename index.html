@@ -295,10 +295,11 @@
      tarjeta con padding, así que también necesita compensarlo con margen negativo). */
   .tenant-filter-sticky{position:sticky;z-index:18;background:var(--card);padding:14px 24px 10px;margin:-24px -24px 14px;box-shadow:0 4px 8px -6px rgba(0,0,0,0.12);}
   .subtab-btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
-  .chart-group-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-  .chart-group-btn{font-size:15px;padding:8px 10px;border:none;background:var(--card);color:var(--ink-soft);cursor:pointer;line-height:1;}
-  .chart-group-btn+.chart-group-btn{border-left:1px solid var(--border);}
-  .chart-group-btn.active{background:var(--teal-soft);color:var(--teal-dark);}
+  /* Flecha única (sin texto) para cambiar la agrupación del histograma — se posiciona flotando
+     dentro de la esquina del propio gráfico, como si fuera parte de él, en vez de un control
+     aparte con su propia fila y etiqueta. */
+  .chart-group-arrow-btn{position:absolute;top:2px;right:4px;z-index:5;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--ink-soft);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.12);}
+  .chart-group-arrow-btn:hover{background:var(--teal-soft);color:var(--teal-dark);}
   .quick-jump-bar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 22px;}
   .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
   .quick-jump-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
@@ -352,12 +353,9 @@
 
   /* ===== RESPONSIVE (tablet / mobile) ===== */
   @media (max-width: 860px){
-    /* Filtro de Año y toggle de agrupar más compactos en mobile — el select más angosto y el
-       toggle de íconos un poco más chico, para que quepan cómodos uno junto al otro. */
-    #chart-controls{gap:8px;}
-    #chart-controls .field{max-width:110px!important;}
+    /* Año más compacto en mobile, y la flecha de agrupar un poco más chica. */
     #chart-year-filter{padding:8px 6px;font-size:13px;}
-    .chart-group-btn{padding:7px 8px;font-size:13px;}
+    .chart-group-arrow-btn{width:26px;height:26px;font-size:12px;}
     /* El scroll ocurre dentro de .main (no en la página): así el navegador (p.ej. Samsung
        Internet) no muestra su botón flotante de "ir arriba" encima de nuestra barra inferior. */
     html,body{height:100%;overflow:hidden;}
@@ -907,21 +905,16 @@
       <div id="resumen-panel-resumen">
         <div class="card">
           <h2>📈 Histograma — Saldo, esperado, pagado y descuentos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-          <div class="line-row form-compact" style="margin-bottom:8px;max-width:420px">
-            <div class="field"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
-          </div>
-          <div class="line-row form-compact" id="chart-controls" style="margin-bottom:10px;max-width:420px;align-items:flex-end;">
-            <div class="field" style="max-width:150px;"><label>Año</label><select id="chart-year-filter"></select></div>
-            <div class="field" style="flex:0 0 auto;">
-              <div class="chart-group-toggle" id="chart-group-toggle">
-                <button type="button" class="chart-group-btn active" data-group="mes" title="Agrupar por mes">📅</button>
-                <button type="button" class="chart-group-btn" data-group="anio" title="Agrupar por año">🗓️</button>
-              </div>
-            </div>
+          <div class="line-row form-compact" style="margin-bottom:10px;max-width:480px;gap:8px;">
+            <div class="field" style="flex:1;min-width:0;"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
+            <div class="field" style="max-width:96px;flex:0 0 auto;"><label>Año</label><select id="chart-year-filter"></select></div>
           </div>
           <input type="hidden" id="chart-group-filter" value="mes">
           <div id="resumen-chart-deuda-box"></div>
-          <div id="resumen-chart"></div>
+          <div style="position:relative;">
+            <button type="button" id="chart-group-arrow-btn" class="chart-group-arrow-btn" data-group="mes" title="Ver agrupado por año">⬆️</button>
+            <div id="resumen-chart"></div>
+          </div>
         </div>
         <div class="card">
           <h2>📊 Clientes con deuda o saldo a favor <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
@@ -6562,11 +6555,17 @@ function computeContratoMonthlySeries(contratoId){
 document.getElementById('chart-year-filter').addEventListener('change', ()=>{
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
-document.getElementById('chart-group-toggle').addEventListener('click', e=>{
-  const btn = e.target.closest('.chart-group-btn');
-  if(!btn) return;
-  document.querySelectorAll('#chart-group-toggle .chart-group-btn').forEach(b=> b.classList.toggle('active', b===btn));
-  document.getElementById('chart-group-filter').value = btn.dataset.group;
+document.getElementById('chart-group-arrow-btn').addEventListener('click', ()=>{
+  const btn = document.getElementById('chart-group-arrow-btn');
+  const actual = btn.dataset.group;
+  const nuevo = actual==='mes' ? 'anio' : 'mes';
+  btn.dataset.group = nuevo;
+  // Cuando queda en "mes" (detalle), la flecha apunta hacia arriba, ofreciendo subir a año
+  // (agrupación mayor). Cuando queda en "año", apunta hacia abajo, ofreciendo bajar a mes (más
+  // detalle) — el ícono siempre indica hacia dónde lleva el próximo clic.
+  btn.textContent = nuevo==='mes' ? '⬆️' : '⬇️';
+  btn.title = nuevo==='mes' ? 'Ver agrupado por año' : 'Ver detalle por mes';
+  document.getElementById('chart-group-filter').value = nuevo;
   renderResumenChart(document.getElementById('resumen-filter').value);
 });
 
@@ -6721,11 +6720,9 @@ function renderResumenChart(contratoId){
   const deudaBox = document.getElementById('resumen-chart-deuda-box');
   const yearSel = document.getElementById('chart-year-filter');
   const groupSel = document.getElementById('chart-group-filter');
-  const chartControls = document.getElementById('chart-controls');
   const availableWidth = container.clientWidth || (container.parentElement && container.parentElement.clientWidth) || 600;
 
   if(!contratoId){
-    if(chartControls) chartControls.style.display = 'flex';
     const series = computeGlobalMonthlySeries();
     if(!series.length){
       yearSel.innerHTML = '<option value="">—</option>';
@@ -6744,7 +6741,6 @@ function renderResumenChart(contratoId){
     return;
   }
 
-  if(chartControls) chartControls.style.display = 'flex';
   const series = computeContratoMonthlySeries(contratoId);
   if(!series.length){
     yearSel.innerHTML = '<option value="">—</option>';
