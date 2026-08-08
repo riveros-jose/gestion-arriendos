@@ -114,12 +114,6 @@
   .deuda-acumulada-chevron-badge{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--brick);background:#fff;border:1px solid rgba(180,67,46,0.3);border-radius:20px;padding:6px 12px;white-space:nowrap;}
   .deuda-acumulada-box.sin-deuda .deuda-acumulada-chevron-badge{color:var(--teal-dark);border-color:rgba(43,111,92,0.3);}
   .deuda-acumulada-detalle{margin:-8px 0 14px;max-width:520px;}
-  /* En desktop, el cuadro de deuda queda a la derecha de los filtros de Arrendatario/Año, en la
-     misma línea. En mobile no hay espacio para ambos, así que se apila abajo automáticamente
-     (flex-wrap), sin necesitar una media query aparte para forzarlo. */
-  .chart-filters-and-deuda{display:flex;align-items:flex-end;flex-wrap:wrap;gap:14px 20px;margin-bottom:10px;}
-  .chart-filters-and-deuda > .form-compact{flex:1 1 260px;min-width:220px;max-width:480px;margin-bottom:0;}
-  .chart-filters-and-deuda > #resumen-chart-deuda-box{flex:0 1 auto;}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
   .estado-select-atrasado{background:#F2C4B8!important;color:var(--brick)!important;border-color:var(--brick)!important;}
@@ -924,13 +918,11 @@
       <div id="resumen-panel-resumen">
         <div class="card">
           <h2>📈 Pago de Arriendos <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
-          <div class="chart-filters-and-deuda">
-            <div class="form-compact" style="display:flex;gap:8px;">
-              <div class="field" style="flex:1;min-width:0;"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
-              <div class="field" style="max-width:92px;flex:0 0 auto;"><label>Año</label><select id="chart-year-filter"></select></div>
-            </div>
-            <div id="resumen-chart-deuda-box"></div>
+          <div class="form-compact" style="display:flex;gap:8px;margin-bottom:10px;max-width:480px;">
+            <div class="field" style="flex:1;min-width:0;"><label>Arrendatario</label><select class="filter" id="chart-tenant-filter" style="margin-bottom:0"></select></div>
+            <div class="field" style="max-width:92px;flex:0 0 auto;"><label>Año</label><select id="chart-year-filter"></select></div>
           </div>
+          <div id="resumen-chart-deuda-box"></div>
           <input type="hidden" id="chart-group-filter" value="mes">
           <div style="position:relative;">
             <div class="chart-group-arrows" id="chart-group-arrows">
@@ -2613,6 +2605,7 @@ function switchTab(tabName){
   if(topBell) topBell.classList.toggle('active', tabName==='alertas');
   const sideBell = document.getElementById('sidebar-alert-btn');
   if(sideBell) sideBell.classList.toggle('active', tabName==='alertas');
+  scrollAppToTop();
 }
 document.querySelectorAll('.nav-item').forEach(item=>{
   item.addEventListener('click',()=> switchTab(item.dataset.tab));
@@ -2620,7 +2613,6 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 
 function openAlertsTab(){
   switchTab('alertas');
-  scrollAppToTop();
 }
 
 // ---------- PROPIEDADES ----------
