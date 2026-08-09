@@ -547,7 +547,10 @@
   <div class="result-modal-card" style="max-width:720px;width:100%;text-align:left;">
     <div class="result-modal-title" id="table-modal-title" style="text-align:left;"></div>
     <div id="table-modal-content" style="max-height:60vh;overflow-y:auto;margin:12px 0 16px;"></div>
-    <button type="button" class="btn btn-primary result-modal-accept-btn" onclick="closeTableModal()">Cerrar</button>
+    <div class="confirm-modal-btn-row">
+      <button type="button" class="btn btn-secondary" id="table-modal-export-btn" style="display:none;" onclick="exportTableModalData()">Exportar a Google Drive</button>
+      <button type="button" class="btn btn-primary" onclick="closeTableModal()">Cerrar</button>
+    </div>
   </div>
 </div>
 
@@ -2629,7 +2632,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 // a mes (y la cobranza si es un histórico), en vez de navegar a otra pestaña.
 function verHistorialDeArrendatario(contratoId, historico){
   const contenido = buildHistorialContratoHtml(contratoId, true); // true = ver todos los meses directo, sin paginar
-  showTableModal(contractLabel(contratoId), contenido);
+  showTableModal(contractLabel(contratoId), contenido, ()=>exportarHistorialContratoModal(contratoId));
 }
 
 function openAlertsTab(){
@@ -3320,18 +3323,83 @@ document.getElementById('chart-tenant-filter').addEventListener('change', ()=>{
   renderResumen();
 });
 
-function showTableModal(titulo, contenidoHtml){
+// exportFn es opcional: una función sin argumentos que arma y sube el Excel correspondiente al
+// contenido que se está mostrando en ese momento. Si no se pasa, el botón de exportar se oculta.
+let tableModalExportFn = null;
+function showTableModal(titulo, contenidoHtml, exportFn){
   document.getElementById('table-modal-title').textContent = titulo;
   document.getElementById('table-modal-content').innerHTML = contenidoHtml;
+  tableModalExportFn = exportFn || null;
+  document.getElementById('table-modal-export-btn').style.display = exportFn ? 'inline-block' : 'none';
   document.getElementById('table-modal-overlay').style.display = 'flex';
 }
 function closeTableModal(){
   document.getElementById('table-modal-overlay').style.display = 'none';
+  tableModalExportFn = null;
+}
+function exportTableModalData(){
+  if(tableModalExportFn) tableModalExportFn();
 }
 // Mismo modal y mismo contenido que se usa desde la matriz (verHistorialDeArrendatario) — así
 // ambos lugares son exactamente consistentes entre sí, sin dos versiones distintas del mismo dato.
 function mostrarDesgloseDeuda(contratoId, historico){
   verHistorialDeArrendatario(contratoId, historico);
+}
+
+// Arma y sube a Drive el mismo desglose mes a mes (con la cobranza incluida) que se ve en el
+// modal — mismo orden, mismas columnas.
+function exportarHistorialContratoModal(contratoId){
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c){ alert('No se encontró el contrato.'); return; }
+  const filas = [];
+  if(c.fechaTermino){
+    const pagosCobranza = payments.filter(p=> p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
+      .slice().sort((a,b)=> b.fechaPago.localeCompare(a.fechaPago));
+    pagosCobranza.forEach(p=>{
+      filas.push({ Mes: formatDate(p.fechaPago), MontoEsperado:'', Pagado: Number(p.montoPagado||0), Descuentos: Number(p.descuentos||0), Saldo:'', Estado:'Cobranza', Comentario: p.comentarios||'' });
+    });
+  }
+  computeContratoMonthlySeries(contratoId).slice().reverse().forEach(d=>{
+    const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
+    const saldo = d.monto - (d.pagado+d.descuento);
+    let estado;
+    if(saldo<0) estado='A favor';
+    else if(pagosMes.length===0) estado='Sin pago';
+    else if(saldo>0) estado='Parcial';
+    else estado='Pagado';
+    const comentarios = pagosMes.map(p=>p.comentarios).filter(Boolean).join(' · ');
+    filas.push({ Mes: `${MESES_ES[d.month]} ${d.year}`, MontoEsperado: Number(d.monto), Pagado: Number(d.pagado), Descuentos: Number(d.descuento), Saldo: Number(saldo), Estado: estado, Comentario: comentarios });
+  });
+  if(!filas.length){ alert('No hay datos para exportar de este arrendatario.'); return; }
+  const ws = XLSX.utils.json_to_sheet(filas);
+  applyColumnFormats(ws, ['Mes','MontoEsperado','Pagado','Descuentos','Saldo','Estado','Comentario']);
+  styleWorksheet(ws, [16,14,14,14,14,12,32]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  const nombre = truncateText(contractLabel(contratoId), 40).replace(/[\\/:*?"<>|]/g,'');
+  exportWorkbookToDrive(wb, `historial-${nombre}`);
+}
+
+// Arma y sube a Drive la lista de "Clientes con deuda o saldo a favor" tal como se ve en el
+// modal (respetando el filtro de arrendatario, si hay uno).
+function exportarListaDeudaModal(contratoId){
+  const allRows = computeResumenRows();
+  const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
+  let rows = contratoId ? conSaldoDistintoDeCero.filter(r=>r.c.id===contratoId) : conSaldoDistintoDeCero;
+  rows = sortRows('resumen', rows, {
+    contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto, saldo: r=>r.saldo
+  });
+  if(!rows.length){ alert('No hay clientes con deuda ni con saldo a favor para exportar.'); return; }
+  const exportRows = rows.map(r=>({
+    Arrendatario: contractLabel(r.c.id) + (r.historico?' (Histórico)':''),
+    Saldo: Number(r.saldo)
+  }));
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  applyColumnFormats(ws, ['Arrendatario','Saldo']);
+  styleWorksheet(ws, [36,16]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Clientes con deuda');
+  exportWorkbookToDrive(wb, 'clientes-con-deuda');
 }
 
 function buildDeudaListHtml(contratoId){
@@ -6897,7 +6965,7 @@ function renderDeudaAcumuladaBox(deudaBox, contratoId){
   </div>`;
 }
 function mostrarDeudaAcumuladaModal(contratoId){
-  showTableModal(contratoId ? 'Deuda de '+contractLabel(contratoId) : 'Clientes con deuda o saldo a favor', buildDeudaListHtml(contratoId||null));
+  showTableModal(contratoId ? 'Deuda de '+contractLabel(contratoId) : 'Clientes con deuda o saldo a favor', buildDeudaListHtml(contratoId||null), ()=>exportarListaDeudaModal(contratoId||null));
 }
 
 // Calcula las medidas fijas del gráfico (posiciones X, ancho de columnas, etc.) — estas NO
