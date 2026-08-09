@@ -104,8 +104,20 @@
      arrendatario, la cobranza fusionada en el historial, etc.) — un color claramente distinto de
      la alternancia normal par/impar, para que nunca se confundan con una fila de datos más.
      Necesita !important porque la regla de alternancia de arriba también apunta a los <td>. */
-  .nested-detail-row td{background:#E1E4E8 !important;}
+  .nested-detail-row td, .nested-detail-row.mes-card{background:#E1E4E8 !important;}
   table ::selection{background:var(--azul-oscuro);color:#fff;}
+  /* Tarjetas apiladas para el historial de pagos de un arrendatario (usadas tanto en la pestaña
+     "Historial de pagos" como en la modal) — en vez de una tabla ancha de columnas, para que se
+     lea toda la información sin tener que hacer scroll hacia los lados. */
+  .mes-card-list{display:flex;flex-direction:column;}
+  .mes-card{padding:10px 4px;border-bottom:1px solid var(--border);}
+  .mes-card-sinpago{background:var(--brick-soft);}
+  .mes-card-parcial{background:#FBEEEA;}
+  .mes-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;}
+  .mes-card-top strong{flex:1;min-width:90px;}
+  .mes-card-saldo{font-weight:700;margin-left:auto;white-space:nowrap;}
+  .mes-card-montos{font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
+  .mes-card-pago-linea{font-size:12px;color:var(--ink-soft);padding:2px 0;}
   .mono{font-family:'Inter',sans-serif;}
   .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
   .tag-ok{background:var(--teal-soft);color:var(--teal-dark);}
@@ -119,6 +131,7 @@
   .deuda-acumulada-chevron-badge{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--brick);background:#fff;border:1px solid rgba(180,67,46,0.3);border-radius:20px;padding:6px 12px;white-space:nowrap;}
   .deuda-acumulada-box.sin-deuda .deuda-acumulada-chevron-badge{color:var(--teal-dark);border-color:rgba(43,111,92,0.3);}
   .ver-desglose-btn{display:inline-block;font-size:11px;font-weight:700;color:var(--teal-dark);background:var(--teal-soft);border-radius:20px;padding:5px 10px;white-space:nowrap;}
+  .deuda-acumulada-detalle{margin:-8px 0 14px;max-width:520px;}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
   .estado-select-atrasado{background:#F2C4B8!important;color:var(--brick)!important;border-color:var(--brick)!important;}
@@ -5370,11 +5383,7 @@ function buildHistorialContratoHtml(contratoId, verTodoOverride){
   const verTodo = verTodoOverride!==undefined ? verTodoOverride : historialMensualVerTodo;
   const series = verTodo ? seriesTotal : seriesTotal.slice(0,12);
 
-  return `<div class="table-scroll"><table><thead><tr>
-    <th>Mes</th><th>Monto esperado</th><th>Pagado</th><th>Descuentos</th><th>Saldo</th><th>Estado</th><th>Detalle de pagos del mes</th>
-  </tr></thead><tbody>
-  ${buildCobranzaRowsHtml(c)}
-  ${series.map(d=>{
+  const filasHtml = series.map(d=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
     const saldo = d.monto - (d.pagado+d.descuento);
     let estado, tagClass;
@@ -5383,27 +5392,31 @@ function buildHistorialContratoHtml(contratoId, verTodoOverride){
     else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
     else { estado='Pagado'; tagClass='tag-ok'; }
     // Misma lógica de colores que la matriz: rojo fuerte para "sin pago" (equivalente a "Sin
-    // registro" ahí), rojo clarito para "parcial" — así ambas tablas se leen igual de un vistazo.
-    let rowStyle = '';
-    if(estado==='Sin pago') rowStyle = ' style="background:var(--brick-soft);"';
-    else if(estado==='Parcial') rowStyle = ' style="background:#FBEEEA;"';
+    // registro" ahí), rojo clarito para "parcial" — así todo se lee igual de un vistazo.
+    let cardClass = '';
+    if(estado==='Sin pago') cardClass = ' mes-card-sinpago';
+    else if(estado==='Parcial') cardClass = ' mes-card-parcial';
     const detalle = pagosMes.length
-      ? pagosMes.map(p=>`<div style="margin-bottom:3px">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''}${p.comentarios?(' · '+esc(p.comentarios)):''}
-        <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
-        <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
-      </div>`).join('')
-      : '—';
-    return `<tr${rowStyle}>
-      <td>${MESES_ES[d.month]} ${d.year}</td>
-      <td class="mono">${money(d.monto)}</td>
-      <td class="mono">${money(d.pagado)}</td>
-      <td class="mono">${money(d.descuento)}</td>
-      <td class="mono" style="color:${saldo>0?'var(--brick)':(saldo<0?'var(--teal-dark)':'inherit')};font-weight:600">${money(saldo)}</td>
-      <td><span class="tag ${tagClass}">${estado}</span></td>
-      <td style="font-size:12px;color:var(--ink-soft)">${detalle}</td>
-    </tr>`;
-  }).join('')}
-  </tbody></table></div>
+      ? pagosMes.map(p=>{
+          const comentario = p.comentarios ? truncateText(p.comentarios, 36) : '';
+          return `<div class="mes-card-pago-linea">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''}${comentario?(' · '+esc(comentario)):''}
+            <button onclick="editPayment('${p.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;margin-left:4px;">✏️</button>
+            <button onclick="deletePayment('${p.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:12px;">🗑️</button>
+          </div>`;
+        }).join('')
+      : '<div class="mes-card-pago-linea" style="color:var(--ink-soft);">Sin pagos registrados este mes</div>';
+    return `<div class="mes-card${cardClass}">
+      <div class="mes-card-top">
+        <strong>${MESES_ES[d.month]} ${d.year}</strong>
+        <span class="tag ${tagClass}">${estado}</span>
+        <span class="mes-card-saldo" style="color:${saldo>0?'var(--brick)':(saldo<0?'var(--teal-dark)':'inherit')}">${money(saldo)}</span>
+      </div>
+      <div class="mes-card-montos">Esperado ${money(d.monto)} · Pagado ${money(d.pagado)} · Desc. ${money(d.descuento)}</div>
+      ${detalle}
+    </div>`;
+  }).join('');
+
+  return `<div class="mes-card-list">${buildCobranzaRowsHtml(c)}${filasHtml}</div>
   ${(verTodoOverride===undefined && seriesTotal.length>12) ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="historialMensualVerTodo=!historialMensualVerTodo;renderHistorial();">
       ${historialMensualVerTodo ? 'Ver solo los últimos 12 meses' : `Ver todo (${seriesTotal.length} meses)`}
@@ -5419,30 +5432,32 @@ function renderHistorial(){
 }
 
 // Los pagos con fecha POSTERIOR al término del contrato son abonos a la deuda pactada (cobranza),
-// no arriendo de ningún mes — pero se muestran como filas más DENTRO DE LA MISMA TABLA (mismas
-// columnas que el resto), en vez de una tarjeta aparte, para que todo se lea de corrido.
+// no arriendo de ningún mes — se muestran como tarjetas más DENTRO DE LA MISMA LISTA (mismo
+// formato que el resto), en vez de una tabla aparte, para que todo se lea de corrido.
 function buildCobranzaRowsHtml(c){
   if(!c.fechaTermino) return '';
   const pagosCobranza = payments.filter(p=> p.contratoId===c.id && p.fechaPago && p.fechaPago>=c.fechaTermino)
     .slice().sort((a,b)=> b.fechaPago.localeCompare(a.fechaPago));
   if(!pagosCobranza.length && !Number(c.deudaPactada||0)) return '';
   const saldo = computeCobranzaSaldo(c);
-  const headerRow = `<tr class="nested-detail-row"><td colspan="7" style="font-weight:700;">
+  const header = `<div class="mes-card nested-detail-row" style="font-weight:700;">
     💼 Cobranza posterior al término (${formatDate(c.fechaTermino)}) — Deuda pactada: ${money(c.deudaPactada||0)} — Saldo pendiente: <span style="color:${saldo>0?'var(--brick)':'var(--teal-dark)'}">${money(saldo)}</span>
-  </td></tr>`;
-  const rows = pagosCobranza.map(p=>`<tr class="nested-detail-row">
-    <td>${formatDate(p.fechaPago)}</td>
-    <td class="mono">—</td>
-    <td class="mono">${money(Number(p.montoPagado||0))}</td>
-    <td class="mono">${money(Number(p.descuentos||0))}</td>
-    <td class="mono">—</td>
-    <td><span class="tag tag-pending">Cobranza</span></td>
-    <td style="font-size:12px;color:var(--ink-soft)">${p.comentarios?esc(p.comentarios):''}
-      <button onclick="editPayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:6px;">editar</button>
-      <button onclick="deletePayment('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--ink-soft);text-decoration:underline;font-size:11px;margin-left:4px;">eliminar</button>
-    </td>
-  </tr>`).join('');
-  return headerRow + (rows || `<tr class="nested-detail-row"><td colspan="7"><div class="empty">Aún no hay abonos de cobranza registrados.</div></td></tr>`) + `<tr><td colspan="7" style="padding:0;border-bottom:2px solid var(--border);"></td></tr>`;
+  </div>`;
+  const rows = pagosCobranza.length ? pagosCobranza.map(p=>{
+    const comentario = p.comentarios ? truncateText(p.comentarios, 36) : '';
+    return `<div class="mes-card nested-detail-row">
+      <div class="mes-card-top">
+        <strong>${formatDate(p.fechaPago)}</strong>
+        <span class="tag tag-pending">Cobranza</span>
+        <span class="mes-card-saldo">${money(Number(p.montoPagado||0))}${Number(p.descuentos)?(' + '+money(p.descuentos)+' desc.'):''}</span>
+      </div>
+      <div class="mes-card-pago-linea">${comentario?esc(comentario):''}
+        <button onclick="editPayment('${p.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;margin-left:4px;">✏️</button>
+        <button onclick="deletePayment('${p.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:12px;">🗑️</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="mes-card nested-detail-row"><div class="empty">Aún no hay abonos de cobranza registrados.</div></div>`;
+  return header + rows + `<div style="border-bottom:2px solid var(--border);margin-bottom:6px;"></div>`;
 }
 
 // ---------- ARRENDATARIOS HISTÓRICOS (solo lectura) ----------
@@ -6931,6 +6946,11 @@ function computeSaldoConReglas(c, series, anioFiltro){
   return totalEsperado - (totalPagado + totalDescuentos);
 }
 
+let deudaAcumuladaExpandida = false;
+function toggleDeudaAcumuladaBox(){
+  deudaAcumuladaExpandida = !deudaAcumuladaExpandida;
+  renderResumenChart(document.getElementById('resumen-filter').value);
+}
 function renderDeudaAcumuladaBox(deudaBox, contratoId){
   if(!deudaBox) return;
   const anioFiltro = document.getElementById('chart-year-filter').value;
@@ -6952,20 +6972,19 @@ function renderDeudaAcumuladaBox(deudaBox, contratoId){
     deudaAcumulada += contratosConCobranza().reduce((sum,c)=> sum + Math.max(0, computeCobranzaSaldo(c)), 0);
     etiqueta = 'Deuda total acumulada';
   }
-  // El cuadro se puede tocar para abrir, en una modal, la misma lista de "Clientes con deuda o
-  // saldo a favor" — respetando el filtro de arrendatario ya aplicado — sin tener que bajar
-  // hasta esa otra tarjeta ni que se despliegue empujando el resto de la página.
+  // Este cuadro se despliega EN LA MISMA PÁGINA (no necesita modal, es solo una lista compacta
+  // de nombre + saldo) — la modal queda reservada para cuando se quiere ver el detalle de PAGOS
+  // de un arrendatario específico (una tabla más grande, ahí sí conviene la modal).
+  const detalleHtml = deudaAcumuladaExpandida
+    ? `<div class="deuda-acumulada-detalle">${buildDeudaListHtml(contratoId)}</div>` : '';
   const claseSinDeuda = deudaAcumulada<=0 ? ' sin-deuda' : '';
-  deudaBox.innerHTML = `<div class="deuda-acumulada-box${claseSinDeuda}" onclick="mostrarDeudaAcumuladaModal('${contratoId||''}')" role="button" tabindex="0">
+  deudaBox.innerHTML = `<div class="deuda-acumulada-box${claseSinDeuda}" onclick="toggleDeudaAcumuladaBox()" role="button" tabindex="0">
     <div>
       <span class="lbl">${etiqueta}</span>
       <div class="val">${money(Math.max(0,deudaAcumulada))}</div>
     </div>
-    <span class="deuda-acumulada-chevron-badge">Ver detalle ▼</span>
-  </div>`;
-}
-function mostrarDeudaAcumuladaModal(contratoId){
-  showTableModal(contratoId ? 'Deuda de '+contractLabel(contratoId) : 'Clientes con deuda o saldo a favor', buildDeudaListHtml(contratoId||null), ()=>exportarListaDeudaModal(contratoId||null));
+    <span class="deuda-acumulada-chevron-badge">${deudaAcumuladaExpandida?'Ocultar ▲':'Ver detalle ▼'}</span>
+  </div>${detalleHtml}`;
 }
 
 // Calcula las medidas fijas del gráfico (posiciones X, ancho de columnas, etc.) — estas NO
@@ -7299,7 +7318,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr${rowStyle}><td class="cell-tap-full" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})" title="Tocar para ver el historial completo de pagos"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}</tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})" title="Tocar para ver el historial completo de pagos"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Ver detalle ▸</span></td></tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
@@ -7315,7 +7334,7 @@ function renderResumenMatrix(){
       ${totDescuento ? `<div class="cell-stacked-sub">Desc: ${money(totDescuento)}</div>` : ''}
     </td>`;
   }).join('');
-  const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}</tr>`;
+  const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}<td></td></tr>`;
 
   const toggleHtml = (!yearFiltro && total>2) ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
@@ -7323,7 +7342,7 @@ function renderResumenMatrix(){
     </button>
   </div>` : '';
 
-  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}<th></th></tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
 
   // Se guarda exactamente lo que se está mostrando ahora mismo (mismos meses, mismas filas, con
   // el mismo filtro aplicado) para que "Exportar a Google Drive" exporte tal cual lo que se ve
