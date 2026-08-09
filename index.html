@@ -116,6 +116,7 @@
   .mes-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;}
   .mes-card-top strong{flex:1;min-width:90px;}
   .mes-card-saldo{font-weight:700;margin-left:auto;white-space:nowrap;}
+  .mes-card-saldo-lbl{font-weight:400;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-soft);}
   .mes-card-montos{font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
   .mes-card-pago-linea{font-size:12px;color:var(--ink-soft);padding:2px 0;}
   .mono{font-family:'Inter',sans-serif;}
@@ -5411,7 +5412,7 @@ function buildHistorialContratoHtml(contratoId, verTodoOverride){
       <div class="mes-card-top">
         <strong>${MESES_ES[d.month]} ${d.year}</strong>
         <span class="tag ${tagClass}">${estado}</span>
-        <span class="mes-card-saldo" style="color:${saldo>0?'var(--brick)':(saldo<0?'var(--teal-dark)':'inherit')}">${money(saldo)}</span>
+        <span class="mes-card-saldo" style="color:${saldo>0?'var(--brick)':(saldo<0?'var(--teal-dark)':'inherit')}"><span class="mes-card-saldo-lbl">Saldo:</span> ${money(saldo)}</span>
       </div>
       <div class="mes-card-montos">Esperado ${money(d.monto)} · Pagado ${money(d.pagado)} · Desc. ${money(d.descuento)}</div>
       ${detalle}
@@ -7320,7 +7321,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr${rowStyle}><td class="cell-tap-full" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})" title="Tocar para ver el historial completo de pagos"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Ver detalle ▸</span></td></tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})" title="Tocar para ver el historial completo de pagos"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Historial de Pagos ▸</span></td></tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
