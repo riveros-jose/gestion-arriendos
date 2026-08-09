@@ -3397,15 +3397,14 @@ function exportarHistorialContratoModal(contratoId){
 // modal (respetando el filtro de arrendatario, si hay uno).
 function exportarListaDeudaModal(contratoId){
   const allRows = computeResumenRows();
-  const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
-  let rows = contratoId ? conSaldoDistintoDeCero.filter(r=>r.c.id===contratoId) : conSaldoDistintoDeCero;
+  let rows = contratoId ? allRows.filter(r=>r.c.id===contratoId) : allRows;
   rows = sortRows('resumen', rows, {
     contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto, saldo: r=>r.saldo
   });
-  if(!rows.length){ alert('No hay clientes con deuda ni con saldo a favor para exportar.'); return; }
+  if(!rows.length){ alert('No hay arrendatarios registrados para exportar.'); return; }
   const exportRows = rows.map(r=>({
     Arrendatario: contractLabel(r.c.id) + (r.historico?' (Histórico)':''),
-    Saldo: Number(r.saldo)
+    Saldo: r.saldo===0 ? 'Sin deuda' : Number(r.saldo)
   }));
   const ws = XLSX.utils.json_to_sheet(exportRows);
   applyColumnFormats(ws, ['Arrendatario','Saldo']);
@@ -3417,22 +3416,23 @@ function exportarListaDeudaModal(contratoId){
 
 function buildDeudaListHtml(contratoId){
   const allRows = computeResumenRows();
-  const conSaldoDistintoDeCero = allRows.filter(r=>r.saldo !== 0);
-  let rows = contratoId ? conSaldoDistintoDeCero.filter(r=>r.c.id===contratoId) : conSaldoDistintoDeCero;
+  let rows = contratoId ? allRows.filter(r=>r.c.id===contratoId) : allRows;
   rows = sortRows('resumen', rows, {
     contrato: r=>contractLabel(r.c.id)||'', monto: r=>r.monto, saldo: r=>r.saldo
   });
-  if(!rows.length) return '<div class="empty">No hay clientes con deuda ni con saldo a favor en este momento.</div>';
+  if(!rows.length) return '<div class="empty">No hay arrendatarios registrados todavía.</div>';
   return `<div class="table-scroll"><table><thead><tr>
     ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}<th></th>
   </tr></thead><tbody>
   ${rows.map(r=>{
-    const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'inherit');
+    const sinDeuda = r.saldo===0;
+    const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'var(--teal-dark)');
+    const saldoTexto = sinDeuda ? 'Sin deuda' : money(r.saldo);
     const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
     return `<tr style="cursor:pointer;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})">
     <td class="cell-tap-full"><span class="cell-clamp-2">${etiqueta}</span></td>
-    <td class="mono" style="color:${saldoColor};font-weight:600">${money(r.saldo)}</td>
-    <td style="white-space:nowrap;"><span class="ver-desglose-btn">Ver desglose ▾</span></td>
+    <td class="mono" style="color:${saldoColor};font-weight:600">${saldoTexto}</td>
+    <td style="white-space:nowrap;"><span class="ver-desglose-btn">Historial de Pagos ▾</span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>`;
@@ -5355,8 +5355,10 @@ function renderHistorialTodos(){
   </tr></thead><tbody>
   ${mostrar.map(p=>{
     const full = contractLabel(p.contratoId);
+    const c = contracts.find(x=>x.id===p.contratoId);
+    const historico = c ? !isActiveContract(c) : false;
     return `<tr>
-    <td class="cell-tap-full" title="${esc(full)}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${esc(full)}</span></td>
+    <td class="cell-tap-full" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})" title="Tocar para ver el historial completo de este arrendatario"><span class="cell-clamp-2">${esc(full)}</span></td>
     <td class="mono">${formatDate(p.fechaPago)}</td>
     <td class="mono cell-stacked">
       <div>${money(p.montoPagado)}</div>
