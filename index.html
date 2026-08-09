@@ -235,10 +235,6 @@
   .confirm-modal-btn-row{display:flex;gap:10px;}
   .confirm-modal-btn-row .btn{flex:1;padding:14px;font-size:15px;}
   #confirm-modal-accept-btn{background:var(--brick);color:#fff;}
-  @media (min-width: 861px){
-    .result-modal-overlay{background:rgba(22,38,31,0.72);backdrop-filter:blur(2px);}
-    .result-modal-card{background:var(--card);border-radius:14px;padding:32px;box-shadow:0 16px 40px rgba(22,38,31,0.3);}
-  }
   /* Calendario visual propio, reemplaza al selector nativo de fecha (que varía mucho entre
      navegadores/dispositivos) por una experiencia consistente en toda la app. */
   input[type="date"].cal-input{background:#fdfdfc url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%234B5951" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>') no-repeat right 10px center;background-size:16px;padding-right:34px;cursor:pointer;}
@@ -395,6 +391,15 @@
     #chart-year-filter{padding:8px 6px;font-size:13px;}
     /* Título de la matriz de pagos: reduce un poco el tamaño y evita que se corte en 2 líneas. */
     .matrix-title-mobile{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    /* Tarjetas de pago (Historial de Pagos): más compactas en mobile, sin tanto padding ni
+       elementos grandes — para que no se vean tan abultadas en una pantalla chica. */
+    .mes-card{padding:7px 2px;}
+    .mes-card-top{gap:6px;margin-bottom:2px;}
+    .mes-card-top strong{font-size:12.5px;min-width:70px;}
+    .mes-card-saldo{font-size:12.5px;}
+    .mes-card-saldo-lbl{font-size:9px;}
+    .mes-card-montos{font-size:10.5px;margin-bottom:2px;}
+    .mes-card-pago-linea{font-size:10.5px;padding:1px 0;}
     /* El scroll ocurre dentro de .main (no en la página): así el navegador (p.ej. Samsung
        Internet) no muestra su botón flotante de "ir arriba" encima de nuestra barra inferior. */
     html,body{height:100%;overflow:hidden;}
@@ -501,7 +506,7 @@
     .prop-card-header .row-actions{width:100%;}
     .sort-bar{gap:6px;}
     .sort-chip{padding:5px 10px;font-size:11px;}
-    .tag{font-size:11px;padding:3px 8px;}
+    .tag{font-size:10px;padding:2px 6px;}
     .status-msg{font-size:12.5px;}
     .mini-reload{display:none;}
     .subtabs{overflow-x:visible;flex-wrap:nowrap;padding-bottom:0;gap:6px;}
@@ -557,11 +562,11 @@
   </div>
 </div>
 
-<div id="table-modal-overlay" class="result-modal-overlay" style="display:none" onclick="if(event.target===this) closeTableModal();">
-  <div class="result-modal-card" style="max-width:720px;width:100%;text-align:left;">
-    <div class="result-modal-title" id="table-modal-title" style="text-align:left;"></div>
-    <div id="table-modal-content" style="max-height:60vh;overflow-y:auto;margin:12px 0 16px;"></div>
-    <div class="confirm-modal-btn-row">
+<div id="table-modal-overlay" class="result-modal-overlay" style="display:none;align-items:stretch;justify-content:stretch;padding:0;" onclick="if(event.target===this) closeTableModal();">
+  <div class="result-modal-card" style="max-width:none;width:100%;height:100%;text-align:left;display:flex;flex-direction:column;padding:20px;box-sizing:border-box;">
+    <div class="result-modal-title" id="table-modal-title" style="text-align:left;flex-shrink:0;"></div>
+    <div id="table-modal-content" style="flex:1;overflow-y:auto;margin:12px 0 16px;min-height:0;"></div>
+    <div class="confirm-modal-btn-row" style="flex-shrink:0;">
       <button type="button" class="btn btn-secondary" id="table-modal-export-btn" style="display:none;" onclick="exportTableModalData()">Exportar a Google Drive</button>
       <button type="button" class="btn btn-primary" onclick="closeTableModal()">Cerrar</button>
     </div>
@@ -1650,6 +1655,25 @@ function styleWorksheet(ws, widths){
 
 const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
 const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo','proximaDecisionMonto'];
+// Igual que applyColumnFormats, pero para exportaciones donde los encabezados son texto libre
+// (no coinciden exactamente con los nombres de MONEY_COLUMNS) o son dinámicos (ej. nombres de
+// mes en la matriz) — en vez de una lista blanca de columnas a formatear, se formatea CUALQUIER
+// columna numérica, excepto las que se indiquen explícitamente como texto.
+function applyMoneyFormatExcept(ws, headers, textHeaders){
+  if(!ws['!ref']) return;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  headers.forEach((h,C)=>{
+    if(textHeaders.includes(h)) return;
+    for(let R = 1; R <= range.e.r; R++){
+      const addr = XLSX.utils.encode_cell({ r:R, c:C });
+      const cell = ws[addr];
+      if(!cell || cell.v==='' || cell.v==null) continue;
+      const n = Number(cell.v);
+      if(!isNaN(n)){ cell.t = 'n'; cell.v = Math.round(n); cell.z = '"$"#,##0'; }
+    }
+  });
+}
+
 function applyColumnFormats(ws, headers){
   if(!ws['!ref']) return;
   const range = XLSX.utils.decode_range(ws['!ref']);
@@ -3386,7 +3410,7 @@ function exportarHistorialContratoModal(contratoId){
   });
   if(!filas.length){ alert('No hay datos para exportar de este arrendatario.'); return; }
   const ws = XLSX.utils.json_to_sheet(filas);
-  applyColumnFormats(ws, ['Mes','MontoEsperado','Pagado','Descuentos','Saldo','Estado','Comentario']);
+  applyMoneyFormatExcept(ws, ['Mes','MontoEsperado','Pagado','Descuentos','Saldo','Estado','Comentario'], ['Mes','Estado','Comentario']);
   styleWorksheet(ws, [16,14,14,14,14,12,32]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
@@ -3408,7 +3432,7 @@ function exportarListaDeudaModal(contratoId){
     Saldo: r.saldo===0 ? 'Sin deuda' : Number(r.saldo)
   }));
   const ws = XLSX.utils.json_to_sheet(exportRows);
-  applyColumnFormats(ws, ['Arrendatario','Saldo']);
+  applyMoneyFormatExcept(ws, ['Arrendatario','Saldo'], ['Arrendatario']);
   styleWorksheet(ws, [36,16]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Clientes con deuda');
@@ -3430,10 +3454,10 @@ function buildDeudaListHtml(contratoId){
     const saldoColor = r.saldo>0 ? 'var(--brick)' : (r.saldo<0 ? 'var(--teal-dark)' : 'var(--teal-dark)');
     const saldoTexto = sinDeuda ? 'Sin deuda' : money(r.saldo);
     const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
-    return `<tr style="cursor:pointer;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})">
-    <td class="cell-tap-full"><span class="cell-clamp-2">${etiqueta}</span></td>
+    return `<tr>
+    <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
     <td class="mono" style="color:${saldoColor};font-weight:600">${saldoTexto}</td>
-    <td style="white-space:nowrap;"><span class="ver-desglose-btn">Historial de Pagos ▾</span></td>
+    <td style="white-space:nowrap;cursor:pointer;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Historial de Pagos ▾</span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>`;
@@ -7321,7 +7345,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr${rowStyle}><td class="cell-tap-full" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})" title="Tocar para ver el historial completo de pagos"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Historial de Pagos ▸</span></td></tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;cursor:pointer;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Historial de Pagos ▸</span></td></tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
@@ -7368,6 +7392,8 @@ document.getElementById('export-matrix-btn').addEventListener('click', ()=>{
     return fila;
   });
   const ws = XLSX.utils.json_to_sheet(exportRows);
+  const headers = exportRows.length ? Object.keys(exportRows[0]) : [];
+  applyMoneyFormatExcept(ws, headers, ['Arrendatario']);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagos por mes');
   exportWorkbookToDrive(wb, 'pagos-arrendatarios-por-mes');
