@@ -131,7 +131,7 @@
   .deuda-acumulada-box.sin-deuda .val{color:var(--teal-dark);}
   .deuda-acumulada-chevron-badge{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--brick);background:#fff;border:1px solid rgba(180,67,46,0.3);border-radius:20px;padding:6px 12px;white-space:nowrap;}
   .deuda-acumulada-box.sin-deuda .deuda-acumulada-chevron-badge{color:var(--teal-dark);border-color:rgba(43,111,92,0.3);}
-  .ver-desglose-btn{display:inline-block;font-size:11px;font-weight:700;color:var(--teal-dark);background:var(--teal-soft);border-radius:20px;padding:5px 10px;white-space:nowrap;}
+  .ver-desglose-btn{display:inline-block;font-size:11px;font-weight:700;color:var(--teal-dark);background:var(--teal-soft);border-radius:20px;padding:5px 10px;white-space:nowrap;cursor:pointer;margin-top:4px;}
   .deuda-acumulada-detalle{margin:-8px 0 14px;max-width:520px;}
   .tag-pending{background:#FBF1DC;color:#8A6410;}
   .estado-select-pagado{background:#C8E6D8!important;color:var(--teal-dark)!important;border-color:var(--teal)!important;}
@@ -555,7 +555,7 @@
   </div>
 </div>
 
-<div id="result-modal-overlay" class="result-modal-overlay" style="display:none">
+<div id="result-modal-overlay" class="result-modal-overlay" style="display:none;z-index:10003;">
   <div class="result-modal-card">
     <div class="result-modal-spinner" id="result-modal-spinner" style="display:none"></div>
     <div class="result-modal-icon" id="result-modal-icon" style="display:none">✅</div>
@@ -565,7 +565,7 @@
   </div>
 </div>
 
-<div id="confirm-modal-overlay" class="result-modal-overlay" style="display:none">
+<div id="confirm-modal-overlay" class="result-modal-overlay" style="display:none;z-index:10003;">
   <div class="result-modal-card">
     <div class="result-modal-icon" id="confirm-modal-icon">🗑️</div>
     <div class="result-modal-title" id="confirm-modal-title"></div>
@@ -584,6 +584,26 @@
     <div class="confirm-modal-btn-row" style="flex-shrink:0;">
       <button type="button" class="btn btn-secondary" id="table-modal-export-btn" style="display:none;" onclick="exportTableModalData()">Exportar a Google Drive</button>
       <button type="button" class="btn btn-primary" onclick="closeTableModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="edit-payment-overlay" class="result-modal-overlay" style="display:none;z-index:10002;" onclick="if(event.target===this) closeEditPaymentModal();">
+  <div class="result-modal-card" style="max-width:440px;width:100%;text-align:left;">
+    <div class="result-modal-title" style="text-align:left;">💵 Editar pago</div>
+    <input type="hidden" id="epm-id">
+    <div class="field" style="margin-bottom:12px;"><label>Arrendatario</label><div id="epm-contrato-label" style="font-weight:600;padding:8px 0;font-size:14px;"></div></div>
+    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago</label><input type="date" id="epm-fechaPago"></div>
+    <div class="field" style="margin-bottom:12px;"><label>Monto pagado ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-montoPagado" placeholder="0"></div>
+    <div class="field" style="margin-bottom:12px;"><label>Descuentos aplicados ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-descuentos"></div>
+    <div class="field" style="margin-bottom:12px;"><label>Medio de pago</label>
+      <select id="epm-medioPago"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select>
+    </div>
+    <div class="field" style="margin-bottom:12px;"><label>Valor arriendo vigente ese mes ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-valorArriendo"></div>
+    <div class="field" style="margin-bottom:16px;"><label>Comentarios</label><textarea id="epm-comentarios" rows="2"></textarea></div>
+    <div class="confirm-modal-btn-row">
+      <button type="button" class="btn btn-secondary" onclick="closeEditPaymentModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="submitEditPaymentModal()">Guardar</button>
     </div>
   </div>
 </div>
@@ -2682,10 +2702,12 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 });
 
 // Abre el mismo modal que se usa desde "Deuda total acumulada" — con el historial completo mes
-// a mes (y la cobranza si es un histórico), en vez de navegar a otra pestaña.
+// a mes (y la cobranza si es un histórico), en vez de navegar a otra pestaña. Se pasa a sí misma
+// como función de refresco, para que al editar un pago desde adentro (en su propia modal
+// apilada encima), esta vuelva a generar su contenido con los datos ya actualizados.
 function verHistorialDeArrendatario(contratoId, historico){
-  const contenido = buildHistorialContratoHtml(contratoId, true); // true = ver todos los meses directo, sin paginar
-  showTableModal(contractLabel(contratoId), contenido, ()=>exportarHistorialContratoModal(contratoId));
+  const render = ()=> showTableModal(contractLabel(contratoId), buildHistorialContratoHtml(contratoId, true), ()=>exportarHistorialContratoModal(contratoId), render);
+  render();
 }
 
 function openAlertsTab(){
@@ -3239,6 +3261,53 @@ function resetPayForm(){
   document.getElementById('pay-valorArriendo-edit-field').style.display = 'none';
   refreshDateHints();
 }
+// Igual que editPayment, pero seguro de llamar desde dentro de la modal de tabla: si el pago se
+// estaba viendo desde otra pestaña (Resumen, Matriz), editPayment por sí solo llenaría el
+// formulario de "Ingresar pago" en la pestaña Pagos, invisible detrás de la modal — sin que se
+// note ningún cambio. En vez de navegar, se abre una modal de edición apilada encima de la
+// actual — así se puede "volver atrás" (cancelar) sin perder el contexto en el que se estaba.
+function editPaymentFromModal(id){
+  const p = payments.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('epm-id').value = id;
+  document.getElementById('epm-contrato-label').textContent = contractLabel(p.contratoId);
+  document.getElementById('epm-fechaPago').value = p.fechaPago || '';
+  document.getElementById('epm-montoPagado').value = p.montoPagado ? formatThousandsCLP(rawMoneyValue(p.montoPagado)) : '';
+  document.getElementById('epm-descuentos').value = p.descuentos ? formatThousandsCLP(rawMoneyValue(p.descuentos)) : '0';
+  document.getElementById('epm-medioPago').value = p.medioPago || 'Transferencia';
+  document.getElementById('epm-valorArriendo').value = p.valorArriendo ? formatThousandsCLP(rawMoneyValue(p.valorArriendo)) : '';
+  document.getElementById('epm-comentarios').value = p.comentarios || '';
+  document.getElementById('edit-payment-overlay').style.display = 'flex';
+}
+function closeEditPaymentModal(){
+  document.getElementById('edit-payment-overlay').style.display = 'none';
+}
+async function submitEditPaymentModal(){
+  const id = document.getElementById('epm-id').value;
+  const p = payments.find(x=>x.id===id);
+  if(!p) return;
+  const montoPagado = rawMoneyValue(document.getElementById('epm-montoPagado').value);
+  const descuentos = rawMoneyValue(document.getElementById('epm-descuentos').value);
+  if(Number(montoPagado||0)<=0 && Number(descuentos||0)<=0){
+    alert('Ingresa un monto pagado o un descuento — al menos uno de los dos debe ser mayor a $0.');
+    return;
+  }
+  const actualizado = {
+    ...p,
+    fechaPago: document.getElementById('epm-fechaPago').value,
+    montoPagado, descuentos,
+    medioPago: document.getElementById('epm-medioPago').value,
+    valorArriendo: rawMoneyValue(document.getElementById('epm-valorArriendo').value),
+    comentarios: document.getElementById('epm-comentarios').value,
+  };
+  payments = payments.map(x=> x.id===id ? actualizado : x);
+  await saveKey('payments', payments);
+  closeEditPaymentModal();
+  renderAll();
+  if(tableModalRefreshFn) tableModalRefreshFn(); // refresca la modal de tabla que quedó atrás, sin cerrarla
+  await pushToDriveAndWarn();
+}
+
 function editPayment(id){
   const p = payments.find(x=>x.id===id);
   if(!p) return;
@@ -3266,6 +3335,7 @@ async function deletePayment(id){
   payments = payments.filter(x=>x.id!==id);
   await saveKey('payments',payments);
   renderAll();
+  if(tableModalRefreshFn) tableModalRefreshFn();
   await pushToDriveAndWarn();
 }
 
@@ -3378,17 +3448,22 @@ document.getElementById('chart-tenant-filter').addEventListener('change', ()=>{
 
 // exportFn es opcional: una función sin argumentos que arma y sube el Excel correspondiente al
 // contenido que se está mostrando en ese momento. Si no se pasa, el botón de exportar se oculta.
+// refreshFn (opcional) vuelve a generar y mostrar el mismo contenido con datos frescos — se usa
+// para actualizar la modal sola después de editar un pago desde adentro, sin tener que cerrarla.
 let tableModalExportFn = null;
-function showTableModal(titulo, contenidoHtml, exportFn){
+let tableModalRefreshFn = null;
+function showTableModal(titulo, contenidoHtml, exportFn, refreshFn){
   document.getElementById('table-modal-title').textContent = titulo;
   document.getElementById('table-modal-content').innerHTML = contenidoHtml;
   tableModalExportFn = exportFn || null;
+  tableModalRefreshFn = refreshFn || null;
   document.getElementById('table-modal-export-btn').style.display = exportFn ? 'inline-block' : 'none';
   document.getElementById('table-modal-overlay').style.display = 'flex';
 }
 function closeTableModal(){
   document.getElementById('table-modal-overlay').style.display = 'none';
   tableModalExportFn = null;
+  tableModalRefreshFn = null;
 }
 function exportTableModalData(){
   if(tableModalExportFn) tableModalExportFn();
@@ -3462,7 +3537,7 @@ function buildDeudaListHtml(contratoId){
   });
   if(!rows.length) return '<div class="empty">No hay arrendatarios registrados todavía.</div>';
   return `<div class="table-scroll"><table><thead><tr>
-    ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}<th></th>
+    ${th('resumen','contrato','Arrendatario (Dirección — Nemo)')}${th('resumen','saldo','Saldo')}
   </tr></thead><tbody>
   ${rows.map(r=>{
     const sinDeuda = r.saldo===0;
@@ -3470,9 +3545,8 @@ function buildDeudaListHtml(contratoId){
     const saldoTexto = sinDeuda ? 'Sin deuda' : money(r.saldo);
     const etiqueta = r.historico ? esc(contractLabel(r.c.id)) + ' <span class="tag tag-pending">Histórico</span>' : esc(contractLabel(r.c.id));
     return `<tr>
-    <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
+    <td class="cell-tap-full"><span class="cell-clamp-2" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))">${etiqueta}</span><br><span class="ver-desglose-btn" title="Historial de Pagos" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})">🕘<span class="ver-desglose-txt"> Historial de Pagos</span></span></td>
     <td class="mono" style="color:${saldoColor};font-weight:600">${saldoTexto}</td>
-    <td style="white-space:nowrap;cursor:pointer;text-align:center;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn" title="Historial de Pagos">🕘<span class="ver-desglose-txt"> Historial de Pagos</span></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>`;
@@ -5391,14 +5465,14 @@ function renderHistorialTodos(){
   const mostrar = historialTodosVerTodo ? list : list.slice(0,12);
 
   el.innerHTML = `<div class="table-scroll"><table><thead><tr>
-    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Pagado / Desc. / Arriendo')}${th('payments-todos','comentarios','Comentarios')}<th></th>
+    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Pagado / Desc. / Arriendo')}${th('payments-todos','comentarios','Comentarios')}
   </tr></thead><tbody>
   ${mostrar.map(p=>{
     const full = contractLabel(p.contratoId);
     const c = contracts.find(x=>x.id===p.contratoId);
     const historico = c ? !isActiveContract(c) : false;
     return `<tr>
-    <td class="cell-tap-full" title="${esc(full)}${historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${esc(full)}</span></td>
+    <td class="cell-tap-full"><span class="cell-clamp-2" title="${esc(full)}${historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(full)}</span><br><span class="ver-desglose-btn" title="Ver todos los pagos" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})">🕘<span class="ver-desglose-txt"> Ver todos</span></span></td>
     <td class="mono">${formatDate(p.fechaPago)}</td>
     <td class="mono cell-stacked">
       <div>${money(p.montoPagado)}</div>
@@ -5406,7 +5480,6 @@ function renderHistorialTodos(){
       ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
     </td>
     <td class="cell-comments">${commentCellHtml(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
-    <td style="white-space:nowrap;cursor:pointer;text-align:center;" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})"><span class="ver-desglose-btn" title="Ver todos los pagos">🕘<span class="ver-desglose-txt"> Ver todos</span></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -5448,7 +5521,7 @@ function buildHistorialContratoHtml(contratoId, verTodoOverride){
       ? pagosMes.map(p=>{
           const comentario = p.comentarios ? truncateText(p.comentarios, 36) : '';
           return `<div class="mes-card-pago-linea">${formatDate(p.fechaPago)} · ${money(p.montoPagado)}${Number(p.descuentos)?(' · desc. '+money(p.descuentos)):''}${comentario?(' · '+esc(comentario)):''}
-            <button onclick="editPayment('${p.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;margin-left:4px;">✏️</button>
+            <button onclick="editPaymentFromModal('${p.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;margin-left:4px;">✏️</button>
             <button onclick="deletePayment('${p.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:12px;">🗑️</button>
           </div>`;
         }).join('')
@@ -5503,7 +5576,7 @@ function buildCobranzaRowsHtml(c){
         <span class="mes-card-saldo">${money(Number(p.montoPagado||0))}${Number(p.descuentos)?(' + '+money(p.descuentos)+' desc.'):''}</span>
       </div>
       <div class="mes-card-pago-linea">${comentario?esc(comentario):''}
-        <button onclick="editPayment('${p.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;margin-left:4px;">✏️</button>
+        <button onclick="editPaymentFromModal('${p.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;margin-left:4px;">✏️</button>
         <button onclick="deletePayment('${p.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:12px;">🗑️</button>
       </div>
     </div>`;
@@ -7369,7 +7442,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr${rowStyle}><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;cursor:pointer;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn" title="Historial de Pagos">🕘<span class="ver-desglose-txt"> Historial de Pagos</span></span></td></tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full"><span class="cell-clamp-2" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))">${etiqueta}</span><br><span class="ver-desglose-btn" title="Historial de Pagos" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})">🕘<span class="ver-desglose-txt"> Historial de Pagos</span></span></td>${cells}</tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
@@ -7385,7 +7458,7 @@ function renderResumenMatrix(){
       ${totDescuento ? `<div class="cell-stacked-sub">Desc: ${money(totDescuento)}</div>` : ''}
     </td>`;
   }).join('');
-  const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}<td></td></tr>`;
+  const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}</tr>`;
 
   const toggleHtml = (!yearFiltro && total>2) ? `<div class="table-scroll-toggle">
     <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
@@ -7393,7 +7466,7 @@ function renderResumenMatrix(){
     </button>
   </div>` : '';
 
-  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}<th></th></tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
 
   // Se guarda exactamente lo que se está mostrando ahora mismo (mismos meses, mismas filas, con
   // el mismo filtro aplicado) para que "Exportar a Google Drive" exporte tal cual lo que se ve
