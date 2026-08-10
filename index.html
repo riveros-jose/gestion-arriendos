@@ -734,11 +734,9 @@
         <div class="field"><label>Servicio</label>
           <select id="bs-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select>
         </div>
-        <div class="field"><label>Sector</label>
-          <select id="bs-sector"><option value="1">Sector 1</option><option value="2">Sector 2</option></select>
-        </div>
         <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
       </div>
+      <div class="subtitle" style="margin:6px 0 0;font-size:11.5px;">El sector se detecta automáticamente según la dirección que figura en la boleta — no hace falta indicarlo.</div>
       <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
       <div class="btn-row">
         <button type="submit" class="btn btn-primary">Guardar boleta del sector</button>
@@ -4208,15 +4206,6 @@ function closeBoletaSectorModal(){
 }
 document.getElementById('toggle-boleta-btn').addEventListener('click', openBoletaSectorModal);
 
-// La Luz siempre corresponde al Sector 1, sin importar la dirección — se fija y se bloquea el
-// combobox de sector para que no se pueda elegir otro por error.
-document.getElementById('bs-servicio').addEventListener('change', ()=>{
-  const esLuz = document.getElementById('bs-servicio').value==='Luz';
-  const selSector = document.getElementById('bs-sector');
-  if(esLuz){ selSector.value = '1'; selSector.disabled = true; }
-  else{ selSector.disabled = false; }
-});
-
 const SECTOR_NOMBRES = { 1: 'Sector1-SargentoAldea1088', 2: 'Sector2-SanDiego1946-1954' };
 async function subirBoletaSector(file, servicio, sector, mes, datos){
   if(!driveToken) throw new Error('No estás conectado a Google Drive.');
@@ -4411,7 +4400,7 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   if(!file){ alert('Elige el archivo PDF de la boleta.'); return; }
   if(!driveToken){ alert('Para subir la boleta primero debes estar conectado a Google Drive.'); return; }
 
-  statusEl.textContent = '🔎 Leyendo boleta…';
+  showLoadingModal('🔎 Leyendo boleta…');
   let datos = { total:null, consumo:null, mes:null, sector:null };
   try{
     const text = await extractPdfText(file);
@@ -4419,24 +4408,29 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   }catch(err){ console.error('Error leyendo PDF', err); }
 
   // El sector se detecta automáticamente según la dirección que figura en la boleta (Sargento
-  // Aldea 1088 = Sector 1, San Diego 1950 = Sector 2). Si no se logra detectar, se usa lo que
-  // esté elegido manualmente en el combobox como respaldo.
-  // La Luz siempre corresponde al Sector 1, sin importar la dirección de la boleta.
-  const sector = servicio==='Luz' ? 1 : (datos.sector || Number(document.getElementById('bs-sector').value));
-  document.getElementById('bs-sector').value = sector;
+  // Aldea 1088 = Sector 1, San Diego 1950 = Sector 2) — ya no se pide elegirlo a mano. La Luz
+  // siempre corresponde al Sector 1, sin importar la dirección de la boleta. Si no se logra
+  // detectar (Agua/Gas con un PDF que no trae la dirección reconocible), se avisa y se detiene
+  // en vez de adivinar un sector que podría quedar mal clasificado.
+  let sector = servicio==='Luz' ? 1 : datos.sector;
+  if(!sector){
+    closeResultModal();
+    alert('No se pudo detectar automáticamente a qué sector corresponde esta boleta (no se reconoció la dirección en el PDF). Revisa que sea el archivo correcto — si el problema persiste, puede que el formato de esta boleta sea distinto al habitual.');
+    return;
+  }
 
   // El mes de la boleta se obtiene automáticamente de su fecha de vencimiento. Si por algún
   // motivo no se pudo leer, se usa el mes actual como respaldo.
   const mes = datos.mes || mesActualKey();
 
-  statusEl.textContent = 'Subiendo boleta a Drive…';
+  showLoadingModal('Subiendo boleta a Drive…');
   let boletaUrl;
   try{
     boletaUrl = await subirBoletaSector(file, servicio, sector, mes, datos);
   }catch(err){
     console.error('Error subiendo boleta de sector', err);
+    closeResultModal();
     alert('No se pudo subir la boleta a Drive: '+(err.message||err));
-    statusEl.textContent = '';
     return;
   }
 
@@ -4444,16 +4438,13 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   const obj = { id: existente ? existente.id : uid(), servicio, sector, mes, total: datos.total||'', consumo: datos.consumo||'', lecturaActual: (datos.lecturaActual!==null && datos.lecturaActual!==undefined) ? datos.lecturaActual : '', boletaUrl };
   sectorBoletas = existente ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
-  statusEl.textContent = '';
   document.getElementById('form-boleta-sector').reset();
-  document.getElementById('bs-sector').disabled = false;
   renderSectorBoletasList();
   renderFlujoCobro();
   const driveOk = await pushToDriveIfConnected();
-  const resumenBoleta = `Boleta de ${servicio} — Sector ${sector}${datos.sector?' (detectado automáticamente)':' (elegido manualmente, no se detectó en la boleta)'}, mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.`;
-  showFormStatus('bs-status',
-    driveOk ? `✓ ${resumenBoleta}` : `⚠ El PDF se subió, pero no se pudo confirmar el registro en Google Drive — revisa tu conexión. ${resumenBoleta}`,
-    driveOk, 8000);
+  const resumenBoleta = `Boleta de ${servicio} — Sector ${sector} (detectado automáticamente), mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.`;
+  closeResultModal();
+  showResultModal(driveOk ? `✓ ${resumenBoleta}` : `⚠ El PDF se subió, pero no se pudo confirmar el registro en Google Drive — revisa tu conexión. ${resumenBoleta}`, driveOk);
 
   if(datos.total && datos.consumo){
     const valorBoleta = Math.round(datos.total / datos.consumo);
