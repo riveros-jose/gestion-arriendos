@@ -703,7 +703,7 @@
   </div>
 </div>
 
-<div id="boleta-mismatch-overlay" class="drive-gate-overlay" style="display:none">
+<div id="boleta-mismatch-overlay" class="drive-gate-overlay" style="display:none;z-index:10004;">
   <div class="drive-gate-card" style="max-width:520px;text-align:left;">
     <h2 style="text-align:left;">⚠️ Revisar lecturas vs. boleta</h2>
     <p id="boleta-mismatch-title" style="text-align:left;font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;"></p>
@@ -3147,7 +3147,7 @@ function renderTenantsContracts(){
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
         <div class="row-actions-always-visible" style="gap:6px;flex-wrap:wrap;align-items:center;">
-          <button class="btn contract-update-btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')" title="Actualizar o finalizar contrato">🔄<span class="contract-update-text"> Actualizar o finalizar contrato</span></button>
+          <button class="btn contract-update-btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')" title="Actualizar o finalizar contrato">📜➕<span class="contract-update-text"> Actualizar o finalizar contrato</span></button>
         </div>
         <div class="row-actions" style="gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="table-action-btn" title="Editar" onclick="editTenantContract('${c.tenantId}','${c.id}')">✏️</button>
@@ -4423,6 +4423,27 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
   // motivo no se pudo leer, se usa el mes actual como respaldo.
   const mes = datos.mes || mesActualKey();
 
+  // Si ya existe una boleta del mismo servicio + sector + mes, se avisa ANTES de subir el
+  // archivo a Drive (así no se sube un PDF que después se termina descartando si la persona
+  // cancela). Confirmar reemplaza la boleta anterior por esta.
+  const existentePrevio = sectorBoletas.find(b=> b.servicio===servicio && b.sector===sector && b.mes===mes);
+  if(existentePrevio){
+    closeResultModal();
+    const reemplazar = await showConfirmModal({
+      icono: '⚠️',
+      titulo: 'Esta boleta ya estaría duplicada',
+      detalles: [
+        { label:'Servicio', value: servicio },
+        { label:'Sector', value: 'Sector '+sector },
+        { label:'Mes', value: mes },
+        { label:'Nota', value: 'Ya existe una boleta registrada para este mismo servicio, sector y mes.' },
+      ],
+      textoConfirmar: 'Reemplazar la anterior',
+      textoCancelar: 'Cancelar',
+    });
+    if(!reemplazar) return;
+  }
+
   showLoadingModal('Subiendo boleta a Drive…');
   let boletaUrl;
   try{
@@ -4434,17 +4455,27 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
     return;
   }
 
-  const existente = sectorBoletas.find(b=> b.servicio===servicio && b.sector===sector && b.mes===mes);
-  const obj = { id: existente ? existente.id : uid(), servicio, sector, mes, total: datos.total||'', consumo: datos.consumo||'', lecturaActual: (datos.lecturaActual!==null && datos.lecturaActual!==undefined) ? datos.lecturaActual : '', boletaUrl };
-  sectorBoletas = existente ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
+  const obj = { id: existentePrevio ? existentePrevio.id : uid(), servicio, sector, mes, total: datos.total||'', consumo: datos.consumo||'', lecturaActual: (datos.lecturaActual!==null && datos.lecturaActual!==undefined) ? datos.lecturaActual : '', boletaUrl };
+  sectorBoletas = existentePrevio ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
   document.getElementById('form-boleta-sector').reset();
   renderSectorBoletasList();
   renderFlujoCobro();
   const driveOk = await pushToDriveIfConnected();
-  const resumenBoleta = `Boleta de ${servicio} — Sector ${sector} (detectado automáticamente), mes ${mes}${datos.total?`, total ${money(datos.total)}${datos.consumo?`, consumo ${formatNumber(datos.consumo)}`:''}`:''}.`;
+  const [mesAnio, mesNum] = mes.split('-');
+  const mesLabel = `${MESES_ES[Number(mesNum)-1]} ${mesAnio}`;
+  const detallesBoleta = [
+    { label:'Servicio', value: servicio },
+    { label:'Sector', value: `Sector ${sector} (detectado automáticamente)` },
+    { label:'Mes', value: mesLabel },
+    { label:'Total', value: datos.total ? money(datos.total) : '' },
+    { label:'Consumo', value: datos.consumo ? formatNumber(datos.consumo) : '' },
+  ];
   closeResultModal();
-  showResultModal(driveOk ? `✓ ${resumenBoleta}` : `⚠ El PDF se subió, pero no se pudo confirmar el registro en Google Drive — revisa tu conexión. ${resumenBoleta}`, driveOk);
+  showResultModal({
+    titulo: driveOk ? '✅ Boleta guardada en Google Drive' : '⚠ El PDF se subió, pero no se pudo confirmar el registro en Google Drive — revisa tu conexión.',
+    detalles: detallesBoleta,
+  }, driveOk);
 
   if(datos.total && datos.consumo){
     const valorBoleta = Math.round(datos.total / datos.consumo);
@@ -4519,14 +4550,20 @@ function etiquetaBoleta(servicio, mes){
   return `${servicio}_${nombreMes}_${anio}`;
 }
 
-let sectorBoletasVerTodas = false;
 function renderSectorBoletasList(){
   const el = document.getElementById('sector-boletas-list');
   if(!el) return;
   if(!sectorBoletas.length){ el.innerHTML = '<div class="empty">Aún no hay boletas cargadas.</div>'; return; }
-  const ordenadas = [...sectorBoletas].sort((a,b)=> b.mes.localeCompare(a.mes) || a.sector-b.sector);
-  const mostrar = sectorBoletasVerTodas ? ordenadas : ordenadas.slice(0,2);
-  const filas = mostrar.map(b=>{
+  // Solo se muestra la boleta VIGENTE de cada combinación servicio+sector (la de mes más
+  // reciente) — las antiguas quedan guardadas igual (siguen aplicándose a lecturas de su propio
+  // periodo), pero ya no aparecen acá para no saturar la vista con historial.
+  const vigentesPorGrupo = {};
+  sectorBoletas.forEach(b=>{
+    const key = `${b.servicio}-${b.sector}`;
+    if(!vigentesPorGrupo[key] || b.mes > vigentesPorGrupo[key].mes) vigentesPorGrupo[key] = b;
+  });
+  const vigentes = Object.values(vigentesPorGrupo).sort((a,b)=> b.mes.localeCompare(a.mes) || a.sector-b.sector);
+  const filas = vigentes.map(b=>{
     const unidad = b.servicio==='Luz' ? 'kWh' : 'm³';
     return `
     <div class="wa-compact-row">
@@ -4535,13 +4572,7 @@ function renderSectorBoletasList(){
       <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteSectorBoleta('${b.id}')">🗑️</button>
     </div>`;
   }).join('');
-  const toggle = ordenadas.length>2
-    ? `<div style="text-align:center;margin-top:10px">
-        <button type="button" class="btn btn-secondary" onclick="sectorBoletasVerTodas=!sectorBoletasVerTodas;renderSectorBoletasList();">
-          ${sectorBoletasVerTodas ? 'Ver solo las últimas 2' : `Ver todas (${ordenadas.length})`}
-        </button>
-      </div>` : '';
-  el.innerHTML = `<div class="wa-compact-list">${filas}</div>${toggle}`;
+  el.innerHTML = `<div class="wa-compact-list">${filas}</div>`;
 }
 
 // ---- Conciliación: si la boleta se sube DESPUÉS de ya haber ingresado lecturas de Agua de ese
