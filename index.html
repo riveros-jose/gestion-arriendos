@@ -111,12 +111,12 @@
      lea toda la información sin tener que hacer scroll hacia los lados. */
   .mes-card-list{display:flex;flex-direction:column;}
   .mes-card{padding:10px 4px;border-bottom:1px solid var(--border);}
-  .mes-card-sinpago{background:var(--brick-soft);}
-  .mes-card-parcial{background:#FBEEEA;}
-  .mes-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;}
+  .mes-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0;}
   .mes-card-top strong{flex:1;min-width:90px;}
   .mes-card-saldo{font-weight:700;margin-left:auto;white-space:nowrap;}
   .mes-card-saldo-lbl{font-weight:400;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-soft);}
+  .mes-card-chevron{color:var(--ink-soft);font-size:11px;flex-shrink:0;}
+  .mes-card-detail{margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);}
   .mes-card-montos{font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
   .mes-card-pago-linea{font-size:12px;color:var(--ink-soft);padding:2px 0;}
   .mono{font-family:'Inter',sans-serif;}
@@ -490,6 +490,12 @@
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
     .row-actions{gap:6px;flex-wrap:wrap;}
     .row-actions-always-visible{gap:6px;flex-wrap:wrap;}
+    /* Botón de "Actualizar o finalizar contrato": en mobile queda como ícono chico cuando la
+       tarjeta está colapsada (para no chocar con el título), y muestra el texto completo recién
+       cuando la tarjeta se despliega. */
+    .contract-update-btn{padding:6px 9px;}
+    .contract-update-text{display:none;}
+    .prop-card:not(.collapsed) .contract-update-text{display:inline;}
     .row-actions button{
       background:var(--paper);border:1px solid var(--border);border-radius:16px;
       padding:6px 11px;font-size:12px;text-decoration:none;color:var(--ink);
@@ -3097,7 +3103,7 @@ function renderTenantsContracts(){
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
         <div class="row-actions-always-visible" style="gap:6px;flex-wrap:wrap;align-items:center;">
-          <button class="btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="openUpdateContractModal('${c.id}')">Actualizar o finalizar contrato</button>
+          <button class="btn contract-update-btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')" title="Actualizar o finalizar contrato">📝<span class="contract-update-text"> Actualizar o finalizar contrato</span></button>
         </div>
         <div class="row-actions" style="gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="table-action-btn" title="Editar" onclick="editTenantContract('${c.tenantId}','${c.id}')">✏️</button>
@@ -5376,14 +5382,14 @@ function renderHistorialTodos(){
   const mostrar = historialTodosVerTodo ? list : list.slice(0,12);
 
   el.innerHTML = `<div class="table-scroll"><table><thead><tr>
-    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Pagado / Desc. / Arriendo')}${th('payments-todos','comentarios','Comentarios')}
+    ${th('payments-todos','contrato','Contrato')}${th('payments-todos','fechaPago','Fecha pago')}${th('payments-todos','montoPagado','Pagado / Desc. / Arriendo')}${th('payments-todos','comentarios','Comentarios')}<th></th>
   </tr></thead><tbody>
   ${mostrar.map(p=>{
     const full = contractLabel(p.contratoId);
     const c = contracts.find(x=>x.id===p.contratoId);
     const historico = c ? !isActiveContract(c) : false;
     return `<tr>
-    <td class="cell-tap-full" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})" title="Tocar para ver el historial completo de este arrendatario"><span class="cell-clamp-2">${esc(full)}</span></td>
+    <td class="cell-tap-full" title="${esc(full)}${historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${esc(full)}</span></td>
     <td class="mono">${formatDate(p.fechaPago)}</td>
     <td class="mono cell-stacked">
       <div>${money(p.montoPagado)}</div>
@@ -5391,6 +5397,7 @@ function renderHistorialTodos(){
       ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
     </td>
     <td class="cell-comments">${commentCellHtml(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
+    <td style="white-space:nowrap;cursor:pointer;" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})"><span class="ver-desglose-btn">Ver todos los pagos ▸</span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -5402,6 +5409,18 @@ function renderHistorialTodos(){
 }
 
 let historialMensualVerTodo = false;
+// Alterna el detalle (montos, pagos individuales, fechas) de una tarjeta de mes — no necesita
+// volver a renderizar toda la lista, solo muestra/oculta ese bloque puntual y gira su flechita.
+function toggleMesCardDetail(id, headerEl){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const abrir = el.style.display==='none';
+  el.style.display = abrir ? 'block' : 'none';
+  if(headerEl){
+    const chevron = headerEl.querySelector('.mes-card-chevron');
+    if(chevron) chevron.textContent = abrir ? '▴' : '▾';
+  }
+}
 function buildHistorialContratoHtml(contratoId, verTodoOverride){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c || !effectiveDebtStartDate(contratoId)) return '<div class="empty">Este contrato no tiene fecha de inicio ni pagos registrados.</div>';
@@ -5413,16 +5432,9 @@ function buildHistorialContratoHtml(contratoId, verTodoOverride){
   const filasHtml = series.map(d=>{
     const pagosMes = payments.filter(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,d.year,d.month));
     const saldo = d.monto - (d.pagado+d.descuento);
-    let estado, tagClass;
-    if(saldo<0){ estado='A favor'; tagClass='tag-ok'; }
-    else if(pagosMes.length===0){ estado='Sin pago'; tagClass='tag-debt'; }
-    else if(saldo>0){ estado='Parcial'; tagClass='tag-pending'; }
-    else { estado='Pagado'; tagClass='tag-ok'; }
-    // Misma lógica de colores que la matriz: rojo fuerte para "sin pago" (equivalente a "Sin
-    // registro" ahí), rojo clarito para "parcial" — así todo se lee igual de un vistazo.
-    let cardClass = '';
-    if(estado==='Sin pago') cardClass = ' mes-card-sinpago';
-    else if(estado==='Parcial') cardClass = ' mes-card-parcial';
+    // Solo rojo (queda saldo por pagar) o verde (se abonó de más) — sin etiqueta de estado
+    // aparte, el color del saldo ya lo dice todo de un vistazo.
+    const saldoColor = saldo>0 ? 'var(--brick)' : (saldo<0 ? 'var(--teal-dark)' : 'inherit');
     const detalle = pagosMes.length
       ? pagosMes.map(p=>{
           const comentario = p.comentarios ? truncateText(p.comentarios, 36) : '';
@@ -5432,14 +5444,17 @@ function buildHistorialContratoHtml(contratoId, verTodoOverride){
           </div>`;
         }).join('')
       : '<div class="mes-card-pago-linea" style="color:var(--ink-soft);">Sin pagos registrados este mes</div>';
-    return `<div class="mes-card${cardClass}">
-      <div class="mes-card-top">
+    const detailId = `mesdet-${contratoId}-${d.year}-${d.month}`;
+    return `<div class="mes-card">
+      <div class="mes-card-top" style="cursor:pointer;" onclick="toggleMesCardDetail('${detailId}', this)">
         <strong>${MESES_ES[d.month]} ${d.year}</strong>
-        <span class="tag ${tagClass}">${estado}</span>
-        <span class="mes-card-saldo" style="color:${saldo>0?'var(--brick)':(saldo<0?'var(--teal-dark)':'inherit')}"><span class="mes-card-saldo-lbl">Saldo:</span> ${money(saldo)}</span>
+        <span class="mes-card-saldo" style="color:${saldoColor}"><span class="mes-card-saldo-lbl">Saldo:</span> ${money(saldo)}</span>
+        <span class="mes-card-chevron">▾</span>
       </div>
-      <div class="mes-card-montos">Esperado ${money(d.monto)} · Pagado ${money(d.pagado)} · Desc. ${money(d.descuento)}</div>
-      ${detalle}
+      <div id="${detailId}" class="mes-card-detail" style="display:none;">
+        <div class="mes-card-montos">Esperado ${money(d.monto)} · Pagado ${money(d.pagado)} · Desc. ${money(d.descuento)}</div>
+        ${detalle}
+      </div>
     </div>`;
   }).join('');
 
