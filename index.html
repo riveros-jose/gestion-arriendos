@@ -726,6 +726,29 @@
   </div>
 </div>
 
+<div id="boleta-sector-overlay" class="drive-gate-overlay" style="display:none">
+  <div class="drive-gate-card" style="max-width:480px;text-align:left;">
+    <h2 style="text-align:left;">📄 Cargar boleta de sector</h2>
+    <form id="form-boleta-sector" class="form-compact">
+      <div class="grid">
+        <div class="field"><label>Servicio</label>
+          <select id="bs-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select>
+        </div>
+        <div class="field"><label>Sector</label>
+          <select id="bs-sector"><option value="1">Sector 1</option><option value="2">Sector 2</option></select>
+        </div>
+        <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
+      </div>
+      <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">Guardar boleta del sector</button>
+        <button type="button" class="btn btn-secondary" onclick="closeBoletaSectorModal()">Cerrar</button>
+      </div>
+    </form>
+    <div id="sector-boletas-list" style="margin-top:14px"></div>
+  </div>
+</div>
+
 <div class="app">
 <div class="mobile-topbar">
   <div class="topbar-group">
@@ -1170,22 +1193,6 @@
           <div class="status-msg" id="r-estimate-box" style="display:none;background:var(--teal-soft);color:var(--teal-dark);border:1px solid var(--teal);border-radius:6px;padding:6px 9px;margin-top:8px;font-weight:600;font-size:12px;"></div>
           <div class="status-msg" id="r-status"></div>
         </form>
-        <div id="boleta-sector-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-          <form id="form-boleta-sector" class="form-compact">
-            <div class="grid">
-              <div class="field"><label>Servicio</label>
-                <select id="bs-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select>
-              </div>
-              <div class="field"><label>Sector</label>
-                <select id="bs-sector"><option value="1">Sector 1</option><option value="2">Sector 2</option></select>
-              </div>
-              <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
-            </div>
-            <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
-            <div class="btn-row"><button type="submit" class="btn btn-primary">Guardar boleta del sector</button></div>
-          </form>
-          <div id="sector-boletas-list" style="margin-top:14px"></div>
-        </div>
       </div>
       <div class="card">
         <h2>🔄 Flujo de cobro de servicios</h2>
@@ -4192,10 +4199,14 @@ function parseBoletaServicio(text){
   };
 }
 // ---- Boleta de agua por sector: el agua se factura por sector completo, no por unidad ----
-document.getElementById('toggle-boleta-btn').addEventListener('click', ()=>{
-  const panel = document.getElementById('boleta-sector-panel');
-  panel.style.display = panel.style.display==='none' ? 'block' : 'none';
-});
+function openBoletaSectorModal(){
+  document.getElementById('boleta-sector-overlay').style.display = 'flex';
+  renderSectorBoletasList();
+}
+function closeBoletaSectorModal(){
+  document.getElementById('boleta-sector-overlay').style.display = 'none';
+}
+document.getElementById('toggle-boleta-btn').addEventListener('click', openBoletaSectorModal);
 
 // La Luz siempre corresponde al Sector 1, sin importar la dirección — se fija y se bloquea el
 // combobox de sector para que no se pueda elegir otro por error.
@@ -4342,13 +4353,23 @@ document.getElementById('ver-boletas-btn').addEventListener('click', async ()=>{
       });
     });
 
-    listEl.innerHTML = conDatos.map(a=>{
+    // Las boletas "en uso" (vigentes) quedan arriba de todo; dentro de cada grupo, el resto se
+    // ordena igual que antes (por nombre, ya venía así desde Drive).
+    const ordenados = conDatos.slice().sort((a,b)=>{
+      const aVigente = a.servicio && a.sector && vigentePorGrupo[`${a.servicio}-${a.sector}`]===a.id;
+      const bVigente = b.servicio && b.sector && vigentePorGrupo[`${b.servicio}-${b.sector}`]===b.id;
+      if(aVigente !== bVigente) return aVigente ? -1 : 1;
+      return 0;
+    });
+
+    listEl.innerHTML = ordenados.map(a=>{
       const esVigente = a.servicio && a.sector && vigentePorGrupo[`${a.servicio}-${a.sector}`]===a.id;
       return `<div class="alert-card ${esVigente?'u3':''}" style="margin-bottom:8px;${esVigente?'':'border-left-color:var(--gris-linea);'}">
         <div class="title">${a.servicio?`${a.servicio} — `:''}${a.sector?`Sector ${a.sector}`:'Sector no identificado'}${a.mes?` — ${a.mes}`:''} ${esVigente?'<span class="tag tag-ok">✅ En uso</span>':''}</div>
         <div class="alert-line" style="font-size:11.5px;word-break:break-all;">${esc(a.name)}</div>
         <div class="row-actions" style="margin-top:6px;">
           <a href="${esc(a.webViewLink)}" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none;">📄 Ver PDF</a>
+          <button type="button" class="table-action-btn danger" title="Eliminar de Drive" onclick="eliminarBoletaDeDrive('${a.id}', '${esc(a.name).replace(/'/g,"\\'")}')">🗑️</button>
         </div>
       </div>`;
     }).join('');
@@ -4357,6 +4378,30 @@ document.getElementById('ver-boletas-btn').addEventListener('click', async ()=>{
     listEl.innerHTML = `<div class="empty">⚠ No se pudo leer el listado de Drive: ${esc(err.message||err)}</div>`;
   }
 });
+
+// Elimina el archivo REAL en Google Drive (no solo un registro interno de la app) — se usa desde
+// la modal "Ver boletas cargadas", que lista directamente lo que hay en la carpeta de Drive.
+async function eliminarBoletaDeDrive(fileId, nombreArchivo){
+  const ok = await showConfirmModal({
+    titulo: '¿Eliminar esta boleta de Drive?',
+    detalles: [
+      { label:'Archivo', value: nombreArchivo },
+      { label:'Nota', value: 'Se elimina el PDF de tu Google Drive — no se puede deshacer.' },
+    ],
+  });
+  if(!ok) return;
+  try{
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method:'DELETE',
+      headers:{ Authorization:'Bearer '+driveToken }
+    });
+    if(!res.ok && res.status!==404) throw new Error('HTTP '+res.status);
+    document.getElementById('ver-boletas-btn').click();
+  }catch(err){
+    console.error('Error eliminando boleta de Drive', err);
+    alert('No se pudo eliminar el archivo de Drive: '+(err.message||err));
+  }
+}
 
 document.getElementById('form-boleta-sector').addEventListener('submit', async e=>{
   e.preventDefault();
