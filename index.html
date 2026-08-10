@@ -235,6 +235,14 @@
   .confirm-modal-btn-row{display:flex;gap:10px;}
   .confirm-modal-btn-row .btn{flex:1;padding:14px;font-size:15px;}
   #confirm-modal-accept-btn{background:var(--brick);color:#fff;}
+  /* La modal de tabla (historial de pagos, deuda, etc.) va a pantalla completa en mobile — tiene
+     sentido ahí, la pantalla ya es angosta. Pero en desktop, estirarla a todo el ancho deja las
+     filas "Mes ........... Saldo" con un espacio enorme en el medio, difícil de leer. Ahí se
+     restringe a un tamaño de ventana razonable, centrada, como un diálogo normal. */
+  @media (min-width: 861px){
+    #table-modal-overlay{align-items:center !important;justify-content:center !important;padding:24px !important;background:rgba(22,38,31,0.72);backdrop-filter:blur(2px);}
+    #table-modal-overlay .result-modal-card{max-width:640px !important;width:100%;height:min(680px,85vh);max-height:85vh;border-radius:14px;box-shadow:0 16px 40px rgba(22,38,31,0.3);}
+  }
   /* Calendario visual propio, reemplaza al selector nativo de fecha (que varía mucho entre
      navegadores/dispositivos) por una experiencia consistente en toda la app. */
   input[type="date"].cal-input{background:#fdfdfc url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%234B5951" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>') no-repeat right 10px center;background-size:16px;padding-right:34px;cursor:pointer;}
