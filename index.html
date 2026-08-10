@@ -491,11 +491,20 @@
     .row-actions{gap:6px;flex-wrap:wrap;}
     .row-actions-always-visible{gap:6px;flex-wrap:wrap;}
     /* Botón de "Actualizar o finalizar contrato": en mobile queda como ícono chico cuando la
-       tarjeta está colapsada (para no chocar con el título), y muestra el texto completo recién
-       cuando la tarjeta se despliega. */
+       tarjeta está colapsada (para no chocar con el título). Al desplegar la tarjeta, en vez de
+       forzarlo a compartir la fila angosta del título, pasa a su propia fila completa abajo. */
     .contract-update-btn{padding:6px 9px;}
     .contract-update-text{display:none;}
     .prop-card:not(.collapsed) .contract-update-text{display:inline;}
+    .prop-card:not(.collapsed) .row-actions-always-visible{width:100%;order:10;margin-top:2px;}
+    .prop-card:not(.collapsed) .contract-update-btn{width:100%;text-align:center;padding:10px 12px;font-size:13px;}
+    /* "Historial de Pagos" / "Ver todos los pagos": en mobile, dentro de una tabla ya angosta,
+       queda solo el ícono en un botón redondo — el texto ocuparía demasiado espacio ahí. */
+    .ver-desglose-txt{display:none;}
+    .ver-desglose-btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:30px;height:30px;padding:0;border-radius:50%;font-size:15px;
+    }
     .row-actions button{
       background:var(--paper);border:1px solid var(--border);border-radius:16px;
       padding:6px 11px;font-size:12px;text-decoration:none;color:var(--ink);
@@ -3103,7 +3112,7 @@ function renderTenantsContracts(){
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
         <div class="row-actions-always-visible" style="gap:6px;flex-wrap:wrap;align-items:center;">
-          <button class="btn contract-update-btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')" title="Actualizar o finalizar contrato">📝<span class="contract-update-text"> Actualizar o finalizar contrato</span></button>
+          <button class="btn contract-update-btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')" title="Actualizar o finalizar contrato">🔄<span class="contract-update-text"> Actualizar o finalizar contrato</span></button>
         </div>
         <div class="row-actions" style="gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="table-action-btn" title="Editar" onclick="editTenantContract('${c.tenantId}','${c.id}')">✏️</button>
@@ -3463,7 +3472,7 @@ function buildDeudaListHtml(contratoId){
     return `<tr>
     <td class="cell-tap-full" title="${esc(contractLabel(r.c.id))}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>
     <td class="mono" style="color:${saldoColor};font-weight:600">${saldoTexto}</td>
-    <td style="white-space:nowrap;cursor:pointer;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Historial de Pagos ▾</span></td>
+    <td style="white-space:nowrap;cursor:pointer;text-align:center;" onclick="mostrarDesgloseDeuda('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn" title="Historial de Pagos">🕘<span class="ver-desglose-txt"> Historial de Pagos</span></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>`;
@@ -5397,7 +5406,7 @@ function renderHistorialTodos(){
       ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
     </td>
     <td class="cell-comments">${commentCellHtml(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
-    <td style="white-space:nowrap;cursor:pointer;" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})"><span class="ver-desglose-btn">Ver todos los pagos ▸</span></td>
+    <td style="white-space:nowrap;cursor:pointer;text-align:center;" onclick="verHistorialDeArrendatario('${p.contratoId}', ${historico})"><span class="ver-desglose-btn" title="Ver todos los pagos">🕘<span class="ver-desglose-txt"> Ver todos</span></span></td>
   </tr>`;
   }).join('')}
   </tbody></table></div>
@@ -7360,7 +7369,7 @@ function renderResumenMatrix(){
       }
       return '<td class="mono" style="text-align:center;color:var(--border);">—</td>';
     }).join('');
-    return `<tr${rowStyle}><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;cursor:pointer;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn">Historial de Pagos ▸</span></td></tr>`;
+    return `<tr${rowStyle}><td class="cell-tap-full" title="${esc(r.label)}${r.historico?' (Histórico)':''}" onclick="showFullTextTooltip(this.getAttribute('title'))"><span class="cell-clamp-2">${etiqueta}</span></td>${cells}<td style="white-space:nowrap;text-align:center;cursor:pointer;" onclick="verHistorialDeArrendatario('${r.c.id}', ${r.historico})"><span class="ver-desglose-btn" title="Historial de Pagos">🕘<span class="ver-desglose-txt"> Historial de Pagos</span></span></td></tr>`;
   }).join('');
 
   // Fila de totales: suma de pagado/descuento de todos los arrendatarios (según el filtro), por mes.
