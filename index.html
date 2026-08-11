@@ -5250,12 +5250,20 @@ function renderFlujoCobro(){
     }
     if(mostrarPend){
       const m = item.pendItem;
-      const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
-      accionesTop.push(sinTel
-        ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
-        : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar aviso de pago por WhatsApp" onclick="event.stopPropagation();enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
-      );
-      accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="${m.enviado ? 'Marcar como pendiente' : 'Marcar aviso como enviado'}" onclick="event.stopPropagation();toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">${m.enviado ? '↩️' : '✅'}</button>`);
+      if(m.enviado){
+        // Esperando pago: solo dos acciones — volver atrás (revierte el aviso, vuelve a "Falta
+        // enviar aviso") o marcar como pagado (esto sí actualiza el estado real del cobro en la
+        // tabla de lecturas, no solo si se avisó o no).
+        accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Volver a 'Falta enviar aviso'" onclick="event.stopPropagation();toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">↩️</button>`);
+        accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Marcar como pagado" onclick="event.stopPropagation();marcarPagoComoPagado('${item.contratoId}')">✅</button>`);
+      } else {
+        const sinTel = !m.telefono || !m.telefono.replace(/\D/g,'');
+        accionesTop.push(sinTel
+          ? `<span class="status-msg" style="color:var(--brick)">⚠ Sin WhatsApp</span>`
+          : `<button type="button" class="table-action-btn table-action-btn-lg" title="Enviar aviso de pago por WhatsApp" onclick="event.stopPropagation();enviarWhatsapp('${esc(m.telefono)}','flujo-pend-${idx}')">📲</button>`
+        );
+        accionesTop.push(`<button type="button" class="table-action-btn table-action-btn-lg" title="Marcar aviso como enviado" onclick="event.stopPropagation();toggleAvisoEnviado('${item.contratoId}', ${m.enviado})">✅</button>`);
+      }
     }
     partes.push(`<div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;">${accionesTop.join('')}</div>`);
 
@@ -5438,6 +5446,20 @@ async function toggleAvisoEnviado(contratoId, estabaEnviado){
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, avisoEnviado: nuevoEstado} : r);
   await saveKey('readings', readings);
   renderFlujoCobro();
+  await pushToDriveAndWarn();
+}
+
+// Marca como PAGADAS todas las lecturas pendientes de un contrato — a diferencia de
+// toggleAvisoEnviado (que solo registra si se avisó o no), esto actualiza el estado real del
+// cobro (el mismo campo que se cambia desde el desplegable de la tabla de lecturas), por eso
+// también refresca toda la app (afecta lecturas, alertas y el propio flujo).
+async function marcarPagoComoPagado(contratoId){
+  const todas = computeReadingsWithConsumption();
+  const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado' && !r.montoAcumuladoPendiente).map(r=>r.id));
+  if(!idsDelContrato.size) return;
+  readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, estado:'Pagado'} : r);
+  await saveKey('readings', readings);
+  renderAll();
   await pushToDriveAndWarn();
 }
 
