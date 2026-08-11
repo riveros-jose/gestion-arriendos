@@ -4128,6 +4128,16 @@ function updateMedidorUbicacionHint(){
 ['r-contratoId','r-medidor'].forEach(id=> document.getElementById(id).addEventListener('change', updateMedidorUbicacionHint));
 document.getElementById('r-medidor').addEventListener('input', updateMedidorUbicacionHint);
 
+// Igual que updateMedidorUbicacionHint, pero como función reutilizable (no atada a los campos
+// del formulario) — para poder consultar "¿a qué local corresponde este medidor?" desde
+// cualquier parte de la app, como el mensaje de WhatsApp de cobro de servicios.
+function ubicacionDeMedidor(contratoId, medidor){
+  const label = contractLabel(contratoId).toLowerCase();
+  const clave = Object.keys(MEDIDORES_UBICACION).find(k=> label.includes(k));
+  if(!clave) return '';
+  return MEDIDORES_UBICACION[clave][(medidor||'1').trim()] || '';
+}
+
 // ---- Lectura automática de boletas en PDF (por ahora ajustada al formato de Aguas Andinas) ----
 if(typeof pdfjsLib !== 'undefined'){
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -5395,11 +5405,15 @@ function computePendientesItems(){
     // Formato de cálculo directo: "consumo × valor = total" en una sola línea por servicio.
     const lineaServicioTexto = r=>{
       const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
+      // Para arrendatarios con más de un medidor del mismo servicio (ej. La Imprenta), se agrega
+      // a qué local corresponde cada uno — si no, quedaría ambiguo cuál cobro es cuál.
+      const ubicacion = ubicacionDeMedidor(r.contratoId, r.medidor);
+      const servicioConUbicacion = ubicacion ? `${r.servicio} — ${ubicacion}` : r.servicio;
       let linea;
       if(r.consumo===null){
-        linea = `• ${r.servicio} (${formatDate(r.fechaLectura)}): primera lectura — Total ${money(r.monto)}`;
+        linea = `• ${servicioConUbicacion} (${formatDate(r.fechaLectura)}): primera lectura — Total ${money(r.monto)}`;
       } else {
-        linea = `• ${r.servicio} (${formatDate(r.fechaLectura)}): ${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) x ${money(r.valorUnitario)} = ${money(r.monto)}`;
+        linea = `• ${servicioConUbicacion} (${formatDate(r.fechaLectura)}): ${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) x ${money(r.valorUnitario)} = ${money(r.monto)}`;
       }
       // El link de la boleta solo se incluye si realmente se usó para calcular esta lectura.
       const boleta = boletaUrlAplicadaA(r);
