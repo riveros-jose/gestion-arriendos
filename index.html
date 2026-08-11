@@ -5433,7 +5433,9 @@ function computePendientesItems(){
         : `${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) × ${money(r.valorUnitario)} = <strong>${money(r.monto)}</strong>`;
       const boletaInfo = boletaUrlAplicadaA(r);
       const boletaTag = boletaInfo ? ` · <a href="${esc(boletaInfo.url)}" target="_blank" rel="noopener">📄 ${esc(etiquetaBoleta(boletaInfo.servicio, boletaInfo.mes))}</a>` : '';
-      return `<div class="cell-stacked-sub">${SERVICIO_SVG[r.servicio]||''} ${r.servicio} (${formatDate(r.fechaLectura)}): ${calculoTxt}${boletaTag}</div>`;
+      const ubicacion = ubicacionDeMedidor(r.contratoId, r.medidor);
+      const servicioConUbicacion = ubicacion ? `${r.servicio} — ${esc(ubicacion)}` : r.servicio;
+      return `<div class="cell-stacked-sub">${SERVICIO_SVG[r.servicio]||''} ${servicioConUbicacion} (${formatDate(r.fechaLectura)}): ${calculoTxt}${boletaTag}</div>`;
     }).join('');
 
     return { contratoId, nombreContacto, telefono, mensaje, resumenHtml, enviado, total };
