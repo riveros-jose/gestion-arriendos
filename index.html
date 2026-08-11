@@ -5389,18 +5389,18 @@ function computePendientesItems(){
       const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
       let linea;
       if(r.consumo===null){
-        linea = `${r.servicio} (${formatDate(r.fechaLectura)}): primera lectura — Total ${money(r.monto)}`;
+        linea = `• ${r.servicio} (${formatDate(r.fechaLectura)}): primera lectura — Total ${money(r.monto)}`;
       } else {
-        linea = `${r.servicio} (${formatDate(r.fechaLectura)}): ${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) x ${money(r.valorUnitario)} = ${money(r.monto)}`;
+        linea = `• ${r.servicio} (${formatDate(r.fechaLectura)}): ${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) x ${money(r.valorUnitario)} = ${money(r.monto)}`;
       }
       // El link de la boleta solo se incluye si realmente se usó para calcular esta lectura.
       const boleta = boletaUrlAplicadaA(r);
-      if(boleta) linea += `\nBoleta ${etiquetaBoleta(boleta.servicio, boleta.mes)}: ${boleta.url}`;
+      if(boleta) linea += `\n${boleta.url}`;
       return linea;
     };
-    let detalle = list.map(lineaServicioTexto).join('\n\n');
+    let detalle = list.map(lineaServicioTexto).join('\n');
     const total = list.reduce((s,r)=>s+Number(r.monto||0),0);
-    const mensaje = `Hola ${nombreContacto}! Este es el pago pendiente de servicios.\n\nTotal a pagar: *${money(total)}*\n\n${detalle}\n\nGracias!`;
+    const mensaje = `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro de servicios:\nTotal a pagar: *${money(total)}*\n${detalle}\nEl depósito va a la cuenta del Santander.\nGracias!`;
     const enviado = list.every(r=> r.avisoEnviado===true);
 
     // Resumen en pantalla (con íconos, sí funcionan bien en el navegador): total primero.
