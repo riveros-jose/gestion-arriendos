@@ -140,10 +140,10 @@
   .row-actions{display:flex;gap:8px;}
   .row-actions-always-visible{display:flex;gap:8px;}
   /* Botón "Renovar o finalizar contrato" — vive al final de cada tarjeta de contrato (dentro del
-     cuerpo, así que solo se ve cuando la tarjeta está desplegada), en rojo oscuro para separarlo
-     visualmente de las demás acciones. Mismo estilo en desktop y mobile. */
+     cuerpo, así que solo se ve cuando la tarjeta está desplegada), en verde oscuro (misma
+     paleta que el resto del sitio). Mismo estilo en desktop y mobile. */
   .contract-update-footer{margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);}
-  .contract-update-btn{width:100%;text-align:center;padding:12px;font-size:13.5px;font-weight:700;background:#7A2418;color:#fff;border-color:#7A2418;}
+  .contract-update-btn{width:100%;text-align:center;padding:12px;font-size:13.5px;font-weight:700;background:var(--teal-dark);color:#fff;border-color:var(--teal-dark);}
   .contract-doc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px;}
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
@@ -5077,7 +5077,17 @@ async function confirmarCambioEstadoLectura(selectEl, id){
   if(!r){ return; }
   if(r.estado===nuevoEstado) return;
   const nombre = contractLabel(r.contratoId);
-  if(!confirm(`¿Confirmas cambiar el estado de esta lectura de ${r.servicio} (${nombre}) a "${nuevoEstado}"?`)){
+  const ok = await showConfirmModal({
+    icono: '💧',
+    titulo: '¿Cambiar el estado de este pago?',
+    detalles: [
+      { label:'Arrendatario', value: nombre },
+      { label:'Servicio', value: r.servicio },
+      { label:'Nuevo estado', value: nuevoEstado },
+    ],
+    textoConfirmar: 'Confirmar',
+  });
+  if(!ok){
     selectEl.value = r.estado || 'Pendiente';
     return;
   }
@@ -5284,19 +5294,28 @@ function medidorColor(medidor){
 }
 
 // ---- Sectores de lectura: agrupan las propiedades en dos zonas para facilitar la revisión ----
-// Sector 1: San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088.
+// Sector 1: San Diego entre 1702 y 1714 (cualquier número dentro de ese rango), y Sargento Aldea 1088.
 // Sector 2: los locales de San Diego 1946 a San Diego 1954 (1946, 1948, 1950, 1952 y 1954).
 // Cualquier otra propiedad que no calce con ninguno de los dos NO pertenece a ningún sector
 // (no aparece ni en Sector 1 ni en Sector 2).
-const SECTOR_1_DIRECCIONES = ['san diego 1712','san diego 1708','san diego 1704','sargento aldea 1088'];
 const SECTOR_2_DIRECCIONES = ['san diego 1946','san diego 1948','san diego 1950','san diego 1952','san diego 1954'];
+
+// Extrae el primer número que aparece después de "san diego " en una dirección normalizada
+// (minúsculas) — para poder comparar por RANGO numérico, en vez de tener que listar cada
+// dirección exacta una por una.
+function numeroSanDiego(dirLower){
+  if(!dirLower.startsWith('san diego ')) return null;
+  const m = dirLower.slice('san diego '.length).match(/\d+/);
+  return m ? Number(m[0]) : null;
+}
 
 function contratoSector(contratoId){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return null;
   const propiedadesContrato = contractPropertyIds(c).map(pid=> properties.find(x=>x.id===pid)).filter(Boolean);
   const dirs = propiedadesContrato.map(p=> String(p.direccion||'').trim().toLowerCase());
-  if(dirs.some(dir=> SECTOR_1_DIRECCIONES.some(needle=> dir.startsWith(needle)))) return 1;
+  if(dirs.some(dir=> dir.startsWith('sargento aldea 1088'))) return 1;
+  if(dirs.some(dir=>{ const n = numeroSanDiego(dir); return n!==null && n>=1702 && n<=1714; })) return 1;
   if(dirs.some(dir=> SECTOR_2_DIRECCIONES.some(needle=> dir.startsWith(needle)))) return 2;
   return null;
 }
