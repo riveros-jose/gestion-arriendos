@@ -139,6 +139,12 @@
   .estado-select-pendiente{background:#FCE588!important;color:#6B4E00!important;border-color:#D9A800!important;}
   .row-actions{display:flex;gap:8px;}
   .row-actions-always-visible{display:flex;gap:8px;}
+  /* Botón "Renovar o finalizar contrato" — vive al final de cada tarjeta de contrato (dentro del
+     cuerpo, así que solo se ve cuando la tarjeta está desplegada), en rojo oscuro para separarlo
+     visualmente de las demás acciones. Mismo estilo en desktop y mobile. */
+  .contract-update-footer{margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);}
+  .contract-update-btn{width:100%;text-align:center;padding:12px;font-size:13.5px;font-weight:700;background:#7A2418;color:#fff;border-color:#7A2418;}
+  .contract-doc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px;}
   .row-actions button{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink-soft);text-decoration:underline;padding:0;}
   .row-actions button:hover{color:var(--teal-dark);}
   .cell-stacked{white-space:normal !important;line-height:1.4;}
@@ -498,14 +504,6 @@
     /* Botones de fila (Editar / Eliminar / etc.): de links diminutos a chips tocables */
     .row-actions{gap:6px;flex-wrap:wrap;}
     .row-actions-always-visible{gap:6px;flex-wrap:wrap;}
-    /* Botón de "Actualizar o finalizar contrato": en mobile queda como ícono chico cuando la
-       tarjeta está colapsada (para no chocar con el título). Al desplegar la tarjeta, en vez de
-       forzarlo a compartir la fila angosta del título, pasa a su propia fila completa abajo. */
-    .contract-update-btn{padding:6px 9px;}
-    .contract-update-text{display:none;}
-    .prop-card:not(.collapsed) .contract-update-text{display:inline;}
-    .prop-card:not(.collapsed) .row-actions-always-visible{width:100%;order:10;margin-top:2px;}
-    .prop-card:not(.collapsed) .contract-update-btn{width:100%;text-align:center;padding:10px 12px;font-size:13px;}
     /* "Historial de Pagos" / "Ver todos los pagos": en mobile, dentro de una tabla ya angosta,
        queda solo el ícono en un botón redondo — el texto ocuparía demasiado espacio ahí. */
     .ver-desglose-txt{display:none;}
@@ -932,6 +930,24 @@
               <div class="field full"><label>Información general</label><textarea id="c-infoGeneral"></textarea></div>
             </div>
           </div>
+          <div class="line-group">
+            <h3>📄 Plantilla de contrato (opcional)</h3>
+            <div class="line-row">
+              <div class="field full">
+                <label>Plantilla en Google Drive</label>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-secondary" id="tc-elegir-plantilla-btn">📂 Elegir plantilla desde Drive</button>
+                  <span id="tc-plantilla-nombre" style="font-size:12.5px;color:var(--ink-soft);"></span>
+                  <button type="button" id="tc-quitar-plantilla-btn" style="display:none;background:none;border:none;color:var(--brick);text-decoration:underline;font-size:12px;cursor:pointer;padding:2px;">Quitar</button>
+                </div>
+                <input type="hidden" id="tc-plantillaId">
+                <div class="subtitle" style="margin:10px 0 0;font-size:11.5px;line-height:1.5;">
+                  Si eliges una plantilla (un documento de Google Docs), al guardar se creará automáticamente una copia dentro de <strong>RentaPro/Contratos</strong>, con los datos de este formulario ya reemplazados. Para que el reemplazo funcione, tu plantilla debe tener escritos estos textos exactos (con las llaves dobles) donde corresponda cada dato:<br>
+                  <code style="font-size:10.5px;">{{NOMBRE_SOCIEDAD}} {{RUT_SOCIEDAD}} {{NEMO}} {{REPRESENTANTE}} {{RUT_REPRESENTANTE}} {{DIRECCION}} {{UNIDAD}} {{FECHA_INICIO}} {{FECHA_FIN}} {{MONTO_ARRIENDO}} {{DIA_PAGO}} {{GARANTIA}} {{TIPO_CONTRATO}} {{FECHA_HOY}}</code>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="btn-row">
             <button type="submit" class="btn btn-primary">Guardar arrendatario y contrato</button>
             <button type="button" class="btn btn-secondary" id="tc-cancel" style="display:none">Cancelar edición</button>
@@ -1309,7 +1325,11 @@
 const GOOGLE_CLIENT_ID = '844367613744-lfct0qcg14ci4hcsc3phoeom29o00nhl.apps.googleusercontent.com';
 const GOOGLE_API_KEY = 'AIzaSyBMZwZZm0VgH22qSOIs13JzP6W2_Zid8f0';
 const SHARED_FOLDER_ID = '1Di-Los3lxS_MkzewUSDaJ6iS-VCQWQJF';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+// El scope de Documentos (Docs API) se agregó para poder rellenar automáticamente el contenido
+// de la copia del contrato con los datos del formulario — drive.file por sí solo NO alcanza
+// para editar el CONTENIDO de un Google Doc (solo su metadata/archivo), aunque el documento
+// haya sido creado o elegido por esta misma app.
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents';
 
 const DRIVE_FOLDER_NAME = 'RentaPro';
 const DRIVE_FILENAME = 'registros-arriendos.xlsx';
@@ -1515,6 +1535,92 @@ async function openFilePicker(){
   picker.setVisible(true);
 }
 
+// Selector para elegir la plantilla de contrato (un documento de Google Docs cualquiera, no
+// necesariamente creado por esta app). Se usa en dos contextos:
+// 1) Desde el formulario de "Nuevo arrendatario y contrato": solo guarda el ID elegido; la copia
+//    real se genera al guardar el formulario.
+// 2) Desde el pie de una tarjeta de contrato YA EXISTENTE (targetContratoId): genera y guarda el
+//    documento de inmediato, usando los datos actuales de ese contrato.
+const GDOC_MIME = 'application/vnd.google-apps.document';
+let templatePickerTargetContratoId = null;
+async function openTemplatePicker(targetContratoId){
+  templatePickerTargetContratoId = targetContratoId || null;
+  if(!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('PEGA_AQUI')){
+    alert('Falta configurar GOOGLE_API_KEY en el código para poder usar el selector de archivos.');
+    return;
+  }
+  if(!driveToken){ alert('Primero conéctate a Google Drive.'); return; }
+  try{
+    await ensurePickerLib();
+  }catch(e){
+    alert(e.message);
+    return;
+  }
+  const viewPropios = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(false);
+  const viewCompartidos = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(false)
+    .setOwnedByMe(false);
+  const APP_PROJECT_NUMBER = GOOGLE_CLIENT_ID.split('-')[0];
+  const picker = new google.picker.PickerBuilder()
+    .setOAuthToken(driveToken)
+    .setDeveloperKey(GOOGLE_API_KEY)
+    .setAppId(APP_PROJECT_NUMBER)
+    .addView(viewPropios)
+    .addView(viewCompartidos)
+    .setTitle('Elige la plantilla de contrato (Google Docs)')
+    .setCallback(onTemplatePickerResult)
+    .build();
+  picker.setVisible(true);
+}
+function onTemplatePickerResult(data){
+  if(data.action !== google.picker.Action.PICKED) return;
+  const file = data.docs[0];
+  if(templatePickerTargetContratoId){
+    generarYGuardarContratoParaExistente(templatePickerTargetContratoId, file.id);
+    templatePickerTargetContratoId = null;
+    return;
+  }
+  document.getElementById('tc-plantillaId').value = file.id;
+  document.getElementById('tc-plantilla-nombre').textContent = '✓ ' + file.name;
+  document.getElementById('tc-quitar-plantilla-btn').style.display = 'inline-block';
+}
+
+// Abre el selector de plantilla para un contrato YA REGISTRADO — el documento generado queda
+// asociado a ese contrato (visible después desde su propia tarjeta), en vez de perderse si no
+// se guardó la pestaña donde se abrió la primera vez.
+function generarContratoParaContratoExistente(contratoId){
+  openTemplatePicker(contratoId);
+}
+async function generarYGuardarContratoParaExistente(contratoId, plantillaId){
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c) return;
+  const t = tenants.find(x=>x.id===c.tenantId) || {};
+  const propiedadIds = contractPropertyIds(c);
+  showLoadingModal('📄 Generando el contrato desde la plantilla…');
+  try{
+    const resultado = await generarContratoDesdeePlantilla(plantillaId, t, c, propiedadIds);
+    c.contratoDocUrl = resultado.link;
+    c.contratoDocNombre = resultado.name;
+    contracts = contracts.map(x=> x.id===contratoId ? c : x);
+    await saveKey('contracts', contracts);
+    renderAll();
+    const ok = await pushToDriveIfConnected();
+    closeResultModal();
+    showResultModal({
+      titulo: ok ? '✅ Documento del contrato generado y guardado' : '⚠ Documento generado, pero no se pudo confirmar el guardado en Google Drive.',
+      detalles: [{ label:'Documento', value: resultado.name }],
+    }, ok);
+    window.open(resultado.link, '_blank');
+  }catch(err){
+    console.error('Error generando contrato desde plantilla', err);
+    closeResultModal();
+    alert('No se pudo generar el documento del contrato: '+(err.message||err));
+  }
+}
+
 async function onPickerResult(data){
   if(data.action !== google.picker.Action.PICKED) return;
   const file = data.docs[0];
@@ -1646,6 +1752,65 @@ async function driveFindOrCreateSubfolder(parentId, name){
   if(createRes.status===401) throw new Error('token expirado');
   const created = await createRes.json();
   return created.id;
+}
+
+// Copia la plantilla elegida a RentaPro/Contratos con el nombre
+// Contrato_Arriendo_{Propiedad}_{Local}_{Sociedad}_{FechaInicio}, y reemplaza en su contenido
+// los textos {{PLACEHOLDER}} por los datos reales del formulario recién guardado.
+let driveContratosFolderId = null;
+async function generarContratoDesdeePlantilla(plantillaId, tObj, cObj, propiedadIds){
+  if(!driveToken) throw new Error('No estás conectado a Google Drive.');
+
+  const direccion = propiedadIds.map(pid=>{ const p=properties.find(x=>x.id===pid); return p?p.direccion:''; }).filter(Boolean).join(' + ');
+  const unidad = propiedadIds.map(pid=>{ const p=properties.find(x=>x.id===pid); return p?p.unidad:''; }).filter(Boolean).join(' + ');
+  const sociedad = tObj.nombreSociedad || tObj.nemoArrendatario || 'Sociedad';
+  const partesNombre = ['Contrato_Arriendo', direccion, unidad, sociedad, cObj.fechaInicioContrato].filter(Boolean);
+  const nombreArchivo = partesNombre.join('_').replace(/[\\/:*?"<>|]/g,'-');
+
+  const rentaProFolderId = await driveFindOrCreateFolder();
+  if(!driveContratosFolderId) driveContratosFolderId = await driveFindOrCreateSubfolder(rentaProFolderId, 'Contratos');
+
+  // 1) Copiar la plantilla con el nuevo nombre, en la carpeta de Contratos.
+  const copyRes = await fetch(`https://www.googleapis.com/drive/v3/files/${plantillaId}/copy`, {
+    method:'POST',
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
+    body: JSON.stringify({ name: nombreArchivo, parents:[driveContratosFolderId] })
+  });
+  if(!copyRes.ok) throw new Error('No se pudo copiar la plantilla (HTTP '+copyRes.status+'). Verifica que sea un documento de Google Docs y que tengas acceso a él.');
+  const copyData = await copyRes.json();
+  const nuevoDocId = copyData.id;
+
+  // 2) Reemplazar cada {{PLACEHOLDER}} presente en la copia por el dato real correspondiente.
+  const reemplazos = {
+    '{{NOMBRE_SOCIEDAD}}': tObj.nombreSociedad || '',
+    '{{RUT_SOCIEDAD}}': tObj.rutSociedad || '',
+    '{{NEMO}}': tObj.nemoArrendatario || '',
+    '{{REPRESENTANTE}}': tObj.nombreRepresentante || '',
+    '{{RUT_REPRESENTANTE}}': tObj.rutRepresentante || '',
+    '{{DIRECCION}}': direccion,
+    '{{UNIDAD}}': unidad,
+    '{{FECHA_INICIO}}': formatDate(cObj.fechaInicioContrato),
+    '{{FECHA_FIN}}': cObj.fechaFinContrato ? formatDate(cObj.fechaFinContrato) : '',
+    '{{MONTO_ARRIENDO}}': money(cObj.montoArriendoPactado),
+    '{{DIA_PAGO}}': String(cObj.diaPago || 1),
+    '{{GARANTIA}}': cObj.garantia ? money(cObj.garantia) : '',
+    '{{TIPO_CONTRATO}}': cObj.tipoContrato || '',
+    '{{FECHA_HOY}}': formatDate(fechaHoyChile()),
+  };
+  const requests = Object.entries(reemplazos).map(([placeholder, valor])=>({
+    replaceAllText: { containsText: { text: placeholder, matchCase: true }, replaceText: String(valor) }
+  }));
+  const batchRes = await fetch(`https://docs.googleapis.com/v1/documents/${nuevoDocId}:batchUpdate`, {
+    method:'POST',
+    headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' },
+    body: JSON.stringify({ requests })
+  });
+  if(!batchRes.ok){
+    const errData = await batchRes.json().catch(()=>({}));
+    throw new Error('El contrato se copió, pero no se pudo rellenar automáticamente: '+(errData.error && errData.error.message ? errData.error.message : 'HTTP '+batchRes.status));
+  }
+
+  return { id: nuevoDocId, name: nombreArchivo, link: `https://docs.google.com/document/d/${nuevoDocId}/edit` };
 }
 
 async function driveUploadFile(fileBlob, fileName, folderId, mimeType){
@@ -1787,11 +1952,12 @@ function buildWorkbook(){
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
     proximaDecisionMonto: c.proximaDecisionMonto||'', proximaDecisionComentarios: c.proximaDecisionComentarios||'',
     proximaDecisionRegistrada: c.proximaDecisionRegistrada||'', recordatorioLecturaMes: c.recordatorioLecturaMes||'',
-    ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||''
+    ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||'',
+    contratoDocUrl: c.contratoDocUrl||'', contratoDocNombre: c.contratoDocNombre||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,10,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','contratoDocUrl','contratoDocNombre']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,10,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16,32,28]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -2966,25 +3132,72 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
     cObj.activo = anterior.activo!==undefined ? anterior.activo : true;
     if(anterior.fechaTermino) cObj.fechaTermino = anterior.fechaTermino;
     if(anterior.deudaPactada!==undefined) cObj.deudaPactada = anterior.deudaPactada;
+    // El documento del contrato (si ya se había generado uno antes) no se pierde al editar los
+    // demás datos del contrato — se conserva, a menos que se genere uno nuevo desde su tarjeta.
+    if(anterior.contratoDocUrl){ cObj.contratoDocUrl = anterior.contratoDocUrl; cObj.contratoDocNombre = anterior.contratoDocNombre; }
     contracts = contracts.map(c=> c.id===editingContract ? cObj : c);
   } else {
     contracts.push(cObj);
   }
 
+  const plantillaId = document.getElementById('tc-plantillaId').value;
+
   await saveKey('tenants',tenants);
   await saveKey('contracts',contracts);
   resetTenantContractForm();
   renderAll();
+
+  // La generación del documento del contrato (si se eligió plantilla) es un paso APARTE del
+  // guardado de los datos — si falla, el arrendatario y el contrato ya quedaron guardados igual,
+  // solo se avisa que el documento no se pudo generar, sin perder lo demás. El resultado (el
+  // link al documento) queda GUARDADO en el propio contrato, no solo abierto una vez — así se
+  // puede volver a ver desde la tarjeta del contrato en cualquier momento después.
+  let contratoGenerado = null, errorContrato = null;
+  if(plantillaId){
+    showLoadingModal('📄 Generando el contrato desde la plantilla…');
+    try{
+      contratoGenerado = await generarContratoDesdeePlantilla(plantillaId, tObj, cObj, propiedadIds);
+      cObj.contratoDocUrl = contratoGenerado.link;
+      cObj.contratoDocNombre = contratoGenerado.name;
+      contracts = contracts.map(c=> c.id===cObj.id ? cObj : c);
+      await saveKey('contracts', contracts);
+      renderAll();
+    }catch(err){
+      console.error('Error generando contrato desde plantilla', err);
+      errorContrato = err.message || String(err);
+    }
+  }
+
   const ok = await pushToDriveIfConnected();
-  showResultModal(ok ? 'Arrendatario y contrato guardados con éxito en Google Drive ✓' : '⚠ No se pudo confirmar el guardado en Google Drive. Revisa tu conexión (ícono 🔄) e intenta de nuevo.', ok);
+  const detallesGuardado = [
+    { label:'Arrendatario', value: tObj.nemoArrendatario || tObj.nombreSociedad },
+    { label:'Propiedad(es)', value: propiedadIds.map(pid=>propAddress(pid)).join(' + ') },
+  ];
+  if(contratoGenerado) detallesGuardado.push({ label:'Contrato generado', value: contratoGenerado.name });
+  if(errorContrato) detallesGuardado.push({ label:'⚠ Contrato no generado', value: errorContrato });
+  closeResultModal();
+  showResultModal({
+    titulo: ok ? '✅ Arrendatario y contrato guardados en Google Drive' : '⚠ No se pudo confirmar el guardado en Google Drive — revisa tu conexión.',
+    detalles: detallesGuardado,
+  }, ok);
+  if(contratoGenerado) window.open(contratoGenerado.link, '_blank');
   if(ok) hideTenantForm();
 });
 document.getElementById('tc-cancel').addEventListener('click', resetTenantContractForm);
+document.getElementById('tc-elegir-plantilla-btn').addEventListener('click', ()=> openTemplatePicker());
+document.getElementById('tc-quitar-plantilla-btn').addEventListener('click', ()=>{
+  document.getElementById('tc-plantillaId').value = '';
+  document.getElementById('tc-plantilla-nombre').textContent = '';
+  document.getElementById('tc-quitar-plantilla-btn').style.display = 'none';
+});
 
 function resetTenantContractForm(){
   editingTenant = null;
   editingContract = null;
   document.getElementById('form-arrendatario-contrato').reset();
+  document.getElementById('tc-plantillaId').value = '';
+  document.getElementById('tc-plantilla-nombre').textContent = '';
+  document.getElementById('tc-quitar-plantilla-btn').style.display = 'none';
   document.getElementById('tc-form-title').textContent='🏢 Nuevo arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='none';
   resetRepRows();
@@ -3146,9 +3359,6 @@ function renderTenantsContracts(){
         <div class="prop-card-title-toggle" onclick="toggleCardExpand(this)">
           <span class="card-index">${idx+1})</span> <span class="prop-card-dir">${esc(propAddresses(c))}</span> <span class="prop-card-unidad">${esc(t.nemoArrendatario || t.nombreSociedad)}</span><span class="prop-card-chevron">▸</span>
         </div>
-        <div class="row-actions-always-visible" style="gap:6px;flex-wrap:wrap;align-items:center;">
-          <button class="btn contract-update-btn" style="padding:6px 12px;font-size:12.5px;background:var(--azul);color:#fff;border-color:var(--azul);" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')" title="Actualizar o finalizar contrato">📜➕<span class="contract-update-text"> Actualizar o finalizar contrato</span></button>
-        </div>
         <div class="row-actions" style="gap:6px;flex-wrap:wrap;align-items:center;">
           <button class="table-action-btn" title="Editar" onclick="editTenantContract('${c.tenantId}','${c.id}')">✏️</button>
           <button class="table-action-btn danger" title="Eliminar" onclick="deleteTenantContract('${c.tenantId}','${c.id}')">🗑️</button>
@@ -3171,6 +3381,11 @@ function renderTenantsContracts(){
         ${c.proximaDecisionMonto ? propField('Nuevo monto propuesto', money(c.proximaDecisionMonto)) : ''}
         ${c.proximaDecisionComentarios ? propField('Comentarios', esc(c.proximaDecisionComentarios)) : ''}
       </div>` : ''}
+      <div class="contract-update-footer">
+        ${c.contratoDocUrl ? `<div class="contract-doc-row">📄 <a href="${esc(c.contratoDocUrl)}" target="_blank" rel="noopener">${esc(c.contratoDocNombre||'Ver documento del contrato')}</a></div>` : ''}
+        <button type="button" class="btn btn-secondary" style="width:100%;margin-bottom:8px;font-size:12.5px;" onclick="event.stopPropagation();generarContratoParaContratoExistente('${c.id}')">📂 ${c.contratoDocUrl?'Regenerar':'Generar'} documento del contrato desde plantilla</button>
+        <button class="btn contract-update-btn" onclick="event.stopPropagation();openUpdateContractModal('${c.id}')">Renovar o finalizar contrato</button>
+      </div>
       </div>
     </div>`;
   }).join('');
