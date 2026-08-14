@@ -3912,7 +3912,7 @@ function buildAlertCardHtml(g){
   return `<div class="alert-card ${urgencyClass}">
     <div class="title">${esc(titleParts.join(' + '))}</div>
     ${lines.join('')}
-    <button type="button" class="btn" style="background:var(--azul);color:#fff;border-color:var(--azul);" onclick="openUpdateContractModal('${g.c.id}')">Actualizar o finalizar contrato</button>
+    <button type="button" class="btn contract-update-btn" onclick="openUpdateContractModal('${g.c.id}')">Renovar o finalizar contrato</button>
   </div>`;
 }
 
@@ -7281,6 +7281,21 @@ function applyYearGroupFilter(series, yearSel, groupSel){
     });
     return Object.keys(byYear).sort((a,b)=>a-b).map(y=>({ label: y, ...byYear[y] }));
   }
+  if(groupBy==='trimestre'){
+    const byQuarter = {};
+    filtered.forEach(d=>{
+      const q = Math.floor(d.month/3)+1; // 1=Ene-Mar, 2=Abr-Jun, 3=Jul-Sep, 4=Oct-Dic
+      const key = `${d.year}-Q${q}`;
+      if(!byQuarter[key]) byQuarter[key] = { year:d.year, q, monto:0, pagado:0, descuento:0 };
+      byQuarter[key].monto += d.monto;
+      byQuarter[key].pagado += d.pagado;
+      byQuarter[key].descuento += d.descuento;
+    });
+    return Object.keys(byQuarter).sort().map(key=>{
+      const g = byQuarter[key];
+      return { label: `T${g.q} ${String(g.year).slice(2)}`, monto:g.monto, pagado:g.pagado, descuento:g.descuento };
+    });
+  }
   return filtered.map(d=>({ label:d.label, monto:d.monto, pagado:d.pagado, descuento:d.descuento }));
 }
 
@@ -7407,7 +7422,7 @@ function histogramToggleHtml(total){
   </div>`;
 }
 
-const CHART_GROUP_LEVELS = ['anio','mes'];
+const CHART_GROUP_LEVELS = ['anio','trimestre','mes'];
 let chartGroupLevel = 'mes';
 
 function actualizarFlechasAgrupacion(){
@@ -7415,7 +7430,7 @@ function actualizarFlechasAgrupacion(){
   const btnUp = document.querySelector('.chart-group-arrow-btn[data-dir="up"]');
   const btnDown = document.querySelector('.chart-group-arrow-btn[data-dir="down"]');
   if(!btnUp || !btnDown) return;
-  const nombres = {anio:'año', mes:'mes', semana:'semana', dia:'día'};
+  const nombres = {anio:'año', trimestre:'trimestre', mes:'mes'};
   const puedeSubir = idx > 0;
   const puedeBajar = idx < CHART_GROUP_LEVELS.length-1;
   btnUp.disabled = !puedeSubir;
@@ -7423,7 +7438,7 @@ function actualizarFlechasAgrupacion(){
   btnUp.title = puedeSubir ? `Ver agrupado por ${nombres[CHART_GROUP_LEVELS[idx-1]]}` : 'Ya estás en el nivel más agregado (año)';
   btnDown.disabled = !puedeBajar;
   btnDown.classList.toggle('enabled', puedeBajar);
-  btnDown.title = puedeBajar ? `Ver detalle por ${nombres[CHART_GROUP_LEVELS[idx+1]]}` : 'Ya estás en el nivel más detallado (día)';
+  btnDown.title = puedeBajar ? `Ver detalle por ${nombres[CHART_GROUP_LEVELS[idx+1]]}` : 'Ya estás en el nivel más detallado (mes)';
 }
 
 function renderResumenChart(contratoId){
