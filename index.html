@@ -352,6 +352,13 @@
   .quick-jump-btn{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--card);color:var(--teal-dark);cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s;}
   .quick-jump-btn:hover{background:var(--teal-soft);border-color:var(--teal);}
   .subtab-btn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+  /* Toggle de tipo de servicio (💧⚡🔥) en la tabla de lecturas — cada ícono se puede prender o
+     apagar por separado, para filtrar por uno, varios, o todos a la vez. Activo = ícono a color
+     normal con fondo marcado; apagado = ícono en gris apagado, para que se note de un vistazo
+     cuál está filtrando y cuál no. */
+  .servicio-toggle-row{display:flex;gap:8px;margin:0 0 16px;}
+  .servicio-toggle-btn{width:42px;height:42px;border-radius:10px;border:2px solid var(--border);background:var(--card);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.35;filter:grayscale(1);transition:opacity .15s,filter .15s,border-color .15s,background .15s;}
+  .servicio-toggle-btn.active{opacity:1;filter:grayscale(0);background:var(--teal-soft);border-color:var(--teal);}
   .checkbox-list{border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:150px;overflow-y:auto;background:#fdfdfc;}
   .checkbox-list label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--ink);padding:4px 0;cursor:pointer;}
   .checkbox-list input[type="checkbox"]{width:15px;height:15px;flex-shrink:0;}
@@ -1178,11 +1185,14 @@
     <div class="tab-section" id="tab-servicios">
       <h1>🔧 Servicios</h1>
       <div class="card">
+        <button type="button" class="btn-add-new" id="lecturaForm-open-btn" onclick="showLecturaForm()"><span class="plus-icon">+</span> Ingresar lectura o boleta</button>
+        <div id="lecturaForm-wrap" style="display:none">
         <div class="toggle-form">
           <h2 id="r-form-title">🔧 Ingresar lectura o boleta</h2>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn btn-secondary" id="ver-boletas-btn">📂 Ver boletas cargadas</button>
             <button type="button" class="btn btn-secondary" id="toggle-boleta-btn">📄 Cargar boleta</button>
+            <button type="button" class="btn btn-secondary" onclick="hideLecturaForm()">Ocultar formulario</button>
           </div>
         </div>
         <form id="form-lectura" class="form-compact">
@@ -1207,6 +1217,7 @@
           <div class="status-msg" id="r-estimate-box" style="display:none;background:var(--teal-soft);color:var(--teal-dark);border:1px solid var(--teal);border-radius:6px;padding:6px 9px;margin-top:8px;font-weight:600;font-size:12px;"></div>
           <div class="status-msg" id="r-status"></div>
         </form>
+        </div>
       </div>
       <div class="card">
         <h2>🔄 Flujo de cobro de servicios</h2>
@@ -1215,6 +1226,11 @@
       <div class="card">
         <h2>🔧 Lecturas registradas <span class="mini-reload" title="Recargar desde Excel" onclick="reloadFromDrive()">⟳</span></h2>
         <select class="filter" id="r-filter"></select>
+        <div class="servicio-toggle-row" id="servicio-toggle-row">
+          <button type="button" class="servicio-toggle-btn active" data-servicio="Agua" title="Agua" onclick="toggleServicioFiltro('Agua')">💧</button>
+          <button type="button" class="servicio-toggle-btn active" data-servicio="Luz" title="Luz" onclick="toggleServicioFiltro('Luz')">⚡</button>
+          <button type="button" class="servicio-toggle-btn active" data-servicio="Gas" title="Gas" onclick="toggleServicioFiltro('Gas')">🔥</button>
+        </div>
         <div class="prop-card-section" style="margin-top:16px;padding-top:0;border-top:none;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
           <span>🏘️ Sector 1 — San Diego 1712, San Diego 1708, San Diego 1704 y Sargento Aldea 1088</span>
           <button class="btn btn-secondary" id="export-readings-sector1-btn" style="font-weight:400;font-size:12px;padding:5px 10px;">Exportar Sector 1 a Google Sheets</button>
@@ -3307,8 +3323,20 @@ function contractLabel(id){
   return propAddresses(c) + ' — ' + identificador;
 }
 
+// Texto adicional para poder ENCONTRAR un contrato en los filtros buscables aunque ese dato no
+// aparezca en su etiqueta visible (dirección — nemo) — por ejemplo, el nombre del contacto de
+// WhatsApp, del representante legal, la razón social completa, o los RUT.
+function contractSearchExtra(id){
+  const c = contracts.find(x=>x.id===id);
+  if(!c) return '';
+  const t = tenants.find(x=>x.id===c.tenantId);
+  if(!t) return '';
+  return [t.whatsappNombreContacto, t.nombreRepresentante, t.nombreSociedad, t.rutSociedad, t.rutRepresentante, t.correo, t.telefono, t.whatsappContacto]
+    .filter(Boolean).join(' ');
+}
+
 function renderTenantSelectOptions(activos){
-  const optionsHtml = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const optionsHtml = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('');
   const sel = document.getElementById('tenant-select');
   const current = sel.value;
   sel.innerHTML = optionsHtml;
@@ -3403,8 +3431,8 @@ function renderPaySelects(){
   const activos = contracts.filter(isActiveContract);
   const cobranza = contratosConCobranza();
   const opts = '<option value="">— Selecciona contrato —</option>'
-    + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('')
-    + cobranza.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))} (Cobranza deuda finalizada)</option>`).join('');
+    + activos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('')
+    + cobranza.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))} (Cobranza deuda finalizada)</option>`).join('');
   document.getElementById('pay-contratoId').innerHTML = opts;
 }
 
@@ -3533,7 +3561,15 @@ async function submitEditPaymentModal(){
   closeEditPaymentModal();
   renderAll();
   if(tableModalRefreshFn) tableModalRefreshFn(); // refresca la modal de tabla que quedó atrás, sin cerrarla
-  await pushToDriveAndWarn();
+  const ok = await pushToDriveIfConnected();
+  showResultModal({
+    titulo: ok ? '✅ Pago actualizado' : '⚠ No se pudo confirmar el guardado — revisa tu conexión e inténtalo de nuevo.',
+    detalles: [
+      { label:'Arrendatario', value: contractLabel(actualizado.contratoId) },
+      { label:'Fecha de pago', value: formatDate(actualizado.fechaPago) },
+      { label:'Monto pagado', value: money(Number(actualizado.montoPagado||0)) },
+    ],
+  }, ok);
 }
 
 function editPayment(id){
@@ -3654,8 +3690,8 @@ function renderResumenSelect(){
   const activos = contracts.filter(isActiveContract);
   const historicos = contratosConCobranza();
   const optionsHtml = '<option value="">Todos los arrendatarios</option>'
-    + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('')
-    + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))} (Histórico)</option>`).join('');
+    + activos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('')
+    + historicos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))} (Histórico)</option>`).join('');
   ['resumen-filter','chart-tenant-filter'].forEach(id=>{
     const sel = document.getElementById(id);
     const current = sel.value;
@@ -3922,7 +3958,7 @@ function openUpdateContractModal(id){
   document.getElementById('contract-update-overlay').style.display = 'flex';
   if(!id){
     const activos = contracts.filter(isActiveContract).slice().sort((a,b)=> contractLabel(a.id).localeCompare(contractLabel(b.id)));
-    document.getElementById('cu-selector-contrato').innerHTML = activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+    document.getElementById('cu-selector-contrato').innerHTML = activos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('');
     document.getElementById('cu-selector-step').style.display = 'block';
     document.getElementById('cu-form-step').style.display = 'none';
     return;
@@ -4213,9 +4249,9 @@ function renderReadingSelects(){
   // Solo tiene sentido registrar lecturas para arrendatarios que pertenecen a un sector (1 o 2)
   // — las demás propiedades no participan del sistema de lecturas por sector.
   const activos = contracts.filter(c=> isActiveContract(c) && (contratoSector(c.id)===1 || contratoSector(c.id)===2));
-  const opts = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  const opts = '<option value="">— Selecciona arrendatario —</option>' + activos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('');
   document.getElementById('r-contratoId').innerHTML = opts;
-  document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
+  document.getElementById('r-filter').innerHTML = '<option value="">Todos los arrendatarios</option>' + contracts.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}${isActiveContract(c)?'':' (Histórico)'}</option>`).join('');
 }
 document.getElementById('r-filter').addEventListener('change', renderReadings);
 
@@ -5006,6 +5042,15 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
 document.getElementById('r-cancel').addEventListener('click', resetReadingForm);
 document.getElementById('r-fechaLectura').value = fechaHoyChile();
 
+function showLecturaForm(){
+  document.getElementById('lecturaForm-wrap').style.display = 'block';
+  document.getElementById('lecturaForm-open-btn').style.display = 'none';
+}
+function hideLecturaForm(){
+  document.getElementById('lecturaForm-wrap').style.display = 'none';
+  document.getElementById('lecturaForm-open-btn').style.display = 'flex';
+  resetReadingForm();
+}
 function resetReadingForm(){
   editingReading = null;
   document.getElementById('form-lectura').reset();
@@ -5039,6 +5084,7 @@ function editReading(id){
   updateLecturaAnteriorHints();
   updateMedidorUbicacionHint();
   refreshDateHints();
+  showLecturaForm();
   scrollAppToTop();
 }
 async function deleteReading(id){
@@ -5391,6 +5437,20 @@ function readingsToggleHtml(sector, total){
   </div>`;
 }
 
+// Servicios activos en el toggle de la tabla de lecturas (💧⚡🔥) — los tres empiezan prendidos
+// (se ve todo por defecto). Se puede apagar uno o varios para filtrar; si se apagan los tres, se
+// vuelve a mostrar todo (no tendría sentido dejar la tabla completamente vacía).
+let serviciosActivosFiltro = new Set(['Agua','Luz','Gas']);
+function toggleServicioFiltro(servicio){
+  if(serviciosActivosFiltro.has(servicio)) serviciosActivosFiltro.delete(servicio);
+  else serviciosActivosFiltro.add(servicio);
+  if(serviciosActivosFiltro.size===0) serviciosActivosFiltro = new Set(['Agua','Luz','Gas']);
+  document.querySelectorAll('.servicio-toggle-btn').forEach(btn=>{
+    btn.classList.toggle('active', serviciosActivosFiltro.has(btn.dataset.servicio));
+  });
+  renderReadings();
+}
+
 function renderReadings(){
   const filter = document.getElementById('r-filter').value;
   const el1 = document.getElementById('reading-table-sector1');
@@ -5400,7 +5460,7 @@ function renderReadings(){
   // recientemente ingresada primero) — no por su fecha de lectura, ya que una lectura atrasada
   // que recién se carga hoy debe aparecer arriba, aunque su fecha sea de hace tiempo. Si se hace
   // clic en un encabezado de columna para ordenar por otra cosa, eso manda por sobre esto.
-  let list = all.filter(r=> !filter || r.contratoId===filter).slice().reverse();
+  let list = all.filter(r=> !filter || r.contratoId===filter).filter(r=> serviciosActivosFiltro.has(r.servicio)).slice().reverse();
   list = sortRows('readings', list, {
     contrato: r=>contractLabel(r.contratoId)||'', servicio: r=>r.servicio||'', fechaLectura: r=>r.fechaLectura||'',
     lecturaActual: r=>Number(r.lecturaActual||0), consumo: r=>(r.consumo===null?-Infinity:r.consumo),
@@ -5425,6 +5485,7 @@ function exportReadingsSector(sector){
   const list = all
     .filter(r=> contratoSector(r.contratoId)===sector)
     .filter(r=> !filter || r.contratoId===filter)
+    .filter(r=> serviciosActivosFiltro.has(r.servicio))
     .sort((a,b)=> (b.fechaLectura||'').localeCompare(a.fechaLectura||''));
   if(!list.length){ alert(`No hay lecturas del Sector ${sector} para exportar con el filtro actual.`); return; }
 
@@ -5774,10 +5835,18 @@ async function marcarPagoComoPagado(contratoId){
   const todas = computeReadingsWithConsumption();
   const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado' && !r.montoAcumuladoPendiente).map(r=>r.id));
   if(!idsDelContrato.size) return;
+  const serviciosPagados = [...new Set(todas.filter(r=> idsDelContrato.has(r.id)).map(r=>r.servicio))];
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, estado:'Pagado'} : r);
   await saveKey('readings', readings);
   renderAll();
-  await pushToDriveAndWarn();
+  const ok = await pushToDriveIfConnected();
+  showResultModal({
+    titulo: ok ? '✅ Pago registrado' : '⚠ No se pudo confirmar el guardado — revisa tu conexión e inténtalo de nuevo.',
+    detalles: [
+      { label:'Arrendatario', value: contractLabel(contratoId) },
+      { label:'Servicio(s)', value: serviciosPagados.join(', ') },
+    ],
+  }, ok);
 }
 
 // ---------- HISTORIAL MENSUAL ----------
@@ -5792,8 +5861,8 @@ function renderHistorialSelects(){
   const activos = contracts.filter(isActiveContract);
   const historicos = contracts.filter(c=>!isActiveContract(c));
 
-  selActivo.innerHTML = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
-  selHist.innerHTML = '<option value="">Todos los arrendatarios</option>' + historicos.map(c=>`<option value="${c.id}">${esc(contractLabel(c.id))}</option>`).join('');
+  selActivo.innerHTML = '<option value="">Todos los arrendatarios</option>' + activos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('');
+  selHist.innerHTML = '<option value="">Todos los arrendatarios</option>' + historicos.map(c=>`<option value="${c.id}" data-search="${esc(contractSearchExtra(c.id))}">${esc(contractLabel(c.id))}</option>`).join('');
 
   if(activos.some(c=>c.id===currentActivo)) selActivo.value = currentActivo;
   if(historicos.some(c=>c.id===currentHist)) selHist.value = currentHist;
@@ -7759,7 +7828,7 @@ function renderResumenMatrix(){
   const tenantSel = document.getElementById('matrix-tenant-filter');
   const currentTenant = tenantSel.value;
   tenantSel.innerHTML = '<option value="">Todos los arrendatarios</option>'
-    + allRows.map(r=> `<option value="${r.c.id}">${esc(r.label)}${r.historico?' (Histórico)':''}</option>`).join('');
+    + allRows.map(r=> `<option value="${r.c.id}" data-search="${esc(contractSearchExtra(r.c.id))}">${esc(r.label)}${r.historico?' (Histórico)':''}</option>`).join('');
   if(allRows.some(r=>r.c.id===currentTenant)) tenantSel.value = currentTenant;
   const tenantFiltro = tenantSel.value;
 
@@ -7966,6 +8035,10 @@ function makeSearchable(selectId){
   wrapper.appendChild(select);
 
   function optionLabel(o){ return o.textContent.trim(); }
+  // Además del texto visible, cada opción puede traer un atributo data-search con datos que NO
+  // se muestran en la etiqueta (nombre de contacto de WhatsApp, representante legal, RUT, etc.)
+  // — así se puede encontrar un arrendatario buscando por esos datos aunque no aparezcan en pantalla.
+  function optionSearchText(o){ return (optionLabel(o) + ' ' + (o.dataset.search||'')).toLowerCase(); }
 
   function buildList(filterText){
     const term = (filterText||'').toLowerCase();
@@ -7973,7 +8046,7 @@ function makeSearchable(selectId){
     // La primera opción (valor vacío, típicamente "Todos") queda siempre fija arriba,
     // sin filtrar, para poder volver a la vista sin selección en cualquier momento.
     const resetOpt = allOpts.find(o=> o.value==='');
-    const rest = allOpts.filter(o=> o.value!=='').filter(o=> !term || optionLabel(o).toLowerCase().includes(term));
+    const rest = allOpts.filter(o=> o.value!=='').filter(o=> !term || optionSearchText(o).includes(term));
     let html = '';
     if(resetOpt){
       html += `<div class="dropdown-item dropdown-item-reset" data-value="">${esc(optionLabel(resetOpt))}</div>`;
@@ -8000,10 +8073,17 @@ function makeSearchable(selectId){
     dropdown.style.display = 'none';
   }
 
-  input.addEventListener('focus', ()=>{ input.value=''; openDropdown(true); });
-  input.addEventListener('click', ()=>{
+  // Limpia el texto y abre la lista al TOCAR el campo por primera vez (no en cada toque
+  // mientras se está escribiendo/corrigiendo, para no borrar lo que la persona ya tipeó). Se
+  // escuchan focus, click Y touchstart — en algunos navegadores mobile, click no se dispara de
+  // forma confiable en el primer toque si el campo no tenía el foco todavía, lo que hacía
+  // parecer que "no se borraba" el texto anterior.
+  function limpiarYAbrirSiEstabaCerrado(){
     if(dropdown.style.display==='none'){ input.value=''; openDropdown(true); }
-  });
+  }
+  input.addEventListener('focus', ()=>{ input.value=''; openDropdown(true); });
+  input.addEventListener('click', limpiarYAbrirSiEstabaCerrado);
+  input.addEventListener('touchstart', limpiarYAbrirSiEstabaCerrado, {passive:true});
   input.addEventListener('input', ()=>{ buildList(input.value); dropdown.style.display='block'; });
 
   dropdown.addEventListener('mousedown', e=>{
