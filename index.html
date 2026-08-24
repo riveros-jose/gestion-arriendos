@@ -359,6 +359,20 @@
   .servicio-toggle-row{display:flex;gap:8px;margin:0 0 16px;}
   .servicio-toggle-btn{width:42px;height:42px;border-radius:10px;border:2px solid var(--border);background:var(--card);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.35;filter:grayscale(1);transition:opacity .15s,filter .15s,border-color .15s,background .15s;}
   .servicio-toggle-btn.active{opacity:1;filter:grayscale(0);background:var(--teal-soft);border-color:var(--teal);}
+  /* Lecturas registradas: tabla ancha en desktop (hay espacio de sobra), tarjetas apiladas en
+     mobile (7 columnas en una pantalla chica es una mala experiencia). Se ocultan una a otra
+     según el ancho de pantalla — el corte es el mismo 860px que usa el resto de la app. */
+  .reading-cards-mobile{display:none;}
+  .reading-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+  .reading-card-top{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+  .reading-card-servicio{flex-shrink:0;font-size:15px;}
+  .reading-card-nombre{flex:1;min-width:0;font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .reading-card-mid{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+  .reading-card-monto{font-size:17px;font-weight:700;color:var(--ink);}
+  .reading-card-detail{font-size:12px;color:var(--ink-soft);margin-bottom:4px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .reading-card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);}
+  .reading-card-footer .mono{font-size:12px;color:var(--ink-soft);}
+  .reading-card-actions{display:flex;gap:6px;}
   .checkbox-list{border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:150px;overflow-y:auto;background:#fdfdfc;}
   .checkbox-list label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--ink);padding:4px 0;cursor:pointer;}
   .checkbox-list input[type="checkbox"]{width:15px;height:15px;flex-shrink:0;}
@@ -493,6 +507,8 @@
 
     /* Tablas: encabezados compactos que envuelven en 2 líneas, para ver más columnas de una */
     table{font-size:12px;}
+    .reading-table-desktop{display:none;}
+    .reading-cards-mobile{display:block;}
     th{
       white-space:normal;font-size:9.5px;padding:6px 5px;line-height:1.2;
       letter-spacing:0.01em;min-width:40px;vertical-align:bottom;
@@ -2065,6 +2081,18 @@ function buildWorkbook(){
   return XLSX.write(wb, { type:'array', bookType:'xlsx', cellStyles: true });
 }
 
+// Campos como "N° Cliente Gas" o "N° Medidor" son texto libre (no cálculos), pero si en algún
+// momento se pegaron o cargaron como número en Excel/Sheets, pueden volver con un decimal de
+// sobra (ej. "12345.0") al leer el archivo — esto los deja como número entero limpio, sin tocar
+// el valor si no es puramente numérico (por ejemplo, si tiene guiones o letras).
+function limpiarNumeroEntero(v){
+  if(v===undefined || v===null || v==='') return v;
+  const str = String(v).trim();
+  if(!/^\d+(\.\d+)?$/.test(str)) return v;
+  return String(Math.round(Number(str)));
+}
+const CAMPOS_NUMERO_CLIENTE = ['clienteLuz','clienteAgua','clienteGas','medidorLuz','medidorAgua','medidorGas'];
+
 function excelCellToISODate(v){
   if(v instanceof Date && !isNaN(v)){
     const y = v.getUTCFullYear();
@@ -2120,7 +2148,11 @@ function loadFromWorkbook(arrayBuffer){
   const gastoFijoSheet = wb.Sheets['GastosFijos'];
   const gastoPuntualSheet = wb.Sheets['GastosPuntuales'];
   const mantSheet = wb.Sheets['Mantenimientos'];
-  properties = propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : [];
+  properties = (propSheet ? XLSX.utils.sheet_to_json(propSheet).filter(r=>r.id) : []).map(p=>{
+    const limpio = {...p};
+    CAMPOS_NUMERO_CLIENTE.forEach(f=>{ if(limpio[f]!==undefined) limpio[f] = limpiarNumeroEntero(limpio[f]); });
+    return limpio;
+  });
   tenants = tenantSheet ? XLSX.utils.sheet_to_json(tenantSheet).filter(r=>r.id) : [];
 
   const rawContracts = contractSheet ? XLSX.utils.sheet_to_json(contractSheet).filter(r=>r.id) : [];
@@ -2916,6 +2948,7 @@ document.getElementById('form-propiedad').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingProp || uid() };
   propFields.forEach(f=> obj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('p-'+f).value) : document.getElementById('p-'+f).value);
+  CAMPOS_NUMERO_CLIENTE.forEach(f=>{ if(obj[f]!==undefined) obj[f] = limpiarNumeroEntero(obj[f]); });
   ['m2Construidos','m2Terreno'].forEach(f=>{
     if(obj[f]!=='' && !isNaN(Number(obj[f]))) obj[f] = String(Math.ceil(Number(obj[f])));
   });
@@ -2940,7 +2973,7 @@ function editProperty(id){
   const p = properties.find(x=>x.id===id);
   if(!p) return;
   editingProp = id;
-  propFields.forEach(f=> document.getElementById('p-'+f).value = (MONEY_COLUMNS.includes(f) && p[f]) ? formatThousandsCLP(rawMoneyValue(p[f])) : (p[f] || ''));
+  propFields.forEach(f=> document.getElementById('p-'+f).value = (MONEY_COLUMNS.includes(f) && p[f]) ? formatThousandsCLP(rawMoneyValue(p[f])) : (CAMPOS_NUMERO_CLIENTE.includes(f) ? (limpiarNumeroEntero(p[f])||'') : (p[f] || '')));
   document.getElementById('prop-form-title').textContent='🏠 Editar propiedad';
   document.getElementById('p-cancel').style.display='inline-block';
   showPropForm();
@@ -3032,16 +3065,16 @@ function renderProperties(){
       <div class="prop-card-body">
         <div class="prop-fields-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
           <div class="prop-service-group">
-            ${propField('⚡ # Cliente Luz', esc(p.clienteLuz))}
-            ${propField('Medidor Luz', esc(p.medidorLuz))}
+            ${propField('⚡ # Cliente Luz', intFmt(p.clienteLuz))}
+            ${propField('Medidor Luz', intFmt(p.medidorLuz))}
           </div>
           <div class="prop-service-group">
-            ${propField('💧 # Cliente Agua', esc(p.clienteAgua))}
-            ${propField('Medidor Agua', esc(p.medidorAgua))}
+            ${propField('💧 # Cliente Agua', intFmt(p.clienteAgua))}
+            ${propField('Medidor Agua', intFmt(p.medidorAgua))}
           </div>
           <div class="prop-service-group">
-            ${propField('🔥 # Cliente Gas', esc(p.clienteGas))}
-            ${propField('Medidor Gas', esc(p.medidorGas))}
+            ${propField('🔥 # Cliente Gas', intFmt(p.clienteGas))}
+            ${propField('Medidor Gas', intFmt(p.medidorGas))}
           </div>
         </div>
       </div>
@@ -5390,7 +5423,11 @@ function findPropertyContractId(direccionNeedle, unidadNeedle){
 }
 
 function buildReadingsTableHtml(list){
-  return `<div class="table-scroll"><table style="table-layout:fixed;width:100%;min-width:760px;">
+  return buildReadingsDesktopTable(list) + buildReadingsMobileCards(list);
+}
+
+function buildReadingsDesktopTable(list){
+  return `<div class="table-scroll reading-table-desktop"><table style="table-layout:fixed;width:100%;min-width:760px;">
   <colgroup>
     <col style="width:26%"><col style="width:9%"><col style="width:14%"><col style="width:11%"><col style="width:17%"><col style="width:11%"><col style="width:60px">
   </colgroup>
@@ -5424,6 +5461,44 @@ function buildReadingsTableHtml(list){
   </tr>`;
   }).join('')}
   </tbody></table></div>`;
+}
+
+// Versión para mobile: en vez de una tabla ancha de 7 columnas (difícil de leer en una pantalla
+// chica), cada lectura es una tarjeta compacta apilada — misma información, en vertical.
+function buildReadingsMobileCards(list){
+  return `<div class="reading-cards-mobile">${list.map(r=>{
+    const contratoFull = contractLabel(r.contratoId);
+    const estadoTagClass = r.estado==='Pagado' ? 'tag-ok' : (r.estadoEfectivo==='Atrasado' ? 'tag-debt' : 'tag-pending');
+    const estadoTexto = r.estado==='Pagado' ? 'Pagado' : (r.estadoEfectivo==='Atrasado' ? 'Atrasado' : 'Pendiente');
+    return `<div class="reading-card">
+      <div class="reading-card-top">
+        <span class="reading-card-servicio">${servicioIcono(r.servicio)}</span>
+        <span class="reading-card-nombre" title="${esc(contratoFull)}" onclick="showFullTextTooltip(this.getAttribute('title'))">${esc(contratoFull)}</span>
+      </div>
+      <div class="reading-card-mid">
+        <span class="reading-card-monto">${money(r.monto)}</span>
+        <select class="mini-select estado-select-${r.estado==='Pagado' ? 'pagado' : (r.estadoEfectivo==='Atrasado' ? 'atrasado' : 'pendiente')}" style="font-size:11.5px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-weight:600;" title="Cambiar estado de esta lectura" onchange="confirmarCambioEstadoLectura(this,'${r.id}')">
+          <option value="Pendiente" ${r.estado!=='Pagado'?'selected':''}>${estadoTexto==='Atrasado'?'Atrasado':'Pendiente'}</option>
+          <option value="Pagado" ${r.estado==='Pagado'?'selected':''}>Pagado</option>
+        </select>
+      </div>
+      ${r.montoAcumuladoPendiente ? '<div class="tag tag-pending" style="margin-bottom:6px;">⏳ acumulando (boleta sin lectura real este mes)</div>' : ''}
+      ${r.montoPorBoletaSectorial ? '<div class="tag tag-ok" style="margin-bottom:6px;">📄 calculado según boleta</div>' : ''}
+      <div class="reading-card-detail">
+        <span class="medidor-badge" style="background:${medidorColor(r.medidor).bg};color:${medidorColor(r.medidor).fg};">${esc(r.medidor||'1')}</span>
+        Consumo: ${r.consumo===null?'primera lectura':formatNumber(r.consumo)+' ($'+formatNumber(r.valorUnitario)+' c/u)'}
+        ${r.medidorCompartidoDescuento>0?` · − ${formatNumber(r.medidorCompartidoDescuento)} compartido`:''}
+      </div>
+      <div class="reading-card-detail">${r.lecturaAnterior===null?'—':formatNumber(r.lecturaAnterior)} → ${formatNumber(r.lecturaActual)}</div>
+      <div class="reading-card-footer">
+        <span class="mono">📅 ${formatDate(r.fechaLectura)}</span>
+        <span class="reading-card-actions">
+          <button class="table-action-btn" onclick="editReading('${r.id}')" title="Editar">✏️</button>
+          <button class="table-action-btn danger" onclick="deleteReading('${r.id}')" title="Eliminar">🗑️</button>
+        </span>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 let readingsSectorVerTodo = { 1:false, 2:false };
