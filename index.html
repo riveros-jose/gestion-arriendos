@@ -5140,11 +5140,20 @@ async function deleteReading(id){
 async function setReadingEstado(id, estado){
   const r = readings.find(x=>x.id===id);
   if(!r) return;
+  showLoadingModal('Guardando…');
   r.estado = estado;
   readings = readings.map(x=> x.id===id ? r : x);
   await saveKey('readings',readings);
   renderAll();
-  await pushToDriveAndWarn();
+  const ok = await pushToDriveIfConnected();
+  closeResultModal();
+  showResultModal({
+    titulo: ok ? `✅ Marcado como ${estado}` : '⚠ No se pudo confirmar el guardado — revisa tu conexión e inténtalo de nuevo.',
+    detalles: [
+      { label:'Arrendatario', value: contractLabel(r.contratoId) },
+      { label:'Servicio', value: r.servicio },
+    ],
+  }, ok);
 }
 
 // El pago se marca a nivel de LECTURA individual (no por card completa) — un contrato puede
@@ -5911,10 +5920,12 @@ async function marcarPagoComoPagado(contratoId){
   const idsDelContrato = new Set(todas.filter(r=> r.contratoId===contratoId && r.estadoEfectivo !== 'Pagado' && !r.montoAcumuladoPendiente).map(r=>r.id));
   if(!idsDelContrato.size) return;
   const serviciosPagados = [...new Set(todas.filter(r=> idsDelContrato.has(r.id)).map(r=>r.servicio))];
+  showLoadingModal('Guardando…');
   readings = readings.map(r=> idsDelContrato.has(r.id) ? {...r, estado:'Pagado'} : r);
   await saveKey('readings', readings);
   renderAll();
   const ok = await pushToDriveIfConnected();
+  closeResultModal();
   showResultModal({
     titulo: ok ? '✅ Pago registrado' : '⚠ No se pudo confirmar el guardado — revisa tu conexión e inténtalo de nuevo.',
     detalles: [
