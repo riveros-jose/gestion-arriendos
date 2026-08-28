@@ -938,6 +938,7 @@
             </div>
             <div class="line-row" style="margin-top:14px">
               <div class="field"><label>Fecha inicio contrato</label><input id="c-fechaInicioContrato" type="date" required><span class="date-hint" id="c-fechaInicioContrato-hint"></span></div>
+              <div class="field"><label>Fecha entrega de la propiedad</label><input id="c-fechaEntregaPropiedad" type="date"><span class="date-hint" id="c-fechaEntregaPropiedad-hint"></span></div>
               <div class="field"><label>Fecha fin contrato</label><input id="c-fechaFinContrato" type="date"><span class="date-hint" id="c-fechaFinContrato-hint"></span></div>
               <div class="field"><label>Meses de gracia (sin cobro, si aplica)</label><input id="c-mesesGracia" type="number" min="0" step="1" placeholder="0"></div>
             </div>
@@ -949,6 +950,7 @@
               <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="text" inputmode="numeric" class="money-mask" required></div>
               <div class="field"><label>Día de pago del arriendo</label><input id="c-diaPago" type="number" min="1" max="31" step="1" placeholder="1" value="1"></div>
               <div class="field"><label>Meses por adelantado pactados</label><input id="c-mesesAdelantado" type="number" min="0" step="1" placeholder="1" value="1"></div>
+              <div class="field"><label>Días de anticipación para dar término</label><input id="c-diasAnticipacionTermino" type="number" min="0" step="1" placeholder="30" value="30"></div>
               <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="text" inputmode="numeric" class="money-mask"></div>
               <div class="field"><label>Fecha de pago de la garantía (si ya se pagó)</label><input id="c-garantiaFechaPago" type="date"></div>
             </div>
@@ -969,7 +971,8 @@
                 <input type="hidden" id="tc-plantillaId">
                 <div class="subtitle" style="margin:10px 0 0;font-size:11.5px;line-height:1.5;">
                   Si eliges una plantilla (un documento de Google Docs), al guardar se creará automáticamente una copia dentro de <strong>RentaPro/Contratos</strong>, con los datos de este formulario ya reemplazados. Para que el reemplazo funcione, tu plantilla debe tener escritos estos textos exactos (con las llaves dobles) donde corresponda cada dato:<br>
-                  <code style="font-size:10.5px;">{{NOMBRE_SOCIEDAD}} {{RUT_SOCIEDAD}} {{NEMO}} {{REPRESENTANTE}} {{RUT_REPRESENTANTE}} {{DIRECCION}} {{UNIDAD}} {{FECHA_INICIO}} {{FECHA_FIN}} {{MONTO_ARRIENDO}} {{DIA_PAGO}} {{GARANTIA}} {{TIPO_CONTRATO}} {{FECHA_HOY}}</code>
+                  <code style="font-size:10.5px;">{{NOMBRE_SOCIEDAD}} {{RUT_SOCIEDAD}} {{NEMO}} {{REPRESENTANTE}} {{RUT_REPRESENTANTE}} {{DIRECCION}} {{UNIDAD}} {{LOCALIDAD}} {{FECHA_INICIO}} {{FECHA_ENTREGA}} {{FECHA_FIN}} {{MONTO_ARRIENDO}} {{DIA_PAGO}} {{DIAS_ANTICIPACION_TERMINO}} {{GARANTIA}} {{TIPO_CONTRATO}} {{FECHA_HOY}}</code><br>
+                  <span style="display:block;margin-top:6px;">💡 {{MONTO_ARRIENDO}} y {{GARANTIA}} ya incluyen el monto escrito en palabras junto al número — ej: <em>"$400.000 (cuatrocientos mil pesos)"</em>.</span>
                 </div>
               </div>
             </div>
@@ -1578,6 +1581,23 @@ async function openFilePicker(){
 //    documento de inmediato, usando los datos actuales de ese contrato.
 const GDOC_MIME = 'application/vnd.google-apps.document';
 let templatePickerTargetContratoId = null;
+// Busca (sin crear) la carpeta RentaPro/Contratos tipo — a diferencia de driveFindOrCreateFolder
+// / driveFindOrCreateSubfolder, esta NO la crea si no existe; si no se encuentra, el selector de
+// plantillas simplemente abre mostrando toda la unidad de Drive, sin abrir en ningún punto fijo.
+async function buscarCarpetaContratosTipo(){
+  try{
+    const rentaProFolderId = await driveFindOrCreateFolder();
+    const q = encodeURIComponent(`name='Contratos tipo' and mimeType='application/vnd.google-apps.folder' and '${rentaProFolderId}' in parents and trashed=false`);
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, { headers:{ Authorization:'Bearer '+driveToken } });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return (data.files && data.files.length) ? data.files[0].id : null;
+  }catch(e){
+    console.error('Error buscando la carpeta Contratos tipo', e);
+    return null;
+  }
+}
+
 async function openTemplatePicker(targetContratoId){
   templatePickerTargetContratoId = targetContratoId || null;
   if(!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('PEGA_AQUI')){
@@ -1591,6 +1611,7 @@ async function openTemplatePicker(targetContratoId){
     alert(e.message);
     return;
   }
+  const carpetaContratosTipoId = await buscarCarpetaContratosTipo();
   const viewPropios = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS)
     .setIncludeFolders(true)
     .setSelectFolderEnabled(false);
@@ -1598,6 +1619,10 @@ async function openTemplatePicker(targetContratoId){
     .setIncludeFolders(true)
     .setSelectFolderEnabled(false)
     .setOwnedByMe(false);
+  if(carpetaContratosTipoId){
+    // Si existe la carpeta, el selector abre directamente ahí en vez de en la raíz de la unidad.
+    viewPropios.setParent(carpetaContratosTipoId);
+  }
   const APP_PROJECT_NUMBER = GOOGLE_CLIENT_ID.split('-')[0];
   const picker = new google.picker.PickerBuilder()
     .setOAuthToken(driveToken)
@@ -1793,11 +1818,95 @@ async function driveFindOrCreateSubfolder(parentId, name){
 // Contrato_Arriendo_{Propiedad}_{Local}_{Sociedad}_{FechaInicio}, y reemplaza en su contenido
 // los textos {{PLACEHOLDER}} por los datos reales del formulario recién guardado.
 let driveContratosFolderId = null;
+// Convierte un monto en pesos a su escritura en palabras (español) — para dejar en los
+// contratos, junto al monto en números, como es habitual en documentos legales chilenos.
+// Ej: 500000 -> "Quinientos mil pesos". 1000000 -> "Un millón de pesos" (con "de" solo cuando el
+// millón queda "redondo", sin miles ni unidades sueltas después).
+// Igual que numeroATextoPesos pero sin el sufijo "pesos" — para escribir en palabras cualquier
+// otra cantidad (por ahora, días de anticipación). Cubre hasta 999 (de sobra para este uso).
+function numeroATextoSimple(n){
+  n = Math.round(Number(n)||0);
+  if(n===0) return 'cero';
+  if(n<0) return 'menos ' + numeroATextoSimple(-n);
+
+  const UNIDADES = ['','un','dos','tres','cuatro','cinco','seis','siete','ocho','nueve'];
+  const ESPECIALES = {10:'diez',11:'once',12:'doce',13:'trece',14:'catorce',15:'quince',16:'dieciséis',17:'diecisiete',18:'dieciocho',19:'diecinueve',20:'veinte',21:'veintiún',22:'veintidós',23:'veintitrés',24:'veinticuatro',25:'veinticinco',26:'veintiséis',27:'veintisiete',28:'veintiocho',29:'veintinueve'};
+  const DECENAS = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const CENTENAS = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+
+  const c = Math.floor(n/100);
+  const resto = n%100;
+  if(n===100) return 'cien';
+  const partes = [];
+  if(c>0) partes.push(CENTENAS[c]);
+  if(resto>0){
+    if(ESPECIALES[resto]) partes.push(ESPECIALES[resto]);
+    else{
+      const d = Math.floor(resto/10), u = resto%10;
+      if(d===0) partes.push(UNIDADES[u]);
+      else partes.push(u===0 ? DECENAS[d] : DECENAS[d]+' y '+UNIDADES[u]);
+    }
+  }
+  return partes.join(' ');
+}
+
+function numeroATextoPesos(n){
+  n = Math.round(Number(n)||0);
+  if(n===0) return 'Cero pesos';
+  if(n<0) return 'Menos ' + numeroATextoPesos(-n).toLowerCase();
+
+  const UNIDADES = ['','un','dos','tres','cuatro','cinco','seis','siete','ocho','nueve'];
+  const ESPECIALES = {10:'diez',11:'once',12:'doce',13:'trece',14:'catorce',15:'quince',16:'dieciséis',17:'diecisiete',18:'dieciocho',19:'diecinueve',20:'veinte',21:'veintiún',22:'veintidós',23:'veintitrés',24:'veinticuatro',25:'veinticinco',26:'veintiséis',27:'veintisiete',28:'veintiocho',29:'veintinueve'};
+  const DECENAS = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const CENTENAS = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+
+  function convertirGrupo(num){ // 0 a 999
+    if(num===0) return '';
+    if(num===100) return 'cien';
+    const c = Math.floor(num/100);
+    const resto = num%100;
+    const partes = [];
+    if(c>0) partes.push(CENTENAS[c]);
+    if(resto>0){
+      if(ESPECIALES[resto]) partes.push(ESPECIALES[resto]);
+      else{
+        const d = Math.floor(resto/10), u = resto%10;
+        if(d===0) partes.push(UNIDADES[u]);
+        else partes.push(u===0 ? DECENAS[d] : DECENAS[d]+' y '+UNIDADES[u]);
+      }
+    }
+    return partes.join(' ');
+  }
+
+  const millones = Math.floor(n/1000000);
+  const miles = Math.floor((n%1000000)/1000);
+  const resto = n%1000;
+  const partes = [];
+  if(millones>0) partes.push(millones===1 ? 'un millón' : convertirGrupo(millones)+' millones');
+  if(miles>0) partes.push(miles===1 ? 'mil' : convertirGrupo(miles)+' mil');
+  if(resto>0) partes.push(convertirGrupo(resto));
+
+  const esMillonRedondo = millones>0 && miles===0 && resto===0;
+  const texto = partes.join(' ') + (esMillonRedondo ? ' de pesos' : ' pesos');
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+// Combina el monto en $ y su escritura en palabras en un solo texto — así en la plantilla del
+// contrato basta con un solo placeholder ({{MONTO_ARRIENDO}} o {{GARANTIA}}) para que salga
+// "$400.000 (cuatrocientos mil pesos)", sin tener que agregar uno aparte para el texto.
+function montoConTexto(monto){
+  if(!monto || Number(monto)<=0) return '';
+  return `${money(monto)} (${numeroATextoPesos(monto).toLowerCase()})`;
+}
+
 async function generarContratoDesdeePlantilla(plantillaId, tObj, cObj, propiedadIds){
   if(!driveToken) throw new Error('No estás conectado a Google Drive.');
 
   const direccion = propiedadIds.map(pid=>{ const p=properties.find(x=>x.id===pid); return p?p.direccion:''; }).filter(Boolean).join(' + ');
   const unidad = propiedadIds.map(pid=>{ const p=properties.find(x=>x.id===pid); return p?p.unidad:''; }).filter(Boolean).join(' + ');
+  // La localidad viene de la ficha de inscripción CBR de la propiedad — si el contrato incluye
+  // más de una propiedad y tienen localidades distintas, se listan todas sin repetir.
+  const localidad = [...new Set(propiedadIds.map(pid=>{ const p=properties.find(x=>x.id===pid); return p?p.cbrLocalidad:''; }).filter(Boolean))].join(' + ');
   const sociedad = tObj.nombreSociedad || tObj.nemoArrendatario || 'Sociedad';
   const partesNombre = ['Contrato_Arriendo', direccion, unidad, sociedad, cObj.fechaInicioContrato].filter(Boolean);
   const nombreArchivo = partesNombre.join('_').replace(/[\\/:*?"<>|]/g,'-');
@@ -1824,11 +1933,14 @@ async function generarContratoDesdeePlantilla(plantillaId, tObj, cObj, propiedad
     '{{RUT_REPRESENTANTE}}': tObj.rutRepresentante || '',
     '{{DIRECCION}}': direccion,
     '{{UNIDAD}}': unidad,
+    '{{LOCALIDAD}}': localidad,
     '{{FECHA_INICIO}}': formatDate(cObj.fechaInicioContrato),
+    '{{FECHA_ENTREGA}}': formatDate(cObj.fechaEntregaPropiedad || cObj.fechaInicioContrato),
     '{{FECHA_FIN}}': cObj.fechaFinContrato ? formatDate(cObj.fechaFinContrato) : '',
-    '{{MONTO_ARRIENDO}}': money(cObj.montoArriendoPactado),
+    '{{MONTO_ARRIENDO}}': montoConTexto(cObj.montoArriendoPactado),
     '{{DIA_PAGO}}': String(cObj.diaPago || 1),
-    '{{GARANTIA}}': cObj.garantia ? money(cObj.garantia) : '',
+    '{{DIAS_ANTICIPACION_TERMINO}}': (()=>{ const d = cObj.diasAnticipacionTermino!==undefined && cObj.diasAnticipacionTermino!=='' ? Number(cObj.diasAnticipacionTermino) : 30; return `${numeroATextoSimple(d)} (${d}) días`; })(),
+    '{{GARANTIA}}': montoConTexto(cObj.garantia),
     '{{TIPO_CONTRATO}}': cObj.tipoContrato || '',
     '{{FECHA_HOY}}': formatDate(fechaHoyChile()),
   };
@@ -1901,7 +2013,7 @@ function styleWorksheet(ws, widths){
   }
 }
 
-const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
+const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
 const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo','proximaDecisionMonto'];
 // Igual que applyColumnFormats, pero para exportaciones donde los encabezados son texto libre
 // (no coinciden exactamente con los nombres de MONEY_COLUMNS) o son dinámicos (ej. nombres de
@@ -1979,9 +2091,9 @@ function buildWorkbook(){
     direccion: propAddresses(c),
     nemo: tenantNemo(c.tenantId) || tenantName(c.tenantId),
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
-    fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'', mesesGracia: c.mesesGracia||0,
+    fechaInicioContrato: c.fechaInicioContrato, fechaEntregaPropiedad: c.fechaEntregaPropiedad||'', fechaFinContrato: c.fechaFinContrato||'', mesesGracia: c.mesesGracia||0,
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
-    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, diaPago: c.diaPago||1, mesesAdelantado: c.mesesAdelantado!==undefined && c.mesesAdelantado!=='' ? c.mesesAdelantado : 1, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
+    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, diaPago: c.diaPago||1, mesesAdelantado: c.mesesAdelantado!==undefined && c.mesesAdelantado!=='' ? c.mesesAdelantado : 1, diasAnticipacionTermino: c.diasAnticipacionTermino!==undefined && c.diasAnticipacionTermino!=='' ? c.diasAnticipacionTermino : 30, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
     garantiaDevueltaMonto: c.garantiaDevueltaMonto||'', garantiaDevueltaFecha: c.garantiaDevueltaFecha||'',
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
@@ -1991,8 +2103,8 @@ function buildWorkbook(){
     contratoDocUrl: c.contratoDocUrl||'', contratoDocNombre: c.contratoDocNombre||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','contratoDocUrl','contratoDocNombre']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,10,10,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16,32,28]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','diasAnticipacionTermino','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','contratoDocUrl','contratoDocNombre']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,10,14,14,14,10,12,10,10,14,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16,32,28]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -2105,7 +2217,7 @@ function excelCellToISODate(v){
   }
   return v;
 }
-const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio','ultimaFecha','garantiaFechaPago','garantiaDevueltaFecha'];
+const DATE_FIELD_NAMES = ['fechaPago','fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada','fecha','fechaInicio','ultimaFecha','garantiaFechaPago','garantiaDevueltaFecha'];
 function normalizeDates(obj){
   DATE_FIELD_NAMES.forEach(f=>{ if(obj[f]!==undefined) obj[f] = excelCellToISODate(obj[f]); });
   return obj;
@@ -2551,7 +2663,7 @@ function fechaHoyChile(){
 // FORMATO que muestra el navegador dentro del campo depende del idioma/sistema operativo de
 // cada dispositivo (a veces sale MM/DD/AAAA). Este indicador de abajo siempre muestra
 // DD-MM-AAAA, sin importar el navegador.
-const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaFinContrato','pay-fechaPago','cu-fechaTermino'];
+const DATE_INPUT_IDS = ['c-fechaInicioContrato','c-fechaEntregaPropiedad','c-fechaFinContrato','pay-fechaPago','cu-fechaTermino'];
 function refreshDateHints(){
   DATE_INPUT_IDS.forEach(id=>{
     const input = document.getElementById(id);
@@ -3141,7 +3253,7 @@ document.getElementById('resumen-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','whatsappNombreContacto','whatsappContacto'];
-const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','garantia','garantiaFechaPago','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','diasAnticipacionTermino','garantia','garantiaFechaPago','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 // Devuelve el contrato ACTIVO (si hay alguno, exceptuando el que se está editando) que ya tiene
@@ -3474,9 +3586,11 @@ function renderTenantsContracts(){
       <div class="prop-card-section" style="margin-top:0;padding-top:0;border-top:none">📝 Contrato</div>
       <div class="prop-fields-grid">
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
+        ${propField('Entrega de la propiedad', c.fechaEntregaPropiedad ? formatDate(c.fechaEntregaPropiedad) : '—')}
         ${propField('Fin contrato', fechaFin)}
         ${propField('Monto pactado', money(c.montoArriendoPactado))}
         ${propField('Meses por adelantado', c.mesesAdelantado!==undefined && c.mesesAdelantado!=='' ? c.mesesAdelantado : '1')}
+        ${propField('Días anticipación término', (c.diasAnticipacionTermino!==undefined && c.diasAnticipacionTermino!=='' ? c.diasAnticipacionTermino : '30')+' días')}
         ${propField('Garantía', c.garantia ? money(c.garantia) : '—')}
       </div>
       ${c.infoGeneral ? `<div class="prop-field prop-field-full"><span class="lbl">Comentarios</span><span class="val">${esc(c.infoGeneral)}</span></div>` : ''}
