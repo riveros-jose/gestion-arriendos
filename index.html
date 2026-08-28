@@ -931,6 +931,7 @@
             <div class="line-row">
               <div class="field">
                 <label>Propiedad(es)</label>
+                <input type="text" id="c-propiedad-buscador" placeholder="🔎 Buscar por dirección o local…" style="margin-bottom:8px;" oninput="filtrarPropiedadesChecklist(this.value)">
                 <div id="c-propiedadId-checks" class="checkbox-list"></div>
                 <div id="c-propiedad-arrendada-aviso" style="display:none;margin-top:8px;background:var(--brick-soft);color:var(--brick);border:1px solid var(--brick);border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.5;"></div>
               </div>
@@ -3150,6 +3151,8 @@ function propiedadRentadaPor(propId, excludeContratoId){
 
 function renderContractSelects(){
   const cont = document.getElementById('c-propiedadId-checks');
+  const buscador = document.getElementById('c-propiedad-buscador');
+  if(buscador) buscador.value = '';
   // Se listan TODAS las propiedades, estén o no ya arrendadas — las arrendadas quedan marcadas
   // con una etiqueta roja junto al nombre, y si se seleccionan igual, aparece el detalle
   // (a quién y hasta cuándo) en el aviso de abajo.
@@ -3157,10 +3160,21 @@ function renderContractSelects(){
   cont.innerHTML = propiedadesOrdenadas.length
     ? propiedadesOrdenadas.map(p=>{
         const arrendadaPor = propiedadRentadaPor(p.id, editingContract);
-        return `<label><input type="checkbox" value="${p.id}" onchange="actualizarAvisoPropiedadesArrendadas()"> ${esc(p.direccion)} ${esc(p.unidad||'')}${arrendadaPor ? ' <span class="tag tag-debt">Arrendada</span>' : ''}</label>`;
+        const textoBusqueda = (p.direccion+' '+(p.unidad||'')).toLowerCase();
+        return `<label data-search="${esc(textoBusqueda)}"><input type="checkbox" value="${p.id}" onchange="actualizarAvisoPropiedadesArrendadas()"> ${esc(p.direccion)} ${esc(p.unidad||'')}${arrendadaPor ? ' <span class="tag tag-debt">Arrendada</span>' : ''}</label>`;
       }).join('')
     : '<div class="empty-note">No hay propiedades registradas todavía.</div>';
   actualizarAvisoPropiedadesArrendadas();
+}
+
+// Filtra las propiedades del checklist en vivo, según lo que se escriba — no vuelve a armar la
+// lista (así no se pierde qué casillas ya estaban marcadas), solo muestra/oculta cada opción.
+function filtrarPropiedadesChecklist(texto){
+  const term = (texto||'').trim().toLowerCase();
+  document.querySelectorAll('#c-propiedadId-checks label').forEach(label=>{
+    const coincide = !term || (label.dataset.search||'').includes(term);
+    label.style.display = coincide ? 'flex' : 'none';
+  });
 }
 
 // Aviso en rojo, debajo de la tabla de propiedades, cuando se selecciona una que YA está
