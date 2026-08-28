@@ -948,6 +948,7 @@
               <div class="field"><label>Tipo ajuste IPC</label><select id="c-tipoAjusteIPC"><option>Anual</option><option>Semestral</option><option>No aplica</option></select></div>
               <div class="field"><label>Monto arriendo pactado ($)</label><input id="c-montoArriendoPactado" type="text" inputmode="numeric" class="money-mask" required></div>
               <div class="field"><label>Día de pago del arriendo</label><input id="c-diaPago" type="number" min="1" max="31" step="1" placeholder="1" value="1"></div>
+              <div class="field"><label>Meses por adelantado pactados</label><input id="c-mesesAdelantado" type="number" min="0" step="1" placeholder="1" value="1"></div>
               <div class="field"><label>Garantía ($)</label><input id="c-garantia" type="text" inputmode="numeric" class="money-mask"></div>
               <div class="field"><label>Fecha de pago de la garantía (si ya se pagó)</label><input id="c-garantiaFechaPago" type="date"></div>
             </div>
@@ -1980,7 +1981,7 @@ function buildWorkbook(){
     tenantId: c.tenantId, propiedadIds: contractPropertyIds(c).join(','),
     fechaInicioContrato: c.fechaInicioContrato, fechaFinContrato: c.fechaFinContrato||'', mesesGracia: c.mesesGracia||0,
     tipoContrato: c.tipoContrato, periodoContrato: c.periodoContrato, duracionMeses: c.duracionMeses,
-    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, diaPago: c.diaPago||1, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
+    tipoAjusteIPC: c.tipoAjusteIPC, montoArriendoPactado: c.montoArriendoPactado, diaPago: c.diaPago||1, mesesAdelantado: c.mesesAdelantado!==undefined && c.mesesAdelantado!=='' ? c.mesesAdelantado : 1, garantia: c.garantia||'', garantiaFechaPago: c.garantiaFechaPago||'', infoGeneral: c.infoGeneral,
     activo: c.activo, fechaTermino: c.fechaTermino||'', deudaPactada: c.deudaPactada||'',
     garantiaDevueltaMonto: c.garantiaDevueltaMonto||'', garantiaDevueltaFecha: c.garantiaDevueltaFecha||'',
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
@@ -1990,8 +1991,8 @@ function buildWorkbook(){
     contratoDocUrl: c.contratoDocUrl||'', contratoDocNombre: c.contratoDocNombre||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','contratoDocUrl','contratoDocNombre']);
-  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,10,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16,32,28]);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','contratoDocUrl','contratoDocNombre']);
+  styleWorksheet(wsCon, [10,28,22,10,14,14,14,10,14,14,14,10,12,10,10,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16,32,28]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
   const payRows = payments.length ? payments.map(p=>({
@@ -3140,7 +3141,7 @@ document.getElementById('resumen-subtabs').addEventListener('click', e=>{
 
 // ---------- ARRENDATARIOS (Sociedad + Representante) ----------
 const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreRepresentante','rutRepresentante','correo','telefono','whatsappNombreContacto','whatsappContacto'];
-const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral'];
+const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','garantia','garantiaFechaPago','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
 // Devuelve el contrato ACTIVO (si hay alguno, exceptuando el que se está editando) que ya tiene
@@ -3475,6 +3476,7 @@ function renderTenantsContracts(){
         ${propField('Inicio contrato', formatDate(c.fechaInicioContrato))}
         ${propField('Fin contrato', fechaFin)}
         ${propField('Monto pactado', money(c.montoArriendoPactado))}
+        ${propField('Meses por adelantado', c.mesesAdelantado!==undefined && c.mesesAdelantado!=='' ? c.mesesAdelantado : '1')}
         ${propField('Garantía', c.garantia ? money(c.garantia) : '—')}
       </div>
       ${c.infoGeneral ? `<div class="prop-field prop-field-full"><span class="lbl">Comentarios</span><span class="val">${esc(c.infoGeneral)}</span></div>` : ''}
