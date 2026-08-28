@@ -930,8 +930,9 @@
             <h3>📝 Información del Contrato</h3>
             <div class="line-row">
               <div class="field">
-                <label>Propiedad(es) — solo se listan las disponibles</label>
+                <label>Propiedad(es)</label>
                 <div id="c-propiedadId-checks" class="checkbox-list"></div>
+                <div id="c-propiedad-arrendada-aviso" style="display:none;margin-top:8px;background:var(--brick-soft);color:var(--brick);border:1px solid var(--brick);border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.5;"></div>
               </div>
             </div>
             <div class="line-row" style="margin-top:14px">
@@ -3141,21 +3142,48 @@ const tenantFields = ['nemoArrendatario','nombreSociedad','rutSociedad','nombreR
 const contractFields = ['fechaInicioContrato','fechaFinContrato','mesesGracia','tipoContrato','tipoAjusteIPC','montoArriendoPactado','diaPago','garantia','garantiaFechaPago','infoGeneral'];
 function isActiveContract(c){ return c.activo !== false && c.activo !== 'false' && c.activo !== 'FALSE'; }
 
-function propiedadesDisponibles(excludeContratoId){
-  const usadas = new Set();
-  contracts.filter(isActiveContract).forEach(c=>{
-    if(c.id===excludeContratoId) return;
-    contractPropertyIds(c).forEach(id=>usadas.add(id));
-  });
-  return properties.filter(p=>!usadas.has(p.id));
+// Devuelve el contrato ACTIVO (si hay alguno, exceptuando el que se está editando) que ya tiene
+// arrendada esta propiedad — null si está libre.
+function propiedadRentadaPor(propId, excludeContratoId){
+  return contracts.find(c=> isActiveContract(c) && c.id!==excludeContratoId && contractPropertyIds(c).includes(propId)) || null;
 }
 
 function renderContractSelects(){
-  const disponibles = propiedadesDisponibles(editingContract);
   const cont = document.getElementById('c-propiedadId-checks');
-  cont.innerHTML = disponibles.length
-    ? disponibles.map(p=>`<label><input type="checkbox" value="${p.id}"> ${esc(p.direccion)} ${esc(p.unidad||'')}</label>`).join('')
-    : '<div class="empty-note">No hay propiedades disponibles (todas están arrendadas en un contrato activo).</div>';
+  // Se listan TODAS las propiedades, estén o no ya arrendadas — las arrendadas quedan marcadas
+  // con una etiqueta roja junto al nombre, y si se seleccionan igual, aparece el detalle
+  // (a quién y hasta cuándo) en el aviso de abajo.
+  const propiedadesOrdenadas = properties.slice().sort((a,b)=> (a.direccion||'').localeCompare(b.direccion||''));
+  cont.innerHTML = propiedadesOrdenadas.length
+    ? propiedadesOrdenadas.map(p=>{
+        const arrendadaPor = propiedadRentadaPor(p.id, editingContract);
+        return `<label><input type="checkbox" value="${p.id}" onchange="actualizarAvisoPropiedadesArrendadas()"> ${esc(p.direccion)} ${esc(p.unidad||'')}${arrendadaPor ? ' <span class="tag tag-debt">Arrendada</span>' : ''}</label>`;
+      }).join('')
+    : '<div class="empty-note">No hay propiedades registradas todavía.</div>';
+  actualizarAvisoPropiedadesArrendadas();
+}
+
+// Aviso en rojo, debajo de la tabla de propiedades, cuando se selecciona una que YA está
+// arrendada — indica a quién y cuándo termina en teoría ese contrato, para que quede claro antes
+// de guardar (por ejemplo, si se quiere registrar un contrato nuevo a sabiendas de un traslape,
+// o si fue una selección por error).
+function actualizarAvisoPropiedadesArrendadas(){
+  const avisoEl = document.getElementById('c-propiedad-arrendada-aviso');
+  if(!avisoEl) return;
+  const seleccionadas = Array.from(document.querySelectorAll('#c-propiedadId-checks input:checked')).map(cb=>cb.value);
+  const avisos = seleccionadas.map(propId=>{
+    const c = propiedadRentadaPor(propId, editingContract);
+    if(!c) return null;
+    const p = properties.find(x=>x.id===propId);
+    const t = tenants.find(x=>x.id===c.tenantId);
+    const nombreArrendatario = (t && (t.nemoArrendatario || t.nombreSociedad)) || 'un arrendatario';
+    const finCalc = contractEndDate(c);
+    const fechaFinTexto = finCalc ? formatDate(toISO(finCalc)) : 'sin fecha de término definida';
+    const direccionTexto = p ? (p.direccion + (p.unidad?' '+p.unidad:'')) : propId;
+    return `<div>⚠️ <strong>${esc(direccionTexto)}</strong> ya está arrendada a <strong>${esc(nombreArrendatario)}</strong> — el contrato termina en teoría el ${fechaFinTexto}.</div>`;
+  }).filter(Boolean);
+  avisoEl.innerHTML = avisos.join('');
+  avisoEl.style.display = avisos.length ? 'block' : 'none';
 }
 
 document.getElementById('form-arrendatario-contrato').addEventListener('submit', async e=>{
@@ -3268,6 +3296,7 @@ function editTenantContract(tenantId, contractId){
   renderContractSelects();
   const seleccionadas = contractPropertyIds(c);
   document.querySelectorAll('#c-propiedadId-checks input').forEach(cb=>{ cb.checked = seleccionadas.includes(cb.value); });
+  actualizarAvisoPropiedadesArrendadas();
   document.getElementById('tc-form-title').textContent='🏢 Editar arrendatario y contrato';
   document.getElementById('tc-cancel').style.display='inline-block';
   showTenantForm();
