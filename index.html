@@ -1829,7 +1829,7 @@ function numeroATextoSimple(n){
   if(n===0) return 'cero';
   if(n<0) return 'menos ' + numeroATextoSimple(-n);
 
-  const UNIDADES = ['','un','dos','tres','cuatro','cinco','seis','siete','ocho','nueve'];
+  const UNIDADES = ['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve'];
   const ESPECIALES = {10:'diez',11:'once',12:'doce',13:'trece',14:'catorce',15:'quince',16:'dieciséis',17:'diecisiete',18:'dieciocho',19:'diecinueve',20:'veinte',21:'veintiún',22:'veintidós',23:'veintitrés',24:'veinticuatro',25:'veinticinco',26:'veintiséis',27:'veintisiete',28:'veintiocho',29:'veintinueve'};
   const DECENAS = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
   const CENTENAS = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
@@ -1938,7 +1938,7 @@ async function generarContratoDesdeePlantilla(plantillaId, tObj, cObj, propiedad
     '{{FECHA_ENTREGA}}': formatDate(cObj.fechaEntregaPropiedad || cObj.fechaInicioContrato),
     '{{FECHA_FIN}}': cObj.fechaFinContrato ? formatDate(cObj.fechaFinContrato) : '',
     '{{MONTO_ARRIENDO}}': montoConTexto(cObj.montoArriendoPactado),
-    '{{DIA_PAGO}}': String(cObj.diaPago || 1),
+    '{{DIA_PAGO}}': (()=>{ const d = cObj.diaPago || 1; return `${d} (${numeroATextoSimple(d)})`; })(),
     '{{DIAS_ANTICIPACION_TERMINO}}': (()=>{ const d = cObj.diasAnticipacionTermino!==undefined && cObj.diasAnticipacionTermino!=='' ? Number(cObj.diasAnticipacionTermino) : 30; return `${numeroATextoSimple(d)} (${d}) días`; })(),
     '{{GARANTIA}}': montoConTexto(cObj.garantia),
     '{{TIPO_CONTRATO}}': cObj.tipoContrato || '',
