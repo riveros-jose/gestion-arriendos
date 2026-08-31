@@ -4212,13 +4212,54 @@ let cuIpcCalculado = null;
 // Consulta la UF de una fecha específica en la API pública de mindicador.cl (fuente: Banco
 // Central de Chile). La fecha se recibe en formato YYYY-MM-DD y se convierte a DD-MM-YYYY, que
 // es el formato que espera la API.
-async function fetchUF(fechaISO){
+// Robustecida contra fallas puntuales de red: cada intento tiene un tope de 8 segundos (para que
+// nunca quede "pegado" esperando indefinidamente), reintenta una vez si falla, y si el endpoint
+// de fecha específica no responde, cae a pedir el listado del año completo y busca ahí la fecha
+// más cercana (por si justo esa fecha exacta no está publicada, por ejemplo fin de semana).
+async function fetchConTimeout(url, timeoutMs){
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=> controller.abort(), timeoutMs);
+  try{
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  }catch(err){
+    clearTimeout(timeoutId);
+    if(err.name==='AbortError') throw new Error('La consulta demoró demasiado (revisa tu conexión a internet).');
+    throw new Error('No se pudo conectar con mindicador.cl — revisa tu conexión a internet o si algún bloqueador de anuncios/extensión está interfiriendo.');
+  }
+}
+
+async function fetchUFIntentoUnico(fechaISO){
   const [y,m,d] = fechaISO.split('-');
-  const res = await fetch(`https://mindicador.cl/api/uf/${d}-${m}-${y}`);
-  if(!res.ok) throw new Error('No se pudo consultar la UF para esa fecha.');
-  const data = await res.json();
-  if(!data.serie || !data.serie.length) throw new Error('La UF no está disponible para esa fecha.');
-  return Number(data.serie[0].valor);
+  const res = await fetchConTimeout(`https://mindicador.cl/api/uf/${d}-${m}-${y}`, 8000);
+  if(res.ok){
+    const data = await res.json();
+    if(data.serie && data.serie.length) return Number(data.serie[0].valor);
+  }
+  // Respaldo: si la fecha exacta no vino (fin de semana, feriado, o esa ruta específica falló),
+  // se pide el listado del año completo y se toma el valor más cercano a esa fecha.
+  const resAnio = await fetchConTimeout(`https://mindicador.cl/api/uf/${y}`, 8000);
+  if(!resAnio.ok) throw new Error('No se pudo consultar la UF para esa fecha.');
+  const dataAnio = await resAnio.json();
+  if(!dataAnio.serie || !dataAnio.serie.length) throw new Error('La UF no está disponible para esa fecha.');
+  const objetivo = new Date(fechaISO+'T00:00:00Z').getTime();
+  let masCercano = dataAnio.serie[0];
+  let menorDiferencia = Infinity;
+  dataAnio.serie.forEach(item=>{
+    const diferencia = Math.abs(new Date(item.fecha).getTime() - objetivo);
+    if(diferencia < menorDiferencia){ menorDiferencia = diferencia; masCercano = item; }
+  });
+  return Number(masCercano.valor);
+}
+
+async function fetchUF(fechaISO){
+  try{
+    return await fetchUFIntentoUnico(fechaISO);
+  }catch(err){
+    console.warn('Primer intento de consultar la UF falló, reintentando…', err);
+    return await fetchUFIntentoUnico(fechaISO); // un solo reintento — si vuelve a fallar, se avisa
+  }
 }
 
 document.getElementById('cu-calcular-ipc-btn').addEventListener('click', async ()=>{
