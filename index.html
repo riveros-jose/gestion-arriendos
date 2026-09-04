@@ -8387,7 +8387,15 @@ function makeSearchable(selectId){
     setTimeout(()=>{ syncFromSelect(); closeDropdown(); }, 150);
   });
 
-  new MutationObserver(()=>{ syncFromSelect(); if(dropdown.style.display!=='none') buildList(input.value); }).observe(select, { childList:true });
+  // Cuando las opciones del <select> se reconstruyen (por ejemplo, al recalcularse los datos en
+  // segundo plano), NO se debe pisar lo que la persona está escribiendo en ese momento — antes,
+  // esto resincronizaba el campo con "Todos los arrendatarios" a mitad de tipear, y las letras
+  // siguientes quedaban pegadas después de ese texto. Ahora solo se sincroniza si el campo no
+  // tiene el foco; si está enfocado, igual se refresca la lista desplegable con los datos nuevos.
+  new MutationObserver(()=>{
+    if(document.activeElement !== input) syncFromSelect();
+    if(dropdown.style.display!=='none') buildList(input.value);
+  }).observe(select, { childList:true });
 }
 
 ['pay-contratoId','h-contratoId-activo','h-contratoId-historico','chart-tenant-filter','r-contratoId','r-filter','prop-select','tenant-select','historicos-select','matrix-tenant-filter']
