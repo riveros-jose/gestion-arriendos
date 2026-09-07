@@ -752,12 +752,12 @@
     <h2 style="text-align:left;">📄 Cargar boleta de sector</h2>
     <form id="form-boleta-sector" class="form-compact">
       <div class="grid">
-        <div class="field"><label>Servicio</label>
+        <div class="field"><label>Servicio (se detecta solo)</label>
           <select id="bs-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select>
         </div>
         <div class="field full"><label>Archivo (PDF)</label><input type="file" id="bs-pdf" accept="application/pdf" required></div>
       </div>
-      <div class="subtitle" style="margin:6px 0 0;font-size:11.5px;">El sector se detecta automáticamente según la dirección que figura en la boleta — no hace falta indicarlo.</div>
+      <div class="subtitle" style="margin:6px 0 0;font-size:11.5px;">El servicio y el sector se detectan automáticamente según la boleta (Enel = Luz, Aguas Andinas = Agua) — no hace falta indicarlos. El selector de arriba queda como respaldo, por si la boleta es de otro proveedor (Gas, u otro) o la detección se equivoca.</div>
       <div class="status-msg" id="bs-status" style="margin-top:4px;"></div>
       <div class="btn-row">
         <button type="submit" class="btn btn-primary">Guardar boleta del sector</button>
@@ -4920,18 +4920,30 @@ async function eliminarBoletaDeDrive(fileId, nombreArchivo){
 
 document.getElementById('form-boleta-sector').addEventListener('submit', async e=>{
   e.preventDefault();
-  const servicio = document.getElementById('bs-servicio').value;
   const file = document.getElementById('bs-pdf').files[0];
   const statusEl = document.getElementById('bs-status');
   if(!file){ alert('Elige el archivo PDF de la boleta.'); return; }
   if(!driveToken){ alert('Para subir la boleta primero debes estar conectado a Google Drive.'); return; }
 
   showLoadingModal('🔎 Leyendo boleta…');
+  let text = '';
   let datos = { total:null, consumo:null, mes:null, sector:null };
   try{
-    const text = await extractPdfText(file);
+    text = await extractPdfText(file);
     datos = parseBoletaServicio(text);
   }catch(err){ console.error('Error leyendo PDF', err); }
+
+  // El servicio se detecta automáticamente según la empresa que emitió la boleta — Enel siempre
+  // es Luz, Aguas Andinas siempre es Agua — así no hace falta elegirlo a mano en esos casos. Si
+  // no se reconoce ninguna de las dos (por ejemplo, una boleta de Gas, o un proveedor distinto),
+  // se usa lo que esté elegido en el selector como respaldo, y el selector queda visible para
+  // poder corregirlo manualmente si la detección se equivocó.
+  const textoBoletaLower = text.toLowerCase();
+  let servicio;
+  if(textoBoletaLower.includes('enel')) servicio = 'Luz';
+  else if(textoBoletaLower.includes('aguas andinas')) servicio = 'Agua';
+  else servicio = document.getElementById('bs-servicio').value;
+  document.getElementById('bs-servicio').value = servicio;
 
   // Si la boleta de Luz (Enel) no trae un consumo real (viene "Facturación Estimada", sin
   // lectura ese mes), NO se completa con la lectura propia que se haya ingresado en la app —
@@ -5425,7 +5437,12 @@ function computeReadingsWithConsumption(){
     if(!groups[key]) groups[key] = [];
     groups[key].push(r);
   });
-  Object.values(groups).forEach(list=> list.sort((a,b)=> (a.fechaLectura||'').localeCompare(b.fechaLectura||'')));
+  // Si una lectura quedó sin fecha (por ejemplo, se guardó con el campo vacío por error), debe
+  // ordenarse como la MÁS RECIENTE del grupo, no como la primera — de lo contrario, una cadena
+  // vacía ('') ordena ANTES que cualquier fecha real, colándose como si fuera "la primera
+  // lectura" y rompiendo el cálculo de consumo de todas las lecturas que sí tienen fecha.
+  const claveOrden = r => r.fechaLectura || '9999-99-99';
+  Object.values(groups).forEach(list=> list.sort((a,b)=> claveOrden(a).localeCompare(claveOrden(b))));
 
   // Paso 1: consumo bruto normal — delta contra la lectura anterior del mismo contrato+servicio+medidor.
   const brutas = readings.map(r=>{
