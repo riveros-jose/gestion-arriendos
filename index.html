@@ -534,6 +534,14 @@
       display:inline-flex;align-items:center;justify-content:center;
       width:30px;height:30px;padding:0;border-radius:50%;font-size:15px;
     }
+    /* "Ver boletas cargadas" / "Cargar boleta" / "Ocultar formulario": en la barra de
+       "Ingresar lectura o boleta", tres botones con texto largo se ven apretados en mobile —
+       quedan como íconos redondos chicos, igual que el patrón de "Historial de Pagos" arriba. */
+    .lectura-toolbar-txt{display:none;}
+    .lectura-toolbar-btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:34px;height:34px;padding:0;border-radius:50%;font-size:15px;
+    }
     .row-actions button{
       background:var(--paper);border:1px solid var(--border);border-radius:16px;
       padding:6px 11px;font-size:12px;text-decoration:none;color:var(--ink);
@@ -622,7 +630,7 @@
     <div class="result-modal-title" style="text-align:left;">💵 Editar pago</div>
     <input type="hidden" id="epm-id">
     <div class="field" style="margin-bottom:12px;"><label>Arrendatario</label><div id="epm-contrato-label" style="font-weight:600;padding:8px 0;font-size:14px;"></div></div>
-    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago</label><input type="date" id="epm-fechaPago"></div>
+    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago</label><input type="date" id="epm-fechaPago" required></div>
     <div class="field" style="margin-bottom:12px;"><label>Monto pagado ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-montoPagado" placeholder="0"></div>
     <div class="field" style="margin-bottom:12px;"><label>Descuentos aplicados ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-descuentos"></div>
     <div class="field" style="margin-bottom:12px;"><label>Medio de pago</label>
@@ -1212,9 +1220,9 @@
         <div class="toggle-form">
           <h2 id="r-form-title">🔧 Ingresar lectura o boleta</h2>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="btn btn-secondary" id="ver-boletas-btn">📂 Ver boletas cargadas</button>
-            <button type="button" class="btn btn-secondary" id="toggle-boleta-btn">📄 Cargar boleta</button>
-            <button type="button" class="btn btn-secondary" onclick="hideLecturaForm()">Ocultar formulario</button>
+            <button type="button" class="btn btn-secondary lectura-toolbar-btn" id="ver-boletas-btn" title="Ver boletas cargadas">📂<span class="lectura-toolbar-txt"> Ver boletas cargadas</span></button>
+            <button type="button" class="btn btn-secondary lectura-toolbar-btn" id="toggle-boleta-btn" title="Cargar boleta">📄<span class="lectura-toolbar-txt"> Cargar boleta</span></button>
+            <button type="button" class="btn btn-secondary lectura-toolbar-btn" onclick="hideLecturaForm()" title="Ocultar formulario">✖️<span class="lectura-toolbar-txt"> Ocultar formulario</span></button>
           </div>
         </div>
         <form id="form-lectura" class="form-compact">
@@ -2131,11 +2139,11 @@ function buildWorkbook(){
   XLSX.utils.book_append_sheet(wb, wsRead, 'Servicios');
 
   const boletaRows = sectorBoletas.length ? sectorBoletas.map(b=>({
-    id: b.id, servicio: b.servicio||'Agua', sector: b.sector, mes: b.mes, total: b.total||'', consumo: b.consumo||'', lecturaActual: b.lecturaActual||'', boletaUrl: b.boletaUrl||''
+    id: b.id, servicio: b.servicio||'Agua', sector: b.sector, mes: b.mes, fechaLectura: b.fechaLectura||'', total: b.total||'', consumo: b.consumo||'', lecturaActual: b.lecturaActual||'', boletaUrl: b.boletaUrl||''
   })) : [{}];
   const wsBol = XLSX.utils.json_to_sheet(boletaRows);
-  applyColumnFormats(wsBol, ['id','servicio','sector','mes','total','consumo','lecturaActual','boletaUrl']);
-  styleWorksheet(wsBol, [10,10,8,10,12,10,12,32]);
+  applyColumnFormats(wsBol, ['id','servicio','sector','mes','fechaLectura','total','consumo','lecturaActual','boletaUrl']);
+  styleWorksheet(wsBol, [10,10,8,10,14,12,10,12,32]);
   XLSX.utils.book_append_sheet(wb, wsBol, 'BoletasSector');
 
   const maestroRows = maestros.length ? maestros.map(m=>({
@@ -2303,7 +2311,7 @@ function loadFromWorkbook(arrayBuffer){
     boletaUrl: r.boletaUrl || ''
   }));
   sectorBoletas = rawBoletas.map(b=>({
-    id:b.id, servicio:b.servicio||'Agua', sector:Number(b.sector)||1, mes:b.mes||'', total:b.total||'', consumo:b.consumo||'', lecturaActual:b.lecturaActual||'', boletaUrl:b.boletaUrl||''
+    id:b.id, servicio:b.servicio||'Agua', sector:Number(b.sector)||1, mes:b.mes||'', fechaLectura:b.fechaLectura||'', total:b.total||'', consumo:b.consumo||'', lecturaActual:b.lecturaActual||'', boletaUrl:b.boletaUrl||''
   }));
   maestros = rawMaestros.map(m=>({
     id:m.id, nombre:m.nombre||'',
@@ -3734,6 +3742,10 @@ async function submitEditPaymentModal(){
   const id = document.getElementById('epm-id').value;
   const p = payments.find(x=>x.id===id);
   if(!p) return;
+  if(!document.getElementById('epm-fechaPago').value){
+    alert('Ingresa la fecha de pago — es obligatoria.');
+    return;
+  }
   const montoPagado = rawMoneyValue(document.getElementById('epm-montoPagado').value);
   const descuentos = rawMoneyValue(document.getElementById('epm-descuentos').value);
   if(Number(montoPagado||0)<=0 && Number(descuentos||0)<=0){
@@ -4837,13 +4849,22 @@ async function listarBoletasEnDrive(){
 }
 
 // Extrae sector y mes del nombre del archivo (ej: "Agua_2026_07_Sector1-SargentoAldea1088_...").
+// Dirección representativa de cada sector — se usa como referencia principal en vez de decir
+// simplemente "Sector 1"/"Sector 2", que no dice nada por sí solo de un vistazo.
+const SECTOR_DIRECCION_REFERENCIA = { 1: 'Sargento Aldea 1088', 2: 'San Diego 1946-1954' };
+
 function parseNombreBoletaArchivo(nombre){
   const mSector = nombre.match(/Sector(1|2)/);
-  const mServicioMes = nombre.match(/^(Agua|Luz|Gas)_(\d{4})_(\d{2})_/);
+  // Formato actual del nombre: Servicio_FechaLectura_Sector..._Lectura_..._Consumo_..._Subtotal_...
+  // La fecha va en formato ISO (AAAA-MM-DD) justo después del servicio — si la boleta vino
+  // estimada (sin lectura real), esa parte queda como "SD" en el nombre.
+  const mServicioFecha = nombre.match(/^(Agua|Luz|Gas)_(\d{4}-\d{2}-\d{2})_/);
+  const fechaLectura = mServicioFecha ? mServicioFecha[2] : null;
   return {
-    servicio: mServicioMes ? mServicioMes[1] : null,
+    servicio: mServicioFecha ? mServicioFecha[1] : (nombre.match(/^(Agua|Luz|Gas)_/) ? nombre.match(/^(Agua|Luz|Gas)_/)[1] : null),
     sector: mSector ? Number(mSector[1]) : null,
-    mes: mServicioMes ? `${mServicioMes[2]}-${mServicioMes[3]}` : null
+    fechaLectura,
+    mes: fechaLectura ? fechaLectura.slice(0,7) : null
   };
 }
 
@@ -4879,8 +4900,10 @@ document.getElementById('ver-boletas-btn').addEventListener('click', async ()=>{
 
     listEl.innerHTML = ordenados.map(a=>{
       const esVigente = a.servicio && a.sector && vigentePorGrupo[`${a.servicio}-${a.sector}`]===a.id;
+      const direccionRef = a.sector ? SECTOR_DIRECCION_REFERENCIA[a.sector] : 'Dirección no identificada';
+      const fechaRef = a.fechaLectura ? formatDate(a.fechaLectura) : (a.mes ? a.mes : 'boleta estimada');
       return `<div class="alert-card ${esVigente?'u3':''}" style="margin-bottom:8px;${esVigente?'':'border-left-color:var(--gris-linea);'}">
-        <div class="title">${a.servicio?`${a.servicio} — `:''}${a.sector?`Sector ${a.sector}`:'Sector no identificado'}${a.mes?` — ${a.mes}`:''} ${esVigente?'<span class="tag tag-ok">✅ En uso</span>':''}</div>
+        <div class="title">${a.servicio?`${a.servicio} — `:''}${esc(direccionRef)} — ${esc(fechaRef)} ${esVigente?'<span class="tag tag-ok">✅ En uso</span>':''}</div>
         <div class="alert-line" style="font-size:11.5px;word-break:break-all;">${esc(a.name)}</div>
         <div class="row-actions" style="margin-top:6px;">
           <a href="${esc(a.webViewLink)}" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none;">📄 Ver PDF</a>
@@ -4998,7 +5021,8 @@ document.getElementById('form-boleta-sector').addEventListener('submit', async e
     return;
   }
 
-  const obj = { id: existentePrevio ? existentePrevio.id : uid(), servicio, sector, mes, total: datos.total||'', consumo: datos.consumo||'', lecturaActual: (datos.lecturaActual!==null && datos.lecturaActual!==undefined) ? datos.lecturaActual : '', boletaUrl };
+  const fechaReferencia = datos.fechaLectura || datos.vencimiento || '';
+  const obj = { id: existentePrevio ? existentePrevio.id : uid(), servicio, sector, mes, fechaLectura: fechaReferencia, total: datos.total||'', consumo: datos.consumo||'', lecturaActual: (datos.lecturaActual!==null && datos.lecturaActual!==undefined) ? datos.lecturaActual : '', boletaUrl };
   sectorBoletas = existentePrevio ? sectorBoletas.map(b=> b.id===obj.id ? obj : b) : [...sectorBoletas, obj];
   await saveKey('sectorBoletas', sectorBoletas);
   document.getElementById('form-boleta-sector').reset();
@@ -5108,9 +5132,11 @@ function renderSectorBoletasList(){
   const vigentes = Object.values(vigentesPorGrupo).sort((a,b)=> b.mes.localeCompare(a.mes) || a.sector-b.sector);
   const filas = vigentes.map(b=>{
     const unidad = b.servicio==='Luz' ? 'kWh' : 'm³';
+    const direccionRef = SECTOR_DIRECCION_REFERENCIA[b.sector] || `Sector ${b.sector}`;
+    const fechaRef = b.fechaLectura ? formatDate(b.fechaLectura) : (b.mes || 'boleta estimada');
     return `
     <div class="wa-compact-row">
-      <span class="wa-compact-name">${SERVICIO_SVG[b.servicio]||''}${b.servicio||'Agua'} — Sector ${b.sector} — ${b.mes}${b.total?` · ${money(b.total)}`:''}${b.consumo?` · ${formatNumber(b.consumo)} ${unidad}`:''}</span>
+      <span class="wa-compact-name">${SERVICIO_SVG[b.servicio]||''}${b.servicio||'Agua'} — ${esc(direccionRef)} — ${esc(fechaRef)}${b.total?` · ${money(b.total)}`:''}${b.consumo?` · ${formatNumber(b.consumo)} ${unidad}`:''}</span>
       <a href="${esc(b.boletaUrl)}" target="_blank" rel="noopener" class="table-action-btn" title="Ver boleta">📄</a>
       <button type="button" class="table-action-btn danger" title="Eliminar" onclick="deleteSectorBoleta('${b.id}')">🗑️</button>
     </div>`;
@@ -6085,7 +6111,7 @@ function computePendientesItems(){
     };
     let detalle = list.map(lineaServicioTexto).join('\n');
     const total = list.reduce((s,r)=>s+Number(r.monto||0),0);
-    const mensaje = `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro de servicios:\nTotal a pagar: *${money(total)}*\n${detalle}\nEl depósito va a la cuenta del Santander.\nGracias!`;
+    const mensaje = `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro de servicios:\nTotal a pagar: *${money(total)}*\n${detalle}\nRecuerda que el depósito de servicios va a la cuenta del Santander.\nCualquier cosa me avisas.\nSaludos!`;
     const enviado = list.every(r=> r.avisoEnviado===true);
 
     // Resumen en pantalla (con íconos, sí funcionan bien en el navegador): total primero.
