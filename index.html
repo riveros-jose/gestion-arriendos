@@ -1234,6 +1234,11 @@
             <div class="field full"><label>N° Medidor</label><input id="r-medidor" type="text" placeholder="Ej: 1" maxlength="10"><span class="status-msg" id="r-medidor-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required><span class="status-msg" id="r-lecturaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required readonly><span class="status-msg" id="r-valorUnitario-hint" style="display:block;margin-top:2px;"></span></div>
+            <div class="field full" id="r-montoManual-field" style="display:none;">
+              <label>Monto a pagar ($) — se ingresa a mano</label>
+              <input id="r-montoManual" type="number" step="1">
+              <span class="status-msg" style="display:block;margin-top:2px;color:var(--ink-soft);">El agua de este arrendatario se calcula distinto al resto: el consumo queda solo de referencia, el monto a cobrar se ingresa directamente acá.</span>
+            </div>
             <div class="field" id="r-estado-field" style="display:none;"><label>Estado de pago</label>
               <select id="r-estado"><option selected>Pendiente</option><option>Pagado</option></select>
             </div>
@@ -2022,7 +2027,7 @@ function styleWorksheet(ws, widths){
 }
 
 const DATE_COLUMNS = ['fechaPago','fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','fechaLectura','fechaTermino','proximaDecisionFecha','proximaDecisionRegistrada'];
-const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','pagado','descuento','saldo','proximaDecisionMonto'];
+const MONEY_COLUMNS = ['montoPagado','descuentos','valorArriendo','montoArriendoPactado','garantia','avaluoFiscal','valorComercial','contribuciones','deudaPactada','valorUnitario','monto','montoManual','pagado','descuento','saldo','proximaDecisionMonto'];
 // Igual que applyColumnFormats, pero para exportaciones donde los encabezados son texto libre
 // (no coinciden exactamente con los nombres de MONEY_COLUMNS) o son dinámicos (ej. nombres de
 // mes en la matriz) — en vez de una lista blanca de columnas a formatear, se formatea CUALQUIER
@@ -2130,12 +2135,12 @@ function buildWorkbook(){
     id: r.id,
     arrendatario: contractLabel(r.contratoId),
     servicio: r.servicio, medidor: r.medidor||'', fechaLectura: r.fechaLectura, lecturaAnterior: r.lecturaAnterior, lecturaActual: r.lecturaActual,
-    consumo: r.consumo, valorUnitario: r.valorUnitario, monto: r.monto, estado: r.estado, estadoEfectivo: r.estadoEfectivo,
+    consumo: r.consumo, valorUnitario: r.valorUnitario, montoManual: r.montoManual||'', monto: r.monto, estado: r.estado, estadoEfectivo: r.estadoEfectivo,
     comentarios: r.comentarios, contratoId: r.contratoId, avisoEnviado: r.avisoEnviado || false, boletaUrl: r.boletaUrl || ''
   })) : [{}];
   const wsRead = XLSX.utils.json_to_sheet(readingRows);
-  applyColumnFormats(wsRead, ['id','arrendatario','servicio','medidor','fechaLectura','lecturaAnterior','lecturaActual','consumo','valorUnitario','monto','estado','estadoEfectivo','comentarios','contratoId','avisoEnviado','boletaUrl']);
-  styleWorksheet(wsRead, [10,32,8,8,12,10,10,10,12,12,10,10,28,10,12,32]);
+  applyColumnFormats(wsRead, ['id','arrendatario','servicio','medidor','fechaLectura','lecturaAnterior','lecturaActual','consumo','valorUnitario','montoManual','monto','estado','estadoEfectivo','comentarios','contratoId','avisoEnviado','boletaUrl']);
+  styleWorksheet(wsRead, [10,32,8,8,12,10,10,10,12,12,12,10,10,28,10,12,32]);
   XLSX.utils.book_append_sheet(wb, wsRead, 'Servicios');
 
   const boletaRows = sectorBoletas.length ? sectorBoletas.map(b=>({
@@ -2306,7 +2311,7 @@ function loadFromWorkbook(arrayBuffer){
   payments = rawPayments.map(normalizeDates);
   readings = rawReadings.map(r=> normalizeDates({
     id:r.id, contratoId:r.contratoId, servicio:r.servicio, medidor:r.medidor||'', fechaLectura:r.fechaLectura,
-    lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, estado:r.estado || 'Pendiente', comentarios:r.comentarios,
+    lecturaActual:r.lecturaActual, valorUnitario:r.valorUnitario, montoManual:r.montoManual||'', estado:r.estado || 'Pendiente', comentarios:r.comentarios,
     avisoEnviado: (r.avisoEnviado===true || r.avisoEnviado==='TRUE' || r.avisoEnviado==='true'),
     boletaUrl: r.boletaUrl || ''
   }));
@@ -4242,16 +4247,24 @@ async function fetchConTimeout(url, timeoutMs){
   }
 }
 
-async function fetchUFIntentoUnico(fechaISO){
+// Si mindicador.cl no responde directamente (por ejemplo, un bloqueador de anuncios o
+// extensión del navegador filtra ese dominio específico — algo común porque no es un dominio
+// muy conocido), se reintenta pasando por un proxy público de CORS como última alternativa
+// antes de rendirse.
+const CORS_PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
+
+async function fetchUFIntentoUnico(fechaISO, viaProxy){
   const [y,m,d] = fechaISO.split('-');
-  const res = await fetchConTimeout(`https://mindicador.cl/api/uf/${d}-${m}-${y}`, 8000);
+  const urlFecha = `https://mindicador.cl/api/uf/${d}-${m}-${y}`;
+  const res = await fetchConTimeout(viaProxy ? (CORS_PROXY_PREFIX+encodeURIComponent(urlFecha)) : urlFecha, 8000);
   if(res.ok){
     const data = await res.json();
     if(data.serie && data.serie.length) return Number(data.serie[0].valor);
   }
   // Respaldo: si la fecha exacta no vino (fin de semana, feriado, o esa ruta específica falló),
   // se pide el listado del año completo y se toma el valor más cercano a esa fecha.
-  const resAnio = await fetchConTimeout(`https://mindicador.cl/api/uf/${y}`, 8000);
+  const urlAnio = `https://mindicador.cl/api/uf/${y}`;
+  const resAnio = await fetchConTimeout(viaProxy ? (CORS_PROXY_PREFIX+encodeURIComponent(urlAnio)) : urlAnio, 8000);
   if(!resAnio.ok) throw new Error('No se pudo consultar la UF para esa fecha.');
   const dataAnio = await resAnio.json();
   if(!dataAnio.serie || !dataAnio.serie.length) throw new Error('La UF no está disponible para esa fecha.');
@@ -4267,10 +4280,20 @@ async function fetchUFIntentoUnico(fechaISO){
 
 async function fetchUF(fechaISO){
   try{
-    return await fetchUFIntentoUnico(fechaISO);
+    return await fetchUFIntentoUnico(fechaISO, false);
   }catch(err){
     console.warn('Primer intento de consultar la UF falló, reintentando…', err);
-    return await fetchUFIntentoUnico(fechaISO); // un solo reintento — si vuelve a fallar, se avisa
+    try{
+      return await fetchUFIntentoUnico(fechaISO, false);
+    }catch(err2){
+      console.warn('Segundo intento directo también falló, probando por un proxy alternativo…', err2);
+      try{
+        return await fetchUFIntentoUnico(fechaISO, true);
+      }catch(err3){
+        console.error('También falló el intento por proxy alternativo', err3);
+        throw new Error('No se pudo conectar con mindicador.cl (ni directo ni por un proxy alternativo). Puede que un bloqueador de anuncios/extensión esté interfiriendo, o que no haya conexión a internet.');
+      }
+    }
   }
 }
 
@@ -4488,7 +4511,7 @@ async function submitContractUpdate(){
 }
 
 // ---------- SERVICIOS (lecturas de luz/agua/gas) ----------
-const readingFields = ['contratoId','servicio','medidor','fechaLectura','lecturaActual','valorUnitario','estado','comentarios'];
+const readingFields = ['contratoId','servicio','medidor','fechaLectura','lecturaActual','valorUnitario','montoManual','estado','comentarios'];
 
 function renderReadingSelects(){
   // Solo tiene sentido registrar lecturas para arrendatarios que pertenecen a un sector (1 o 2)
@@ -4513,6 +4536,20 @@ function updateMedidorCompartidoHint(){
 }
 document.getElementById('r-contratoId').addEventListener('change', updateMedidorCompartidoHint);
 document.getElementById('r-servicio').addEventListener('change', updateMedidorCompartidoHint);
+
+// Excepción de Mejías: su agua no se calcula por consumo × valorUnitario como el resto — el
+// monto a pagar se ingresa a mano. El campo solo aparece cuando corresponde (Mejías + Agua), para
+// no confundir al resto de los arrendatarios, que siguen con el cálculo automático de siempre.
+function updateMontoManualField(){
+  const field = document.getElementById('r-montoManual-field');
+  const contratoId = document.getElementById('r-contratoId').value;
+  const servicio = document.getElementById('r-servicio').value;
+  const aplica = servicio==='Agua' && contratoId && esContratoMejias(contratoId);
+  field.style.display = aplica ? 'block' : 'none';
+  if(!aplica) document.getElementById('r-montoManual').value = '';
+}
+document.getElementById('r-contratoId').addEventListener('change', updateMontoManualField);
+document.getElementById('r-servicio').addEventListener('change', updateMontoManualField);
 
 // Precarga el valor $/unidad automáticamente al crear una lectura nueva: para Agua, con la
 // boleta vigente del sector; si no, con el último valor cobrado a ese arrendatario para ese
@@ -5257,10 +5294,13 @@ function updateReadingEstimate(){
     if(descuentoCompartido>0) consumo = Math.max(consumo - descuentoCompartido, 0);
   }
 
+  const esMejiasAgua = servicio==='Agua' && esContratoMejias(contratoId);
   const monto = consumo * valorUnitario;
   box.innerHTML = `Consumo estimado del periodo: <strong>${formatNumber(consumo)}</strong> (desde la lectura del ${formatDate(prev.fechaLectura)})`
     + (descuentoCompartido>0 ? ` — ya se restaron <strong>${formatNumber(descuentoCompartido)}</strong> de San Diego 1712 (medidor compartido)` : '')
-    + ` · Monto estimado a pagar: <strong>${money(monto)}</strong>`;
+    + (esMejiasAgua
+        ? ` · El monto a pagar de este arrendatario no se calcula por consumo — complétalo en el campo "Monto a pagar ($)" de abajo.`
+        : ` · Monto estimado a pagar: <strong>${money(monto)}</strong>`);
   box.style.display = 'block';
 }
 ['r-contratoId','r-servicio'].forEach(id=> document.getElementById(id).addEventListener('change', updateReadingEstimate));
@@ -5333,6 +5373,7 @@ function resetReadingForm(){
   document.getElementById('r-estado-field').style.display = 'none';
   document.getElementById('r-estado').value = 'Pendiente';
   updateMedidorCompartidoHint();
+  updateMontoManualField();
   updateReadingEstimate();
   updateLecturaAnteriorHints();
   updateMedidorUbicacionHint();
@@ -5351,6 +5392,7 @@ function editReading(id){
   document.getElementById('r-valorUnitario-hint').textContent = '';
   document.getElementById('r-estado-field').style.display = 'block';
   updateMedidorCompartidoHint();
+  updateMontoManualField();
   updateReadingEstimate();
   updateLecturaAnteriorHints();
   updateMedidorUbicacionHint();
@@ -5522,7 +5564,12 @@ function computeReadingsWithConsumption(){
         .reduce((s,x)=> s + x.consumoBruto, 0);
       if(descuentoCompartido>0){ consumo = Math.max(consumo - descuentoCompartido, 0); }
     }
-    const monto = consumo===null ? 0 : consumo * Number(r.valorUnitario||0);
+    // Excepción: el agua de Mejías se calcula distinto al resto — el consumo se sigue mostrando
+    // igual (para referencia), pero el MONTO A PAGAR no sale de consumo × valorUnitario, sino
+    // que se ingresa a mano (campo montoManual). Es el único caso así en toda la app.
+    const monto = (r.servicio==='Agua' && esContratoMejias(r.contratoId) && Number(r.montoManual)>0)
+      ? Number(r.montoManual)
+      : (consumo===null ? 0 : consumo * Number(r.valorUnitario||0));
     return { ...r, consumo, monto, medidorCompartidoDescuento: descuentoCompartido, estadoEfectivo: estadoEfectivo(r) };
   });
 
@@ -5638,6 +5685,18 @@ function numeroSanDiego(dirLower){
   if(!dirLower.startsWith('san diego ')) return null;
   const m = dirLower.slice('san diego '.length).match(/\d+/);
   return m ? Number(m[0]) : null;
+}
+
+// Identifica el contrato de Mejías por nombre (nemo o razón social) — se usa para la excepción
+// del cálculo de agua (monto manual, no consumo × valorUnitario) y podría reutilizarse en el
+// futuro si aparecen más excepciones propias de este arrendatario.
+function esContratoMejias(contratoId){
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c) return false;
+  const t = tenants.find(x=>x.id===c.tenantId);
+  if(!t) return false;
+  const nombre = (t.nemoArrendatario || t.nombreSociedad || '').toLowerCase();
+  return nombre.includes('mejías') || nombre.includes('mejias');
 }
 
 function contratoSector(contratoId){
@@ -6092,6 +6151,10 @@ function computePendientesItems(){
 
     // Texto plano (sin emoji) para el mensaje que se ENVÍA — más compatible entre dispositivos.
     // Formato de cálculo directo: "consumo × valor = total" en una sola línea por servicio.
+    // Si varios medidores del mismo arrendatario comparten la misma boleta (ej. La Imprenta, con
+    // 3 medidores de agua bajo una sola boleta de sector), el link solo se muestra una vez —
+    // repetirlo en cada línea sería redundante.
+    const boletasYaEnMensaje = new Set();
     const lineaServicioTexto = r=>{
       const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
       // Para arrendatarios con más de un medidor del mismo servicio (ej. La Imprenta), se agrega
@@ -6104,9 +6167,13 @@ function computePendientesItems(){
       } else {
         linea = `• ${servicioConUbicacion} (${formatDate(r.fechaLectura)}): ${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) x ${money(r.valorUnitario)} = ${money(r.monto)}`;
       }
-      // El link de la boleta solo se incluye si realmente se usó para calcular esta lectura.
+      // El link de la boleta solo se incluye si realmente se usó para calcular esta lectura, y
+      // solo la primera vez que aparece (ver boletasYaEnMensaje arriba).
       const boleta = boletaUrlAplicadaA(r);
-      if(boleta) linea += `\n${boleta.url}`;
+      if(boleta && !boletasYaEnMensaje.has(boleta.url)){
+        linea += `\n${boleta.url}`;
+        boletasYaEnMensaje.add(boleta.url);
+      }
       return linea;
     };
     let detalle = list.map(lineaServicioTexto).join('\n');
@@ -6114,14 +6181,20 @@ function computePendientesItems(){
     const mensaje = `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro de servicios:\nTotal a pagar: *${money(total)}*\n${detalle}\nRecuerda que el depósito de servicios va a la cuenta del Santander.\nCualquier cosa me avisas.\nSaludos!`;
     const enviado = list.every(r=> r.avisoEnviado===true);
 
-    // Resumen en pantalla (con íconos, sí funcionan bien en el navegador): total primero.
+    // Resumen en pantalla (con íconos, sí funcionan bien en el navegador): total primero. Mismo
+    // criterio que el mensaje — el link de una boleta compartida entre medidores no se repite.
+    const boletasYaEnResumen = new Set();
     const resumenHtml = `<div>Total a pagar: <strong>${money(total)}</strong></div>` + list.map(r=>{
       const unidad = r.servicio==='Luz' ? 'kWh' : 'm³';
       const calculoTxt = r.consumo===null
         ? 'primera lectura'
         : `${formatNumber(r.consumo)} ${unidad} (${formatNumber(r.lecturaActual)} - ${formatNumber(r.lecturaAnterior)}) × ${money(r.valorUnitario)} = <strong>${money(r.monto)}</strong>`;
       const boletaInfo = boletaUrlAplicadaA(r);
-      const boletaTag = boletaInfo ? ` · <a href="${esc(boletaInfo.url)}" target="_blank" rel="noopener">📄 ${esc(etiquetaBoleta(boletaInfo.servicio, boletaInfo.mes))}</a>` : '';
+      let boletaTag = '';
+      if(boletaInfo && !boletasYaEnResumen.has(boletaInfo.url)){
+        boletaTag = ` · <a href="${esc(boletaInfo.url)}" target="_blank" rel="noopener">📄 ${esc(etiquetaBoleta(boletaInfo.servicio, boletaInfo.mes))}</a>`;
+        boletasYaEnResumen.add(boletaInfo.url);
+      }
       const ubicacion = ubicacionDeMedidor(r.contratoId, r.medidor);
       const servicioConUbicacion = ubicacion ? `${r.servicio} — ${esc(ubicacion)}` : r.servicio;
       return `<div class="cell-stacked-sub">${SERVICIO_SVG[r.servicio]||''} ${servicioConUbicacion} (${formatDate(r.fechaLectura)}): ${calculoTxt}${boletaTag}</div>`;
