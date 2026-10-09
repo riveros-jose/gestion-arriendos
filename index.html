@@ -2833,7 +2833,14 @@ function convertDateInput(input){
 document.addEventListener('reset', e=>{
   if(!(e.target instanceof HTMLFormElement)) return;
   setTimeout(()=>{
-    e.target.querySelectorAll('input.cal-input').forEach(inp=>{ inp.dataset.isoValue = ''; });
+    // Se resincroniza desde lo que se VE en el campo, no se borra a ciegas: si justo después del
+    // .reset() el código le puso una fecha por defecto (por ejemplo la de hoy), el campo la
+    // mostraba pero este paso la borraba por dentro — parecía seleccionada y no se guardaba.
+    e.target.querySelectorAll('input.cal-input').forEach(inp=>{
+      const visible = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').get.call(inp).trim();
+      const m = visible.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+      inp.dataset.isoValue = m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+    });
   }, 0);
 });
 function scanAndConvertDateInputs(root){
