@@ -641,7 +641,7 @@
     <div class="result-modal-title" style="text-align:left;">💵 Editar pago</div>
     <input type="hidden" id="epm-id">
     <div class="field" style="margin-bottom:12px;"><label>Arrendatario</label><div id="epm-contrato-label" style="font-weight:600;padding:8px 0;font-size:14px;"></div></div>
-    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago *</label><input type="date" id="epm-fechaPago" required></div>
+    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago *</label><input type="date" id="epm-fechaPago"></div>
     <div class="field" style="margin-bottom:12px;"><label>Monto pagado ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-montoPagado" placeholder="0"></div>
     <div class="field" style="margin-bottom:12px;"><label>Descuentos aplicados ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-descuentos"></div>
     <div class="field" style="margin-bottom:12px;"><label>Medio de pago</label>
@@ -1041,7 +1041,7 @@
           <input type="hidden" id="pay-id">
           <div class="grid">
             <div class="field full"><label>Contrato (Arrendatario — Propiedad)</label><select id="pay-contratoId" required></select></div>
-            <div class="field"><label>Fecha de pago *</label><input id="pay-fechaPago" type="date" required><span class="date-hint" id="pay-fechaPago-hint"></span></div>
+            <div class="field"><label>Fecha de pago *</label><input id="pay-fechaPago" type="date"><span class="date-hint" id="pay-fechaPago-hint"></span></div>
             <div class="field">
               <label>Monto pagado ($)</label>
               <input id="pay-montoPagado" type="text" inputmode="numeric" class="money-mask" placeholder="0">
@@ -1241,7 +1241,7 @@
           <div class="grid">
             <div class="field full"><label>Arrendatario (Contrato)</label><select id="r-contratoId" required></select></div>
             <div class="field"><label>Servicio</label><select id="r-servicio"><option value="Agua">💧 Agua</option><option value="Luz">⚡ Luz</option><option value="Gas">🔥 Gas</option></select></div>
-            <div class="field"><label>Fecha de lectura</label><input id="r-fechaLectura" type="date" required><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
+            <div class="field"><label>Fecha de lectura *</label><input id="r-fechaLectura" type="date"><span class="status-msg" id="r-fechaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field full"><label>N° Medidor</label><input id="r-medidor" type="text" placeholder="Ej: 1" maxlength="10"><span class="status-msg" id="r-medidor-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Lectura actual</label><input id="r-lecturaActual" type="number" step="0.01" required><span class="status-msg" id="r-lecturaAnterior-hint" style="display:block;margin-top:2px;"></span></div>
             <div class="field"><label>Valor $/unidad (m³ o kWh)</label><input id="r-valorUnitario" type="number" step="0.01" required readonly><span class="status-msg" id="r-valorUnitario-hint" style="display:block;margin-top:2px;"></span></div>
@@ -3678,8 +3678,7 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   // La fecha de pago es obligatoria (no solo por el atributo required del navegador, que algunos
   // móviles no hacen respetar bien con campos de fecha).
   if(!obj.fechaPago){
-    alert('La fecha de pago es obligatoria.');
-    document.getElementById('pay-fechaPago').focus();
+    showResultModal('Falta la fecha de pago. Es obligatoria para guardar el pago.', false);
     return;
   }
 
@@ -3767,7 +3766,7 @@ async function submitEditPaymentModal(){
   const p = payments.find(x=>x.id===id);
   if(!p) return;
   if(!document.getElementById('epm-fechaPago').value){
-    alert('Ingresa la fecha de pago — es obligatoria.');
+    showResultModal('Falta la fecha de pago. Es obligatoria para guardar el pago.', false);
     return;
   }
   const montoPagado = rawMoneyValue(document.getElementById('epm-montoPagado').value);
@@ -5340,6 +5339,11 @@ document.getElementById('form-lectura').addEventListener('submit', async e=>{
   readingFields.forEach(f=> obj[f] = document.getElementById('r-'+f).value);
   if(!obj.estado) obj.estado = 'Pendiente';
 
+  if(!obj.fechaLectura){
+    showResultModal('Falta la fecha de lectura. Es obligatoria para guardar la lectura.', false);
+    return;
+  }
+
   const lecturaAnteriorRef = buscarLecturaAnteriorParaValidar(obj.contratoId, obj.servicio, obj.fechaLectura, editingReading);
   if(lecturaAnteriorRef!==null && Number(obj.lecturaActual) < lecturaAnteriorRef){
     const continuar = confirm(`⚠ La lectura actual (${formatNumber(obj.lecturaActual)}) es MENOR que la lectura anterior registrada (${formatNumber(lecturaAnteriorRef)}).\n\nUn medidor normalmente no retrocede — es probable que haya un error de tipeo, y el consumo quedaría calculado en 0.\n\n¿Guardar de todas formas?`);
@@ -6112,7 +6116,7 @@ function computeFotosItemsPorSector(){
       servicios.push('Luz');
     }
     const { nombreContacto, telefono } = waContactoDe(c.id);
-    const mensaje = `Hola ${nombreContacto}! Te recordamos enviar la foto de la lectura de este mes (${mesActual}) de: ${servicios.join(' y ')}.\n\nGracias!`;
+    const mensaje = `Hola ${nombreContacto},\nMe puedes mandar la foto de la lectura de ${servicios.map(x=>x.toLowerCase()).join('/')} de este mes?\nGracias!`;
     porSector[sector].push({ contratoId:c.id, nombreContacto, telefono, servicios, mensaje });
   });
   waFotosItems = [...porSector[1], ...porSector[2]];
