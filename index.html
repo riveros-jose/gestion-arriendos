@@ -393,6 +393,17 @@
   .card-index{font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--ink-soft);}
   .searchable-select{position:relative;margin-bottom:14px;}
   .searchable-select input{width:100%;}
+  #sx-picker-overlay{position:fixed;inset:0;z-index:10005;background:var(--card);display:none;flex-direction:column;}
+  #sx-picker-overlay .sx-head{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;}
+  #sx-picker-overlay .sx-title{flex:1;font-family:'Fraunces',serif;font-weight:700;font-size:18px;color:var(--ink);}
+  #sx-picker-overlay .sx-close{border:none;background:var(--paper);border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer;color:var(--ink);}
+  #sx-picker-overlay .sx-search{margin:0 16px 10px;padding:12px 14px;font-size:16px;border:1px solid var(--border);border-radius:10px;width:calc(100% - 32px);}
+  #sx-picker-overlay .sx-list{flex:1;overflow-y:auto;padding:0 8px 24px;-webkit-overflow-scrolling:touch;}
+  #sx-picker-overlay .sx-item{padding:14px 12px;border-bottom:1px solid var(--border);font-size:15px;cursor:pointer;}
+  #sx-picker-overlay .sx-item:active{background:var(--paper);}
+  #sx-picker-overlay .sx-item.sx-selected{background:var(--paper);color:var(--teal-dark);font-weight:700;}
+  #sx-picker-overlay .sx-item.sx-reset{color:var(--teal-dark);font-weight:600;}
+  #sx-picker-overlay .sx-empty{padding:20px;text-align:center;color:var(--ink-soft);font-size:14px;}
   .searchable-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;z-index:80;box-shadow:0 8px 20px rgba(0,0,0,0.14);margin-top:4px;}
   .dropdown-item{padding:11px 12px;font-size:13.5px;cursor:pointer;white-space:normal;line-height:1.35;}
   .dropdown-item:hover{background:var(--teal-soft);}
@@ -630,7 +641,7 @@
     <div class="result-modal-title" style="text-align:left;">💵 Editar pago</div>
     <input type="hidden" id="epm-id">
     <div class="field" style="margin-bottom:12px;"><label>Arrendatario</label><div id="epm-contrato-label" style="font-weight:600;padding:8px 0;font-size:14px;"></div></div>
-    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago</label><input type="date" id="epm-fechaPago" required></div>
+    <div class="field" style="margin-bottom:12px;"><label>Fecha de pago *</label><input type="date" id="epm-fechaPago" required></div>
     <div class="field" style="margin-bottom:12px;"><label>Monto pagado ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-montoPagado" placeholder="0"></div>
     <div class="field" style="margin-bottom:12px;"><label>Descuentos aplicados ($)</label><input type="text" inputmode="numeric" class="money-mask" id="epm-descuentos"></div>
     <div class="field" style="margin-bottom:12px;"><label>Medio de pago</label>
@@ -1030,7 +1041,7 @@
           <input type="hidden" id="pay-id">
           <div class="grid">
             <div class="field full"><label>Contrato (Arrendatario — Propiedad)</label><select id="pay-contratoId" required></select></div>
-            <div class="field"><label>Fecha de pago</label><input id="pay-fechaPago" type="date" required><span class="date-hint" id="pay-fechaPago-hint"></span></div>
+            <div class="field"><label>Fecha de pago *</label><input id="pay-fechaPago" type="date" required><span class="date-hint" id="pay-fechaPago-hint"></span></div>
             <div class="field">
               <label>Monto pagado ($)</label>
               <input id="pay-montoPagado" type="text" inputmode="numeric" class="money-mask" placeholder="0">
@@ -3663,6 +3674,14 @@ document.getElementById('form-pago').addEventListener('submit', async e=>{
   e.preventDefault();
   const obj = { id: editingPay || uid() };
   payFields.forEach(f=> obj[f] = MONEY_COLUMNS.includes(f) ? rawMoneyValue(document.getElementById('pay-'+f).value) : document.getElementById('pay-'+f).value);
+
+  // La fecha de pago es obligatoria (no solo por el atributo required del navegador, que algunos
+  // móviles no hacen respetar bien con campos de fecha).
+  if(!obj.fechaPago){
+    alert('La fecha de pago es obligatoria.');
+    document.getElementById('pay-fechaPago').focus();
+    return;
+  }
 
   // El monto pagado ya no es obligatorio — se puede registrar solo un descuento (por ejemplo,
   // un ajuste o condonación) sin que exista un pago en efectivo/transferencia asociado. Pero
@@ -7696,15 +7715,23 @@ function historicalValorArriendo(contratoId, year, month, fallback){
   return fallback;
 }
 
-function computeContratoMonthlySeries(contratoId){
+// incluirCobranza=true (solo para el histograma): además de los meses de arriendo, incluye los
+// meses POSTERIORES al término que tengan pagos de cobranza de deuda (con arriendo pactado $0),
+// para que lo pagado del histograma refleje todo lo realmente cobrado. Sin el flag (cálculo de
+// deuda/saldo) la serie queda igual que siempre, para no contar dos veces esos pagos.
+function computeContratoMonthlySeries(contratoId, incluirCobranza){
   const c = contracts.find(x=>x.id===contratoId);
   if(!c) return [];
   const desde = effectiveDebtStartDate(contratoId);
   if(!desde) return [];
   let months = monthsBetween(desde).slice().reverse();
+  let finY = null, finM = null;
   if(!isActiveContract(c) && c.fechaTermino){
-    const finY = Number(c.fechaTermino.slice(0,4)), finM = Number(c.fechaTermino.slice(5,7))-1;
-    months = months.filter(({year,month})=> year<finY || (year===finY && month<=finM));
+    finY = Number(c.fechaTermino.slice(0,4)); finM = Number(c.fechaTermino.slice(5,7))-1;
+    months = months.filter(({year,month})=>{
+      if(year<finY || (year===finY && month<=finM)) return true;
+      return incluirCobranza && payments.some(p=>p.contratoId===contratoId && sameYearMonth(p.fechaPago,year,month));
+    });
   }
   const montoContrato = Number(c.montoArriendoPactado||0);
   return months.map(({year,month})=>{
@@ -7712,7 +7739,8 @@ function computeContratoMonthlySeries(contratoId){
     const pagado = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
     const descuento = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
     let monto = 0;
-    if(!estaEnMesDeGracia(c, year, month)){
+    const despuesDelTermino = finY!==null && (year>finY || (year===finY && month>finM));
+    if(!despuesDelTermino && !estaEnMesDeGracia(c, year, month)){
       const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
       monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(contratoId, year, month, montoContrato);
     }
@@ -7823,7 +7851,7 @@ function correspondeAlPactado(c, year, month, vigenteEseMes, tuvoPagoEseMes){
   return vigenteEseMes || tuvoPagoEseMes;
 }
 
-function computeGlobalMonthlySeries(excluirContrato){
+function computeGlobalMonthlySeries(excluirContrato, incluirCobranza){
   // Se consideran TODOS los contratos (activos e históricos), salvo que se pase una función
   // "excluirContrato" para dejar fuera algunos específicos (usado por el flujo de caja, para no
   // contar contratos que no forman parte de la empresa por ahora — ver más abajo).
@@ -7853,11 +7881,15 @@ function computeGlobalMonthlySeries(excluirContrato){
       // Para un contrato YA FINALIZADO, solo cuentan los pagos anteriores a su término (cuando
       // todavía era un arriendo activo) — los pagos posteriores son cobranza de la deuda pactada,
       // no arriendo del mes, y no deben sumarse al "arriendo pactado" ni al pagado de este gráfico.
+      let pagosCobranzaMes = [];
       if(!isActiveContract(c) && c.fechaTermino){
+        if(incluirCobranza) pagosCobranzaMes = pagosMes.filter(p=> p.fechaPago && p.fechaPago >= c.fechaTermino);
         pagosMes = pagosMes.filter(p=> p.fechaPago && p.fechaPago < c.fechaTermino);
       }
-      const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
-      const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
+      // Con incluirCobranza (histograma), lo cobrado de la deuda de un contrato histórico se suma
+      // al pagado/descuento del mes, pero NO al pactado (que se calcula con pagosMes, sin ellos).
+      const pagadoC = pagosMes.reduce((s,p)=>s+Number(p.montoPagado||0),0) + pagosCobranzaMes.reduce((s,p)=>s+Number(p.montoPagado||0),0);
+      const descC = pagosMes.reduce((s,p)=>s+Number(p.descuentos||0),0) + pagosCobranzaMes.reduce((s,p)=>s+Number(p.descuentos||0),0);
 
       const vigenteEseMes = contratoVigenteAlPrincipioDeMes(c, year, month);
       const tuvoPagoEseMes = pagosMes.length>0;
@@ -7925,7 +7957,7 @@ function renderResumenChart(contratoId){
   groupSel.value = chartGroupLevel;
 
   if(!contratoId){
-    const series = computeGlobalMonthlySeries();
+    const series = computeGlobalMonthlySeries(undefined, true);
     if(!series.length){
       yearSel.innerHTML = '<option value="">—</option>';
       container.innerHTML = '<div class="empty">Registra contratos y pagos para ver la evolución mensual.</div>';
@@ -7940,7 +7972,7 @@ function renderResumenChart(contratoId){
     return;
   }
 
-  const series = computeContratoMonthlySeries(contratoId);
+  const series = computeContratoMonthlySeries(contratoId, true);
   if(!series.length){
     yearSel.innerHTML = '<option value="">—</option>';
     container.innerHTML = '<div class="empty">Este contrato no tiene fecha de inicio registrada.</div>';
@@ -8415,6 +8447,62 @@ function setSearchableSelectValue(selectId, value){
   }
 }
 
+// En mobile (<=860px) los combobox buscables abren esta pantalla completa con buscador y lista
+// en vez del desplegable pequeño, que se veía apretado. En escritorio se mantiene el desplegable.
+const SX_MOBILE_MAX = 860;
+function sxEsMobile(){ return window.innerWidth <= SX_MOBILE_MAX; }
+let sxPickerAbiertoEn = 0;
+function sxOpenPicker(select, titulo, onPick){
+  let ov = document.getElementById('sx-picker-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'sx-picker-overlay';
+    ov.innerHTML = '<div class="sx-head"><div class="sx-title"></div><button type="button" class="sx-close" aria-label="Cerrar">✕</button></div>'
+      + '<input type="text" class="sx-search" autocomplete="off" placeholder="🔎 Escribe para filtrar…">'
+      + '<div class="sx-list"></div>';
+    document.body.appendChild(ov);
+  }
+  const titleEl = ov.querySelector('.sx-title');
+  const search = ov.querySelector('.sx-search');
+  const list = ov.querySelector('.sx-list');
+  const closeBtn = ov.querySelector('.sx-close');
+  titleEl.textContent = titulo || 'Seleccionar';
+  search.value = '';
+
+  function build(){
+    const term = search.value.toLowerCase().trim();
+    const opts = Array.from(select.options);
+    const reset = opts.find(o=>o.value==='');
+    const rest = opts.filter(o=>o.value!=='').filter(o=>{
+      if(!term) return true;
+      return (o.textContent.trim()+' '+(o.dataset.search||'')).toLowerCase().includes(term);
+    });
+    let html = '';
+    if(reset) html += `<div class="sx-item sx-reset${select.value===''?' sx-selected':''}" data-value="">${esc(reset.textContent.trim())}</div>`;
+    html += rest.map(o=>`<div class="sx-item${o.value===select.value?' sx-selected':''}" data-value="${esc(o.value)}">${esc(o.textContent.trim())}</div>`).join('');
+    if(!rest.length) html += '<div class="sx-empty">Sin resultados</div>';
+    list.innerHTML = html;
+  }
+  function close(){
+    ov.style.display = 'none';
+    search.oninput = null; list.onclick = null; closeBtn.onclick = null;
+  }
+  search.oninput = build;
+  closeBtn.onclick = close;
+  list.onclick = e=>{
+    // Ignora el "clic fantasma" que el mismo toque que abrió la pantalla puede disparar encima.
+    if(Date.now() - sxPickerAbiertoEn < 400) return;
+    const item = e.target.closest('.sx-item');
+    if(!item) return;
+    onPick(item.dataset.value);
+    close();
+  };
+  build();
+  sxPickerAbiertoEn = Date.now();
+  ov.style.display = 'flex';
+  list.scrollTop = 0;
+}
+
 function makeSearchable(selectId){
   const select = document.getElementById(selectId);
   if(!select || select.dataset.searchable) return;
@@ -8483,10 +8571,32 @@ function makeSearchable(selectId){
   function limpiarYAbrirSiEstabaCerrado(){
     if(dropdown.style.display==='none'){ input.value=''; openDropdown(true); }
   }
-  input.addEventListener('focus', ()=>{ input.value=''; openDropdown(true); });
-  input.addEventListener('click', limpiarYAbrirSiEstabaCerrado);
-  input.addEventListener('touchstart', limpiarYAbrirSiEstabaCerrado, {passive:true});
-  input.addEventListener('input', ()=>{ buildList(input.value); dropdown.style.display='block'; });
+  // Mobile: en vez del desplegable, se abre una pantalla completa (ver sxOpenPicker). El campo
+  // queda de solo lectura para que no aparezca el teclado detrás.
+  function etiquetaDelCampo(){
+    const f = select.closest('.field');
+    const lab = f && f.querySelector('label');
+    return lab ? lab.textContent.replace('*','').trim() : 'Seleccionar';
+  }
+  function abrirModalMobile(){
+    input.blur();
+    sxOpenPicker(select, etiquetaDelCampo(), value=>{
+      select.value = value;
+      syncFromSelect();
+      select.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  }
+  function aplicarModoMobile(){
+    input.readOnly = sxEsMobile();
+    input.placeholder = sxEsMobile() ? '🔎 Toca para elegir…' : '🔎 Haz clic para ver la lista o escribe para filtrar…';
+  }
+  aplicarModoMobile();
+  window.addEventListener('resize', aplicarModoMobile);
+
+  input.addEventListener('focus', ()=>{ if(sxEsMobile()) return; input.value=''; openDropdown(true); });
+  input.addEventListener('click', ()=>{ if(sxEsMobile()) abrirModalMobile(); else limpiarYAbrirSiEstabaCerrado(); });
+  input.addEventListener('touchstart', ()=>{ if(!sxEsMobile()) limpiarYAbrirSiEstabaCerrado(); }, {passive:true});
+  input.addEventListener('input', ()=>{ if(sxEsMobile()) return; buildList(input.value); dropdown.style.display='block'; });
 
   dropdown.addEventListener('mousedown', e=>{
     const item = e.target.closest('.dropdown-item');
