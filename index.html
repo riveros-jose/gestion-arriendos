@@ -3838,8 +3838,12 @@ async function deletePayment(id){
 }
 
 document.getElementById('export-payments-btn').addEventListener('click', ()=>{
-  if(!payments.length){ alert('No hay pagos registrados para exportar.'); return; }
-  const rows = payments
+  // Respeta el filtro de contrato (vigente o histórico) aplicado arriba del historial: se exporta
+  // lo mismo que se está viendo, no todos los pagos.
+  const filtroContrato = document.getElementById('h-contratoId-activo').value || document.getElementById('h-contratoId-historico').value;
+  const pagosAExportar = filtroContrato ? payments.filter(p=> p.contratoId===filtroContrato) : payments;
+  if(!pagosAExportar.length){ alert(filtroContrato ? 'No hay pagos registrados para este filtro.' : 'No hay pagos registrados para exportar.'); return; }
+  const rows = pagosAExportar
     .slice()
     .sort((a,b)=> (a.fechaPago||'').localeCompare(b.fechaPago||''))
     .map(p=>{
