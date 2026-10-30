@@ -4084,6 +4084,23 @@ function contractEndDate(c){
   return null;
 }
 
+// Fecha (ISO) de la última vez que se renovó/ajustó el contrato desde "Renovar o finalizar
+// contrato" (solo fecha, IPC o valor). Se lee de las notas que esa ventana deja en infoGeneral
+// ("[dd/mm/aaaa] Motivo — ...") y del registro del último ajuste de IPC, para que también valga
+// para renovaciones hechas antes de que existiera este chequeo.
+function ultimaRenovacionContrato(c){
+  let ultima = c.ultimoAjusteIPCFecha || '';
+  const etiquetas = ['solo_fecha','ipc','valor'].map(k=> CU_MOTIVO_LABELS[k]);
+  const re = /\[(\d{2})\/(\d{2})\/(\d{4})\]\s*([^|]*)/g;
+  let m;
+  while((m = re.exec(c.infoGeneral||'')) !== null){
+    if(!etiquetas.some(e=> m[4].trim().startsWith(e))) continue;
+    const iso = `${m[3]}-${m[2]}-${m[1]}`;
+    if(iso > ultima) ultima = iso;
+  }
+  return ultima;
+}
+
 function buildAlerts(){
   const alerts = [];
   contracts.filter(isActiveContract).forEach(c=>{
@@ -4097,7 +4114,11 @@ function buildAlerts(){
     if(intervalo && c.fechaInicioContrato){
       const next = nextIpcDate(c.fechaInicioContrato, intervalo);
       const m = monthsUntil(toISO(next));
-      if(m===0||m===1||m===2||m===3){ alerts.push({c, tipo:'Ajuste de IPC', meses:m, fecha:toISO(next)}); }
+      // Si el contrato ya se renovó/ajustó dentro de esta misma ventana de aviso, esa alerta ya
+      // quedó atendida y no se vuelve a mostrar.
+      const ultimaRenov = ultimaRenovacionContrato(c);
+      const yaAtendida = ultimaRenov && ultimaRenov >= toISO(addMonths(toISO(next), -4));
+      if(!yaAtendida && (m===0||m===1||m===2||m===3)){ alerts.push({c, tipo:'Ajuste de IPC', meses:m, fecha:toISO(next)}); }
     }
   });
   return alerts;
@@ -4216,8 +4237,13 @@ function populateUpdateContractForm(id){
   const vencActual = contractEndDate(c);
   if(!vencActual){ alert('Este contrato no tiene una fecha de fin calculable (falta fecha de inicio o duración).'); return; }
 
+  // La renovación avanza de a UN año: solo se propone sumar un año si el contrato está por vencer
+  // (misma ventana de las alertas de vencimiento: hasta 3 meses antes) o ya venció. Si ya se
+  // renovó y su vencimiento todavía queda lejos, volver a abrir esta ventana (por ejemplo para
+  // ajustar el valor o el IPC) NO suma otro año — se propone mantener la fecha actual.
   const nuevaFin = new Date(vencActual);
-  nuevaFin.setUTCFullYear(nuevaFin.getUTCFullYear()+1);
+  const yaRenovado = monthsUntil(toISO(vencActual)) > 3;
+  if(!yaRenovado) nuevaFin.setUTCFullYear(nuevaFin.getUTCFullYear()+1);
 
   document.getElementById('cu-contratoId').value = id;
   const nemo = tenantNemo(c.tenantId) || tenantName(c.tenantId);
@@ -4225,7 +4251,7 @@ function populateUpdateContractForm(id){
   document.getElementById('cu-fecha').value = toISO(nuevaFin);
   // Este hint queda fijo mostrando el vencimiento actual del contrato (para comparar), no lo que
   // se vaya escribiendo en el campo — por eso NO usa el mecanismo genérico de refreshDateHints.
-  document.getElementById('cu-fecha-hint').textContent = `Vencimiento actual: ${formatDate(toISO(vencActual))}`;
+  document.getElementById('cu-fecha-hint').textContent = `Vencimiento actual: ${formatDate(toISO(vencActual))}` + (yaRenovado ? ' — ya renovado, no se suma otro año (puedes cambiar la fecha si lo necesitas)' : '');
   document.getElementById('cu-monto').value = c.montoArriendoPactado ? formatThousandsCLP(rawMoneyValue(c.montoArriendoPactado)) : '';
   document.getElementById('cu-monto-actual').value = c.montoArriendoPactado || '';
   document.getElementById('cu-motivo').value = 'solo_fecha';
@@ -5172,6 +5198,21 @@ function boletaUrlAplicadaA(r){
   // Tolerancia de $1 (no de centavos) para no perder la coincidencia por un redondeo menor.
   if(Math.abs(Number(r.valorUnitario||0) - valorBoleta) > 1) return null;
   return { url: boleta.boletaUrl, servicio: boleta.servicio, mes: boleta.mes };
+}
+
+// Si a la lectura le corresponde una boleta del sector (por periodo) pero se guardó con OTRO
+// $/unidad (por ejemplo, se ingresó antes de subir la boleta y quedó con el valor del mes
+// anterior), el link no se muestra — y antes no había ninguna pista de por qué. Esto devuelve el
+// valor de la boleta para poder avisarlo y ofrecer corregirlo con un toque.
+function desajusteConBoleta(r){
+  if(r.boletaUrl || Number(r.montoManual||0)>0 || r.consumo===null) return null;
+  const sector = contratoSector(r.contratoId);
+  if(sector!==1 && sector!==2) return null;
+  const boleta = getBoletaParaLectura(r.servicio, sector, r.fechaLectura);
+  if(!boleta || !(Number(boleta.total)>0) || !(Number(boleta.consumo)>0)) return null;
+  const valorBoleta = Math.round(Number(boleta.total)/Number(boleta.consumo));
+  if(Math.abs(Number(r.valorUnitario||0) - valorBoleta) <= 1) return null;
+  return { valorBoleta };
 }
 
 // Arma la etiqueta legible "Servicio_Mes_Año" (ej: "Agua_Julio_2026") a partir del servicio y
@@ -6212,7 +6253,12 @@ function computePendientesItems(){
     };
     let detalle = list.map(lineaServicioTexto).join('\n');
     const total = list.reduce((s,r)=>s+Number(r.monto||0),0);
-    const mensaje = `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro de servicios:\nTotal a pagar: *${money(total)}*\n${detalle}\nRecuerda que el depósito de servicios va a la cuenta del Santander.\nCualquier cosa me avisas.\nSaludos!`;
+    // Sector 2 solo cobra agua: mensaje más corto, con la cuenta indicada junto al total. Si por
+    // algún motivo ese arrendatario tuviera otro servicio pendiente, se usa el mensaje general.
+    const soloAguaSector2 = contratoSector(contratoId)===2 && list.every(r=> r.servicio==='Agua');
+    const mensaje = soloAguaSector2
+      ? `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro del agua:\nTotal a pagar: *${money(total)}* (Cuenta Santander)\n${detalle}\nCualquier cosa me avisas.\nSaludos!`
+      : `Hola ${nombreContacto}, buenos días.\nAcá dejo el detalle del cobro de servicios:\nTotal a pagar: *${money(total)}*\n${detalle}\nRecuerda que el depósito de servicios va a la cuenta del Santander.\nCualquier cosa me avisas.\nSaludos!`;
     const enviado = list.every(r=> r.avisoEnviado===true);
 
     // Resumen en pantalla (con íconos, sí funcionan bien en el navegador): total primero. Mismo
@@ -6228,6 +6274,11 @@ function computePendientesItems(){
       if(boletaInfo && !boletasYaEnResumen.has(boletaInfo.url)){
         boletaTag = ` · <a href="${esc(boletaInfo.url)}" target="_blank" rel="noopener">📄 ${esc(etiquetaBoleta(boletaInfo.servicio, boletaInfo.mes))}</a>`;
         boletasYaEnResumen.add(boletaInfo.url);
+      }
+      const desajuste = !boletaInfo ? desajusteConBoleta(r) : null;
+      if(desajuste){
+        const unidadV = r.servicio==='Luz' ? 'kWh' : 'm³';
+        boletaTag = ` · <span style="color:var(--brick);">⚠ Cobrado a ${money(r.valorUnitario)}/${unidadV}, la boleta es ${money(desajuste.valorBoleta)}/${unidadV}</span> <button type="button" class="btn btn-secondary" style="font-size:11.5px;padding:3px 8px;margin-top:2px;" onclick="event.stopPropagation();actualizarValorUnitarioLectura('${r.id}', ${desajuste.valorBoleta})">Usar valor de la boleta</button>`;
       }
       const ubicacion = ubicacionDeMedidor(r.contratoId, r.medidor);
       const servicioConUbicacion = ubicacion ? `${r.servicio} — ${esc(ubicacion)}` : r.servicio;
@@ -8516,6 +8567,9 @@ function sxOpenPicker(select, titulo, onPick){
   sxPickerAbiertoEn = Date.now();
   ov.style.display = 'flex';
   list.scrollTop = 0;
+  // Se enfoca el buscador de inmediato (dentro del mismo toque que abrió la pantalla, para que
+  // el navegador mobile lo permita) — así el teclado aparece solo y se puede escribir de una vez.
+  search.focus();
 }
 
 function makeSearchable(selectId){
