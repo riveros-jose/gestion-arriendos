@@ -2123,11 +2123,11 @@ function buildWorkbook(){
     proximaDecisionMotivo: c.proximaDecisionMotivo||'', proximaDecisionFecha: c.proximaDecisionFecha||'',
     proximaDecisionMonto: c.proximaDecisionMonto||'', proximaDecisionComentarios: c.proximaDecisionComentarios||'',
     proximaDecisionRegistrada: c.proximaDecisionRegistrada||'', recordatorioLecturaMes: c.recordatorioLecturaMes||'',
-    ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||'',
+    ultimoAjusteIPCPorcentaje: c.ultimoAjusteIPCPorcentaje||'', ultimoAjusteIPCFecha: c.ultimoAjusteIPCFecha||'', historialArriendo: c.historialArriendo||'',
     contratoDocUrl: c.contratoDocUrl||'', contratoDocNombre: c.contratoDocNombre||''
   })) : [{}];
   const wsCon = XLSX.utils.json_to_sheet(contractRows);
-  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','diasAnticipacionTermino','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','contratoDocUrl','contratoDocNombre']);
+  applyColumnFormats(wsCon, ['id','direccion','nemo','tenantId','propiedadIds','fechaInicioContrato','fechaEntregaPropiedad','fechaFinContrato','mesesGracia','tipoContrato','periodoContrato','duracionMeses','tipoAjusteIPC','montoArriendoPactado','diaPago','mesesAdelantado','diasAnticipacionTermino','garantia','garantiaFechaPago','infoGeneral','activo','fechaTermino','deudaPactada','garantiaDevueltaMonto','garantiaDevueltaFecha','proximaDecisionMotivo','proximaDecisionFecha','proximaDecisionMonto','proximaDecisionComentarios','proximaDecisionRegistrada','recordatorioLecturaMes','ultimoAjusteIPCPorcentaje','ultimoAjusteIPCFecha','historialArriendo','contratoDocUrl','contratoDocNombre']);
   styleWorksheet(wsCon, [10,28,22,10,14,14,14,14,10,14,14,14,10,12,10,10,14,16,12,32,8,14,14,14,14,18,16,14,32,16,16,16,16,32,28]);
   XLSX.utils.book_append_sheet(wb, wsCon, 'Contratos');
 
@@ -3367,6 +3367,7 @@ document.getElementById('form-arrendatario-contrato').addEventListener('submit',
     cObj.activo = anterior.activo!==undefined ? anterior.activo : true;
     if(anterior.fechaTermino) cObj.fechaTermino = anterior.fechaTermino;
     if(anterior.deudaPactada!==undefined) cObj.deudaPactada = anterior.deudaPactada;
+    if(anterior.historialArriendo) cObj.historialArriendo = anterior.historialArriendo;
     // El documento del contrato (si ya se había generado uno antes) no se pierde al editar los
     // demás datos del contrato — se conserva, a menos que se genere uno nuevo desde su tarjeta.
     if(anterior.contratoDocUrl){ cObj.contratoDocUrl = anterior.contratoDocUrl; cObj.contratoDocNombre = anterior.contratoDocNombre; }
@@ -3856,7 +3857,7 @@ document.getElementById('export-payments-btn').addEventListener('click', ()=>{
         fechaPago: p.fechaPago,
         montoPagado: Number(p.montoPagado||0),
         descuentos: Number(p.descuentos||0),
-        valorArriendo: Number(p.valorArriendo||0),
+        valorArriendo: valorArriendoDePago(p),
         MedioPago: p.medioPago,
         Comentarios: p.comentarios
       };
@@ -4088,9 +4089,9 @@ function contractEndDate(c){
 // contrato" (solo fecha, IPC o valor). Se lee de las notas que esa ventana deja en infoGeneral
 // ("[dd/mm/aaaa] Motivo — ...") y del registro del último ajuste de IPC, para que también valga
 // para renovaciones hechas antes de que existiera este chequeo.
-function ultimaRenovacionContrato(c){
+function ultimaRenovacionContrato(c, motivos){
   let ultima = c.ultimoAjusteIPCFecha || '';
-  const etiquetas = ['solo_fecha','ipc','valor'].map(k=> CU_MOTIVO_LABELS[k]);
+  const etiquetas = (motivos || ['solo_fecha','ipc','valor']).map(k=> CU_MOTIVO_LABELS[k]);
   const re = /\[(\d{2})\/(\d{2})\/(\d{4})\]\s*([^|]*)/g;
   let m;
   while((m = re.exec(c.infoGeneral||'')) !== null){
@@ -4490,6 +4491,16 @@ async function submitContractUpdate(){
       if(isNaN(monto) || monto<=0){ alert('Ingresa un monto de arriendo válido.'); return; }
     }
     // Se aplica de inmediato al contrato vigente.
+    // Si el valor del arriendo cambió, se deja registrado desde qué mes rige: así los pagos de ese
+    // mes en adelante (incluso los ya ingresados con el valor anterior) se comparan con el nuevo.
+    if(motivo!=='solo_fecha' && Number(c.montoArriendoPactado||0)!==monto){
+      const mesCambio = hoy.slice(0,7);
+      // Se parte del historial completo (incluido el ajuste anterior inferido desde las notas, si
+      // lo hay) para que quede guardado de forma explícita y no se pierda al agregar este.
+      const previo = historialArriendoDe(c).filter(e=> e.desde!==mesCambio).map(e=>`${e.desde}:${e.monto}`);
+      previo.push(`${mesCambio}:${monto}`);
+      c.historialArriendo = previo.join('|');
+    }
     c.fechaFinContrato = fecha;
     c.montoArriendoPactado = monto;
     c.proximaDecisionMotivo = '';
@@ -6426,7 +6437,7 @@ function renderHistorialTodos(){
   let list = payments.slice().reverse();
   list = sortRows('payments-todos', list, {
     contrato: p=>contractLabel(p.contratoId)||'', fechaPago: p=>p.fechaPago||'', montoPagado: p=>Number(p.montoPagado||0),
-    descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>Number(p.valorArriendo||0), comentarios: p=>p.comentarios||''
+    descuentos: p=>Number(p.descuentos||0), valorArriendo: p=>valorArriendoDePago(p), comentarios: p=>p.comentarios||''
   });
 
   if(!list.length){ el.innerHTML = '<div class="empty">No hay pagos registrados para este filtro.</div>'; return; }
@@ -6447,7 +6458,7 @@ function renderHistorialTodos(){
     <td class="mono cell-stacked">
       <div>${money(p.montoPagado)}</div>
       ${Number(p.descuentos)?`<div class="cell-stacked-sub">Desc: ${money(p.descuentos)}</div>`:''}
-      ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(p.valorArriendo)}</div>`:''}
+      ${p.valorArriendo?`<div class="cell-stacked-sub">Arriendo: ${money(valorArriendoDePago(p))}</div>`:''}
     </td>
     <td class="cell-comments">${commentCellHtml(p.comentarios)}<span class="row-actions-inline"><button class="table-action-btn" onclick="editPayment('${p.id}')" title="Editar">✏️</button><button class="table-action-btn danger" onclick="deletePayment('${p.id}')" title="Eliminar">🗑️</button></span></td>
   </tr>`;
@@ -7768,7 +7779,52 @@ function th(tableId, key, label){
 // el valorArriendo explícito más reciente registrado en un pago de ESE contrato hasta ese mes
 // (inclusive). Evita usar el monto pactado ACTUAL para meses antiguos donde el arriendo era
 // otro — que es justo lo que generaba cifras retroactivas incorrectas.
+// ---- Historial de cambios de valor del arriendo (IPC o ajuste de valor) ----
+// Cuando el arriendo se actualiza desde "Renovar o finalizar contrato", el nuevo valor rige desde
+// ese mes en adelante — aunque los pagos de esos meses hayan quedado guardados con el valor
+// anterior. Se guarda como "AAAA-MM:monto|AAAA-MM:monto" en c.historialArriendo. Para contratos
+// que se ajustaron antes de que existiera este registro, se infiere con la fecha del último
+// ajuste (IPC o valor) y el monto vigente actual.
+function historialArriendoDe(c){
+  const lista = [];
+  String(c.historialArriendo||'').split('|').forEach(t=>{
+    const [d,m] = t.split(':');
+    if(/^\d{4}-\d{2}$/.test(d||'') && Number(m)>0) lista.push({ desde:d, monto:Number(m) });
+  });
+  const ult = ultimaRenovacionContrato(c, ['ipc','valor']);
+  if(ult && Number(c.montoArriendoPactado)>0 && !lista.some(e=> e.desde >= ult.slice(0,7))){
+    lista.push({ desde: ult.slice(0,7), monto: Number(c.montoArriendoPactado) });
+  }
+  return lista.sort((a,b)=> a.desde.localeCompare(b.desde));
+}
+// Valor que rige en ese mes según el historial, o null si el mes es anterior a todo cambio
+// registrado (en ese caso se usa el valor guardado en los pagos, como siempre).
+function valorArriendoPorCambio(contratoId, year, month){
+  const c = contracts.find(x=>x.id===contratoId);
+  if(!c) return null;
+  const cutoff = `${year}-${String(month+1).padStart(2,'0')}`;
+  const aplicables = historialArriendoDe(c).filter(e=> e.desde <= cutoff);
+  return aplicables.length ? aplicables[aplicables.length-1].monto : null;
+}
+// Valor de arriendo que se muestra/exporta para un pago: si el contrato tuvo un cambio de valor
+// (IPC o ajuste) que rige en el mes del pago, se usa ese; si no, el guardado en el pago.
+function valorArriendoDePago(p){
+  if(!(Number(p.valorArriendo||0)>0) || !p.fechaPago) return Number(p.valorArriendo||0);
+  const [y,m] = p.fechaPago.split('-');
+  return valorArriendoPorCambio(p.contratoId, Number(y), Number(m)-1) || Number(p.valorArriendo||0);
+}
+// Arriendo esperado de un mes: primero un cambio de valor registrado; si no, el valor guardado
+// en los pagos de ese mes; si no, el histórico más cercano.
+function valorArriendoDelMes(contratoId, year, month, pagosMes, fallback){
+  const porCambio = valorArriendoPorCambio(contratoId, year, month);
+  if(porCambio) return porCambio;
+  const valoresPeriodo = (pagosMes||[]).map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
+  return valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(contratoId, year, month, fallback);
+}
+
 function historicalValorArriendo(contratoId, year, month, fallback){
+  const porCambio = valorArriendoPorCambio(contratoId, year, month);
+  if(porCambio) return porCambio;
   const cutoff = `${year}-${String(month+1).padStart(2,'0')}`;
   const conocidos = payments
     .filter(p=> p.contratoId===contratoId && Number(p.valorArriendo||0)>0 && p.fechaPago)
@@ -7807,8 +7863,7 @@ function computeContratoMonthlySeries(contratoId, incluirCobranza){
     let monto = 0;
     const despuesDelTermino = finY!==null && (year>finY || (year===finY && month>finM));
     if(!despuesDelTermino && !estaEnMesDeGracia(c, year, month)){
-      const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-      monto = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(contratoId, year, month, montoContrato);
+      monto = valorArriendoDelMes(contratoId, year, month, pagosMes, montoContrato);
     }
     return { year, month, monto, pagado, descuento, label: MESES_ES[month].slice(0,3)+' '+String(year).slice(2) };
   });
@@ -7971,8 +8026,7 @@ function computeGlobalMonthlySeries(excluirContrato, incluirCobranza){
           // de ese mes, o el más cercano conocido) — NO el monto pactado actual, que para un
           // contrato ya finalizado (como uno con deuda) puede haber quedado en $0 o desactualizado
           // y borraría sus meses realmente pagados.
-          const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-          montoC = valoresPeriodo.length ? Math.max(...valoresPeriodo) : historicalValorArriendo(c.id, year, month, Number(c.montoArriendoPactado||0));
+          montoC = valorArriendoDelMes(c.id, year, month, pagosMes, Number(c.montoArriendoPactado||0));
         }
       }
       monto += montoC; pagado += pagadoC; descuento += descC;
@@ -8297,7 +8351,26 @@ function buildStackedColumnChartSVG(rows, availableWidth){
 
 // ---------- MATRIZ DE PAGOS: Arrendatario × Mes ----------
 let matrixVerTodo = false;
+// Los pagos guardados SIN fecha no se pueden ubicar en ningún mes, así que no aparecen en esta
+// matriz (ni en el histograma). Antes podía pasar por un error del formulario que dejaba la
+// fecha vacía. Se avisan arriba de la tabla, con un botón para ponerles la fecha.
 function renderResumenMatrix(){
+  renderResumenMatrixCore();
+  const el = document.getElementById('resumen-matrix');
+  if(!el) return;
+  const filtro = document.getElementById('matrix-tenant-filter').value;
+  const sinFecha = payments.filter(p=> !p.fechaPago && (!filtro || p.contratoId===filtro));
+  if(!sinFecha.length) return;
+  const filas = sinFecha.slice(0,15).map(p=>`<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);">
+      <span>${esc(contractLabel(p.contratoId))} — <b>${money(Number(p.montoPagado||0))}</b>${Number(p.descuentos||0)?` (desc. ${money(Number(p.descuentos))})`:''}</span>
+      <button type="button" class="btn btn-secondary" style="font-size:12px;padding:4px 10px;white-space:nowrap;" onclick="editPaymentFromModal('${p.id}')">Poner fecha</button>
+    </div>`).join('');
+  el.innerHTML = `<div style="background:var(--brick-soft);border:1px solid var(--brick);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;">
+    <div style="font-weight:700;color:var(--brick);margin-bottom:4px;">⚠ ${sinFecha.length} pago${sinFecha.length>1?'s':''} sin fecha — no se pueden mostrar en ningún mes</div>
+    ${filas}${sinFecha.length>15?`<div style="padding-top:6px;">…y ${sinFecha.length-15} más.</div>`:''}
+  </div>` + el.innerHTML;
+}
+function renderResumenMatrixCore(){
   const el = document.getElementById('resumen-matrix');
   if(!el) return;
 
@@ -8361,7 +8434,16 @@ function renderResumenMatrix(){
   // actualmente visible (no simplemente "alguna vez tuvieron un pago").
   const rows = rows0.filter(r=> Object.keys(sumas[r.c.id]).some(k=> clavesVisibles.has(k)));
 
-  if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay arrendatarios con movimientos de pago en el período visible.</div>'; return; }
+  // El botón para ver todos los períodos se arma antes de cualquier retorno: si el arrendatario no
+  // tiene movimientos en los últimos 2 meses la tabla queda vacía, y justamente ahí hace falta el
+  // botón para poder ver los meses anteriores.
+  const toggleHtml = (!yearFiltro && total>2) ? `<div class="table-scroll-toggle">
+    <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
+      ${matrixVerTodo ? 'Ver solo los últimos 2 meses' : `Ver todo (${total} meses)`}
+    </button>
+  </div>` : '';
+
+  if(!rows.length || !mostrarMonths.length){ el.innerHTML = '<div class="empty">No hay arrendatarios con movimientos de pago en el período visible.</div>' + toggleHtml; return; }
 
   // Orden de las filas:
   // 1) Contratos activos sin ningún registro en el último período visible (máxima urgencia)
@@ -8380,10 +8462,7 @@ function renderResumenMatrix(){
       if(d.pagado===0 && d.descuento===0) return 1; // pagó $0
       // Se compara contra el monto esperado ese mes, para distinguir pago parcial de pago completo.
       const pagosMes = payments.filter(p=> p.contratoId===r.c.id && p.fechaPago && p.fechaPago.slice(0,7)===ultimoKey);
-      const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-      const montoEsperado = valoresPeriodo.length
-        ? Math.max(...valoresPeriodo)
-        : historicalValorArriendo(r.c.id, Number(ultimoAnio), Number(ultimoMesNum)-1, Number(r.c.montoArriendoPactado||0));
+      const montoEsperado = valorArriendoDelMes(r.c.id, Number(ultimoAnio), Number(ultimoMesNum)-1, pagosMes, Number(r.c.montoArriendoPactado||0));
       if(montoEsperado>0 && (d.pagado+d.descuento) < montoEsperado) return 4; // pagó menos de lo pactado
       return 5; // pagó todo
     }
@@ -8421,10 +8500,7 @@ function renderResumenMatrix(){
         let bgParcial = '';
         if(!r.historico){
           const pagosMes = payments.filter(p=> p.contratoId===r.c.id && p.fechaPago && p.fechaPago.slice(0,7)===key);
-          const valoresPeriodo = pagosMes.map(p=>Number(p.valorArriendo||0)).filter(v=>v>0);
-          const montoEsperado = valoresPeriodo.length
-            ? Math.max(...valoresPeriodo)
-            : historicalValorArriendo(r.c.id, year, month, Number(r.c.montoArriendoPactado||0));
+          const montoEsperado = valorArriendoDelMes(r.c.id, year, month, pagosMes, Number(r.c.montoArriendoPactado||0));
           if(montoEsperado>0 && (d.pagado+d.descuento) < montoEsperado) bgParcial = 'background:#FBEEEA;';
         }
         return `<td class="mono cell-stacked" style="text-align:center;${bgParcial}" ${bgParcial?'title="Pagó menos de lo pactado ese mes"':''}>
@@ -8458,11 +8534,6 @@ function renderResumenMatrix(){
   }).join('');
   const totalRow = `<tr class="matrix-total-row"><td>Total</td>${totalCells}</tr>`;
 
-  const toggleHtml = (!yearFiltro && total>2) ? `<div class="table-scroll-toggle">
-    <button type="button" class="btn btn-secondary" onclick="matrixVerTodo=!matrixVerTodo;renderResumenMatrix();">
-      ${matrixVerTodo ? 'Ver solo los últimos 2 meses' : `Ver todo (${total} meses)`}
-    </button>
-  </div>` : '';
 
   el.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Arrendatario</th>${headerCells}</tr></thead><tbody>${bodyRows}${totalRow}</tbody></table></div>${toggleHtml}`;
 
